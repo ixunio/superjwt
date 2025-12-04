@@ -1,0 +1,1 @@
+A clean way to handle JWT encoding and decoding. Easily validate your JWT claims with Pydantic. Support for JWS format and detached payload.

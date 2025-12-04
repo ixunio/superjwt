@@ -1,0 +1,115 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "superjwt"
+dynamic = ["version"]
+dependencies = [
+    "pydantic>=2",
+]
+requires-python = ">=3.10"
+authors = [{name = "ixunio"}]
+description = "A super simple JWT library for Python"
+readme = "README.md"
+license = "MIT"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Security",
+]
+keywords = [
+    "jwt",
+    "json",
+    "web",
+    "token",
+    "security",
+    "authentication",
+    "authorization",
+    "auth",
+    "oauth",
+    "bearer",
+    "jose",
+    "pydantic"
+]
+
+[project.urls]
+Homepage = "https://github.com/ixunio/superjwt"
+Repository = "https://github.com/ixunio/superjwt.git"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
+docs = [
+
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "superjwt.__version__"}
+
+[tool.ruff]
+line-length = 90
+target-version = "py312"
+src = ["superjwt", "tests"]
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+]
+show-fixes = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "W",     # pycodestyle warnings
+    "I",     # isort (import sorting)
+    "B",     # flake8-bugbear (common bugs)
+    "UP",    # pyupgrade (modern Python syntax)
+    "N",     # pep8-naming (consistent naming)
+    "ASYNC", # async best practices
+    "RUF",   # Ruff-specific rules
+    "TC",    # flake8-type-checking (type-checking imports)
+]
+ignore = [
+    "E501",  # line length (handled by Black)
+    "N803",  # argument name should be lowercase
+]
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = [
+    "F401",    # Allow unused imports in __init__.py
+]
+
+[tool.ruff.lint.flake8-type-checking]
+# Add quotes around type annotations, if doing so would allow
+# an import to be moved into a type-checking block.
+quote-annotations = false
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = true
+lines-after-imports = 2
+
+[tool.mypy]
+# ... other mypy settings
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+addopts = "-v -p no:warnings --cov=superjwt/ --cov-report=term-missing"
+python_files = "test_*.py"
