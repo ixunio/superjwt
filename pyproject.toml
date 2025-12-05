@@ -8,7 +8,7 @@ dynamic = ["version"]
 dependencies = [
     "pydantic>=2",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 authors = [{name = "ixunio"}]
 description = "A super simple JWT library for Python"
 readme = "README.md"
