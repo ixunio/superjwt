@@ -1,7 +1,6 @@
+from superjwt._version import __version__
 from superjwt.jwt import JWT
 
-
-__version__ = "0.1.0"
 
 _local_jwt_instance = JWT()
 

@@ -54,7 +54,7 @@ docs = [
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "superjwt.__version__"}
+version = {attr = "superjwt._version.__version__"}
 
 [tool.ruff]
 line-length = 90
