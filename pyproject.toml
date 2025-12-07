@@ -36,7 +36,7 @@ keywords = [
     "oauth",
     "bearer",
     "jose",
-    "pydantic"
+    "pydantic",
 ]
 
 [project.urls]
@@ -45,12 +45,18 @@ Repository = "https://github.com/ixunio/superjwt.git"
 
 [dependency-groups]
 dev = [
-    "pytest",
-    "pytest-cov",
-    "ruff",
+    {include-group = "lint"},
+    {include-group = "test"},
 ]
 docs = [
 
+]
+lint = [
+    "ruff",
+]
+test = [
+    "pytest",
+    "pytest-cov",
 ]
 
 [tool.setuptools.dynamic]
