@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["main", "v*"]
+  push:
+    branches: ["main", "v*"]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  code-quality:
+    name: Code Quality (Ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      
+      - name: Install dependencies
+        run: |
+          # python -m pip install --upgrade pip
+          pip install --group lint
+      
+      - name: Run ruff format check
+        run: ruff format --check .
+      
+      - name: Run ruff lint
+        run: ruff check .
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v5
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+      
+      - name: Install dependencies
+        run: |
+          # python -m pip install --upgrade pip
+          pip install -e . --group test
+      
+      - name: Run tests with coverage
+        run: pytest
+
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.current_version.outputs.version }}
+      release_date: ${{ steps.changelog.outputs.release_date }}
+      changelog_content: ${{ steps.changelog.outputs.content }}
+      tag_exists: ${{ steps.check_tag.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      
+      - name: Get current version
+        id: current_version
+        run: bash .github/scripts/get_version.sh
+      
+      - name: Check if tag exists
+        id: check_tag
+        run: bash .github/scripts/check_tag.sh "${{ steps.current_version.outputs.version }}"
+      
+      - name: Skip if tag exists
+        if: steps.check_tag.outputs.exists == 'true'
+        run: |
+          echo "ℹ️  No new release - tag v${{ steps.current_version.outputs.version }} already exists"
+          exit 0
+      
+      - name: Extract changelog for version
+        if: steps.check_tag.outputs.exists == 'false'
+        id: changelog
+        run: bash .github/scripts/extract_changelog.sh "${{ steps.current_version.outputs.version }}"
+      
+      - name: Validation summary
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          echo "✅ Version: ${{ steps.current_version.outputs.version }}"
+          echo "✅ Changelog date: ${{ steps.changelog.outputs.release_date }}"
+          echo "✅ Changelog content validated"
+          echo "✅ Tag v${{ steps.current_version.outputs.version }} does not exist - release will be created on merge"
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [code-quality, test, validate-release]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/v')) && needs.validate-release.outputs.tag_exists == 'false'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Create and push tag
+        if: needs.validate-release.outputs.tag_exists == 'false'
+        run: bash .github/scripts/create_tag.sh "${{ needs.validate-release.outputs.version }}"
+      
+      - name: Create GitHub Release
+        if: needs.validate-release.outputs.tag_exists == 'false'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.validate-release.outputs.version }}
+          name: ${{ needs.validate-release.outputs.version }} (${{ needs.validate-release.outputs.release_date }})
+          body: |
+            ${{ needs.validate-release.outputs.changelog_content }}
+          draft: false
+          prerelease: false
