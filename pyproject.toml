@@ -42,6 +42,7 @@ keywords = [
 [project.urls]
 Homepage = "https://github.com/ixunio/superjwt"
 Repository = "https://github.com/ixunio/superjwt.git"
+Changelog = "https://github.com/ixunio/superjwt/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
