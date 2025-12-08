@@ -122,7 +122,7 @@ jobs:
         if: needs.validate-release.outputs.tag_exists == 'false'
         uses: softprops/action-gh-release@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_CI_TOKEN }}
         with:
           tag_name: v${{ needs.validate-release.outputs.version }}
           name: ${{ needs.validate-release.outputs.version }} (${{ needs.validate-release.outputs.release_date }})
