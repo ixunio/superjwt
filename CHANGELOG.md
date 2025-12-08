@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.1.0 (2025-12-08)
 
 ### :sparkles: New
 
@@ -9,8 +9,8 @@
 - Automatic claims validation with Pydantic
 - Custom claims definition with Pydantic
 - CI workflow: lint, test, validate-release, release
+- PyPI workflow: publish to testPyPI & PyPI upon release
 
 ## v0.0.0
 
-### New
-:tada: Init
+:tada: superjwt repository initialization
