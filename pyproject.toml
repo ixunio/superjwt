@@ -7,8 +7,9 @@ name = "superjwt"
 dynamic = ["version"]
 dependencies = [
     "pydantic>=2",
+    "typing-extensions>=4.0.1",
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 authors = [{name = "ixunio"}]
 description = "A super simple JWT library for Python"
 readme = "README.md"
@@ -18,6 +19,8 @@ classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -65,7 +68,7 @@ version = {attr = "superjwt._version.__version__"}
 
 [tool.ruff]
 line-length = 90
-target-version = "py312"
+target-version = "py310"
 src = ["superjwt", "tests"]
 exclude = [
     ".venv",

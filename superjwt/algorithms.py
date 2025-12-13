@@ -2,13 +2,16 @@ import hashlib
 import hmac
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Generic, TypeVar
 
 from superjwt.exceptions import JWTError, SecurityWarning
 from superjwt.keys import BaseKey, NoneKey, OctetKey
 
 
-class BaseJWSAlgorithm[KeyType: BaseKey](ABC):
+KeyType = TypeVar("KeyType", bound=BaseKey)
+
+
+class BaseJWSAlgorithm(ABC, Generic[KeyType]):
     name: ClassVar[str]
     description: ClassVar[str]
     key_type: type[KeyType]
