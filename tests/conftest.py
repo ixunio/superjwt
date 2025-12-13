@@ -1,5 +1,5 @@
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
@@ -7,6 +7,15 @@ from pydantic import Field
 from superjwt.definitions import JWTClaims
 from superjwt.jws import JWS
 from superjwt.jwt import JWT
+
+
+try:
+    from datetime import UTC
+except ImportError:
+    # Python 3.10 compatibility
+    from datetime import timezone
+
+    UTC = timezone.utc
 
 
 class JWTCustomClaims(JWTClaims):

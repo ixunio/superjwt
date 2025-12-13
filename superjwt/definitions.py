@@ -1,6 +1,6 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from enum import Enum
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     AfterValidator,
@@ -15,6 +15,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from typing_extensions import Self
 
 from superjwt.algorithms import (
     BaseJWSAlgorithm,
@@ -29,6 +30,14 @@ from superjwt.exceptions import (
 )
 from superjwt.keys import BaseKey, NoneKey, OctetKey
 
+
+try:
+    from datetime import UTC
+except ImportError:
+    # Python 3.10 compatibility
+    from datetime import timezone
+
+    UTC = timezone.utc
 
 Algorithm = Literal[
     "HS256",

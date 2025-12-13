@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import pydantic
@@ -15,6 +15,14 @@ from tests.conftest import JWTCustomClaims, check_claims_instance
 
 if TYPE_CHECKING:
     from superjwt.definitions import Algorithm
+
+try:
+    from datetime import UTC
+except ImportError:
+    # Python 3.10 compatibility
+    from datetime import timezone
+
+    UTC = timezone.utc
 
 
 def test_encode_decode_default_claims(secret_key):
