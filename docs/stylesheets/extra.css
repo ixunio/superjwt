@@ -1,0 +1,15 @@
+:root {
+  font-size: 1.38rem;
+}
+
+/* .md-nav__list {
+  font-size: 0.5rem;
+} */
+
+.md-ellipsis {
+  margin-bottom: 0.08rem;
+}
+
+.md-grid {
+  max-width: 1200px;
+}
