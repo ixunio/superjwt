@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Compatibility with python 3.10 & 3.11
+
 ## v0.1.0 (2025-12-08)
 
 ### :sparkles: New

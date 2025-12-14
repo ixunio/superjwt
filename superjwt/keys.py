@@ -1,6 +1,7 @@
 import warnings
 from abc import ABC, abstractmethod
-from typing import Self
+
+from typing_extensions import Self
 
 from superjwt.exceptions import InvalidKeyError, SecurityWarning
 from superjwt.utils import as_bytes, is_pem_format, is_ssh_key
