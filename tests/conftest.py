@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from pydantic import Field
-from superjwt.definitions import JWTClaims
+from superjwt.definitions import JWTClaims, JWTDatetime
 from superjwt.jws import JWS
 from superjwt.jwt import JWT
 
@@ -20,15 +20,14 @@ except ImportError:
 
 class JWTCustomClaims(JWTClaims):
     # override sub as a mandatory field
+    # sub: str --> this syntax triggers a Pylance[reportGeneralTypeIssues] error
     sub: str = Field(default=...)
 
     # add new custom claims
     user_id: str
     optional_id: int | None = None
-
-    # sub: str
-    # this triggers Pylance[reportGeneralTypeIssues] error:
-    # "overrides a field of the same name but is missing a default value"
+    past_date: JWTDatetime | None = None
+    future_date: JWTDatetime | None = None
 
 
 def check_claims_instance(
@@ -101,6 +100,8 @@ def claims_dict(
         "nbf": nbf,
         "exp": exp,
         "user_id": "value",
+        "past_date": (iat - timedelta(days=1)).timestamp(),
+        "future_date": (exp + timedelta(days=1)).timestamp(),
     }
 
 

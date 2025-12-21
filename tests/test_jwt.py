@@ -35,15 +35,56 @@ def test_encode_decode_dict_claims(claims_dict, secret_key):
     token = encode(claims=claims_dict, key=secret_key)
     decoded_claims_dict = decode(token=token, key=secret_key)
 
+    # standard claims
     assert decoded_claims_dict["iss"] == claims_dict["iss"]
     assert decoded_claims_dict["sub"] == claims_dict["sub"]
     assert decoded_claims_dict.get("aud") is None
+    assert decoded_claims_dict.get("jti") is None
+
+    # standard claims (datetime data with various input types)
+    # they will be serialized uniformly as int (timestamp) thanks to JWTClaims validation
     assert decoded_claims_dict["iat"] == int(claims_dict["iat"].timestamp())
     assert decoded_claims_dict["nbf"] == int(claims_dict["nbf"])
     assert decoded_claims_dict["exp"] == int(claims_dict["exp"].timestamp())
-    assert decoded_claims_dict.get("jti") is None
+
+    # custom claims
+    # won't be any type conversion here, nor validation
     assert decoded_claims_dict["user_id"] == claims_dict["user_id"]
     assert decoded_claims_dict.get("optional_id") is None
+
+
+def test_encode_decode_dict_custom_datetime_claim(secret_key):
+    # custom datetime claim from dict cannot be validated without pydantic
+    # it MUST be serializable
+    # it SHOULD be an int timestamp
+    custom_dt_unserializable = {
+        "custom_date": datetime.strptime(
+            "2042-04-02T00:42:42.123456+0000", "%Y-%m-%dT%H:%M:%S.%f%z"
+        ),
+    }
+    custom_dt_serializable_str = {"custom_date": "2042-04-02T:00:42:42.123456+0000"}
+    custom_dt_correct = {
+        "custom_date": int(
+            datetime.strptime(
+                "2042-04-02T00:42:42.123456+0000", "%Y-%m-%dT%H:%M:%S.%f%z"
+            ).timestamp()
+        ),
+    }
+
+    # cannot encode unserializable datetime
+    with pytest.raises(TypeError):
+        encode(claims={"custom_date": custom_dt_unserializable}, key=secret_key)
+
+    # can encode serializable datetime string, this will not be serialized as a timestamp
+    # unlike the standard datetime claims (iat, nbf, exp)
+    token = encode(claims={"custom_date": custom_dt_serializable_str}, key=secret_key)
+    decoded = decode(token=token, key=secret_key)
+    assert decoded["custom_date"] == custom_dt_serializable_str
+
+    # can encode integer timestamp
+    token = encode(claims={"custom_date": custom_dt_correct}, key=secret_key)
+    decoded = decode(token=token, key=secret_key)
+    assert decoded["custom_date"] == custom_dt_correct
 
 
 def test_encode_decode_pydantic_claims(
