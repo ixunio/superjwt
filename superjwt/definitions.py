@@ -81,8 +81,6 @@ class HttpsUrl(HttpUrl):
 
 
 class DataModel(BaseModel):
-    model_config = {"extra": "allow"}
-
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)
 
@@ -149,20 +147,17 @@ class JOSEHeader(DataModel):
         return value
 
 
-def remove_subsecond(dt: datetime | None) -> datetime | None:
-    if dt is None:
-        return dt
+def remove_subsecond(dt: datetime) -> datetime:
     return dt.replace(microsecond=0)
 
 
-def serialize_second_timestamps(value: datetime | int | float | None) -> int | None:
-    if value is None or isinstance(value, int):
+def serialize_second_timestamps(value: datetime | int | float) -> int:
+    if isinstance(value, int):
         return value
     if isinstance(value, float):
         return int(value)
     if isinstance(value, datetime):
         return int(value.timestamp())
-    raise TypeError("Invalid type for datetime serialization")
 
 
 def check_future_dates(value: datetime | None, info: ValidationInfo) -> datetime | None:
