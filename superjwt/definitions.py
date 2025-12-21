@@ -176,7 +176,6 @@ def check_future_dates(value: datetime | None, info: ValidationInfo) -> datetime
 JWTDatetime = Annotated[
     datetime,
     AfterValidator(remove_subsecond),
-    AfterValidator(check_future_dates),
     PlainSerializer(serialize_second_timestamps),
 ]
 
@@ -205,10 +204,12 @@ class JWTClaims(DataModel):
         Field(
             description="not before time - the time before which the JWT must not be accepted"
         ),
+        AfterValidator(check_future_dates),
     ] = None
     exp: Annotated[
         JWTDatetime | None,
         Field(description="expiration time - the time after which the JWT expires"),
+        AfterValidator(check_future_dates),
     ] = None
     jti: Annotated[
         str | None,
