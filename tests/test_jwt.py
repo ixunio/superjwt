@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 import pydantic
 import pytest
 from superjwt import decode, encode
+from superjwt.definitions import JWTClaims, check_future_dates
 from superjwt.exceptions import (
     ClaimsValidationError,
     SignatureVerificationFailedError,
@@ -85,6 +86,35 @@ def test_encode_decode_dict_custom_datetime_claim(secret_key):
     token = encode(claims={"custom_date": custom_dt_correct}, key=secret_key)
     decoded = decode(token=token, key=secret_key)
     assert decoded["custom_date"] == custom_dt_correct
+
+
+def test_empty_iat_with_exp(secret_key):
+    # custom datetime claim set to None should be handled correctly
+    claims = JWTClaims(
+        iat=None,
+        exp=datetime.strptime(
+            "2042-04-02T00:42:42.123456+0000", "%Y-%m-%dT%H:%M:%S.%f%z"
+        ),
+    )
+    token = encode(claims=claims, key=secret_key)
+    decoded = decode(token=token, key=secret_key)
+    assert "iat" not in decoded
+
+
+def test_with_expiration_negative():
+    # custom datetime claim set to invalid type should be handled correctly
+    with pytest.raises(ValueError):
+        JWTClaims().with_expiration(minutes=-15)
+
+
+def test_rewrite_incorrect_exp_type():
+    # custom datetime claim set to invalid type should be handled correctly
+
+    class JWTIncorrectExpClaim(JWTClaims):
+        exp: Annotated[Any, pydantic.AfterValidator(check_future_dates)]  # type: ignore
+
+    with pytest.raises(TypeError):
+        JWTIncorrectExpClaim(exp=True)
 
 
 def test_encode_decode_pydantic_claims(
