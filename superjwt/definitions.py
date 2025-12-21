@@ -173,7 +173,7 @@ def check_future_dates(value: datetime | None, info: ValidationInfo) -> datetime
     return value
 
 
-SecondDatetime = Annotated[
+JWTDatetime = Annotated[
     datetime,
     AfterValidator(remove_subsecond),
     AfterValidator(check_future_dates),
@@ -196,18 +196,18 @@ class JWTClaims(DataModel):
         str | list[str] | None,
         Field(description="audience - the recipient for which the JWT is intended"),
     ] = None
-    iat: SecondDatetime | None = Field(
+    iat: JWTDatetime | None = Field(
         description="issued at time - the time at which the JWT was issued",
         default_factory=lambda: datetime.now(UTC).replace(microsecond=0),
     )  # this field does not use Annotated to avoid pylance issues with default_factory
     nbf: Annotated[
-        SecondDatetime | None,
+        JWTDatetime | None,
         Field(
             description="not before time - the time before which the JWT must not be accepted"
         ),
     ] = None
     exp: Annotated[
-        SecondDatetime | None,
+        JWTDatetime | None,
         Field(description="expiration time - the time after which the JWT expires"),
     ] = None
     jti: Annotated[
