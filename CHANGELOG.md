@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-- Compatibility with python 3.10 & 3.11
+### Changes
+
+- Add compatibility for python 3.10 & 3.11 (was working only for python 3.12-3.14 previously)
+- Better tests for datetime claims
+- SecondDatetime renamed to JWTDatetime
+
+### :bug: Fix
+
+- datetime validation for custom claims is now working properly
 
 ## v0.1.0 (2025-12-08)
 
