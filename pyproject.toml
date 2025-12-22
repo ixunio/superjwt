@@ -74,6 +74,7 @@ exclude = [
     ".venv",
     ".git",
     "__pycache__",
+    "dev_*",
 ]
 show-fixes = true
 
