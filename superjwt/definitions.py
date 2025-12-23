@@ -27,6 +27,7 @@ from superjwt.algorithms import (
 from superjwt.exceptions import (
     AlgorithmNotSupportedError,
     InvalidAlgorithmError,
+    InvalidHeaderError,
 )
 from superjwt.keys import BaseKey, NoneKey, OctetKey
 
@@ -145,6 +146,14 @@ class JOSEHeader(DataModel):
                 raise ValueError("'b64' header parameter must be listed in 'crit' header")
 
         return value
+
+    @model_validator(mode="after")
+    def unsupported_b64_false(self) -> Self:
+        if hasattr(self, "b64") and self.b64 is False:  # type: ignore
+            raise InvalidHeaderError(
+                "'b64' header parameter is not supported in this implementation"
+            )
+        return self
 
 
 def remove_subsecond(dt: datetime) -> datetime:

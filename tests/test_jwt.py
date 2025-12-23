@@ -7,6 +7,7 @@ from superjwt import decode, encode
 from superjwt.definitions import JWTClaims, check_future_dates
 from superjwt.exceptions import (
     ClaimsValidationError,
+    InvalidHeaderError,
     SignatureVerificationFailedError,
 )
 from superjwt.jwt import JWT
@@ -213,6 +214,16 @@ def test_required_field_missing(jwt: JWT, claims: JWTCustomClaims, secret_key: s
     decoded = jwt.decode(token=encoded, key=secret_key, disable_claims_validation=True)
     with pytest.raises(pydantic.ValidationError):
         JWTCustomClaims(**decoded)
+
+
+def test_unsupported_b64_header(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
+    # 'b64' header parameter is not supported
+    with pytest.raises(InvalidHeaderError):
+        jwt.encode(
+            claims=claims,
+            key=secret_key,
+            headers={"alg": "HS256", "b64": False},
+        )
 
 
 def test_invalid_claims_future_dates(jwt: JWT, secret_key: str):
