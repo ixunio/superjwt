@@ -61,8 +61,10 @@ class HeaderValidationError(InvalidHeaderError):
     ):
         self.error = message or self.error
         if validation_errors is not None:
+            self.error += "\n"
             self.error += "\n".join(
-                f"header '{error['loc'][0]}'={error['input']} -> validation failed ({error['type']}): {error['msg']}"
+                f"header {error['loc'] if error['loc'] else ''} = {error['input']} "
+                f"-> validation failed ({error['type']}): {error['msg']}"
                 for error in validation_errors
             )
         super().__init__(self.error)

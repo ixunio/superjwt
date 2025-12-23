@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING, Annotated, Any
 import pydantic
 import pytest
 from superjwt import decode, encode
-from superjwt.definitions import JWTClaims, check_future_dates
+from superjwt.definitions import JWTClaims, JWTCompliantClaims, check_future_dates
 from superjwt.exceptions import (
     ClaimsValidationError,
     InvalidHeaderError,
+    JWTError,
     SignatureVerificationFailedError,
 )
 from superjwt.jwt import JWT
@@ -91,7 +92,7 @@ def test_encode_decode_dict_custom_datetime_claim(secret_key):
 
 def test_empty_iat_with_exp(secret_key):
     # custom datetime claim set to None should be handled correctly
-    claims = JWTClaims(
+    claims = JWTCompliantClaims(
         iat=None,
         exp=datetime.strptime(
             "2042-04-02T00:42:42.123456+0000", "%Y-%m-%dT%H:%M:%S.%f%z"
@@ -127,6 +128,12 @@ def test_encode_decode_pydantic_claims(
     decoded_claims = JWTCustomClaims(**jwt.decode(token=token, key=secret_key))
 
     check_claims_instance(claims, decoded_claims)
+
+    # test non compliant claims
+    claims = JWTCustomClaims(**claims_dict)
+    claims.aud = 123  # invalid type for aud  # type: ignore
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(claims=claims, key=secret_key)
 
 
 def test_decode_invalid_signature(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
@@ -291,6 +298,16 @@ def test_unsafe_inspect(jwt: JWT, claims_fixed_dt, secret_key: str):
     unsafe_token = jwt.inspect(token=forged_compact)
     assert unsafe_token.decoded.payload["sub"] == forged_claims.sub
 
+    # detached mode
+    detached_compact = (
+        b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        b"."
+        b"."
+        b"7J8anGc2Ytg-vyaTVN0ln2IjouLupxgHXiIEwxTO-oE"
+    )
+    unsafe_token_detached = jwt.inspect(token=detached_compact, has_detached_payload=True)
+    assert unsafe_token_detached.decoded.payload == {}
+
 
 def test_detached_payload(jwt: JWT, claims_fixed_dt, secret_key):
     encoded_token = jwt.encode(claims=claims_fixed_dt, key=secret_key)
@@ -323,4 +340,8 @@ def test_detached_payload(jwt: JWT, claims_fixed_dt, secret_key):
         detached_compact, secret_key, with_detached_payload=claims_fixed_dt.to_dict()
     )
     assert decoded == claims_fixed_dt.to_dict()
-    # todo: change to to_dict() everywhere
+
+
+def test_detached_payload_no_jws_instance(jwt: JWT):
+    with pytest.raises(JWTError):
+        jwt.detach_payload()

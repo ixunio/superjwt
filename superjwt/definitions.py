@@ -81,14 +81,14 @@ class HttpsUrl(HttpUrl):
     _constraints = UrlConstraints(max_length=2083, allowed_schemes=["https"])
 
 
-class DataModel(BaseModel):
+class JWTBaseModel(BaseModel):
+    model_config = {"extra": "allow"}
+
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)
 
 
-class JOSEHeader(DataModel):
-    model_config = {"extra": "allow"}
-
+class JOSEHeader(JWTBaseModel):
     alg: Annotated[
         Algorithm | Literal["none"],
         Field(description="algorithm - the algorithm used to sign the JWT"),
@@ -189,9 +189,7 @@ JWTDatetime = Annotated[
 ]
 
 
-class JWTClaims(DataModel):
-    model_config = {"extra": "allow"}
-
+class JWTCompliantClaims(JWTBaseModel):
     iss: Annotated[
         str | None,
         Field(description="issuer - the issuer of the JWT"),
@@ -204,10 +202,10 @@ class JWTClaims(DataModel):
         str | list[str] | None,
         Field(description="audience - the recipient for which the JWT is intended"),
     ] = None
-    iat: JWTDatetime | None = Field(
-        description="issued at time - the time at which the JWT was issued",
-        default_factory=lambda: datetime.now(UTC).replace(microsecond=0),
-    )  # this field does not use Annotated to avoid pylance issues with default_factory
+    iat: Annotated[
+        JWTDatetime | None,
+        Field(description="issued at time - the time at which the JWT was issued"),
+    ] = None
     nbf: Annotated[
         JWTDatetime | None,
         Field(
@@ -247,6 +245,12 @@ class JWTClaims(DataModel):
         now = datetime.now(UTC).replace(microsecond=0) if self.iat is None else self.iat
         exp_time = now + timedelta(minutes=minutes, hours=hours, days=days)
         return self.model_copy(update={"exp": exp_time})
+
+
+class JWTClaims(JWTCompliantClaims):
+    iat: JWTDatetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(microsecond=0),
+    )  # this field does not use Annotated to avoid pylance issues with default_factory
 
 
 class JWSTokenEncoded(BaseModel):
@@ -295,16 +299,6 @@ class JWSToken(BaseModel):
 class JWSTokenLifeCycle(BaseModel):
     unsafe: JWSToken = JWSToken()
     validated: JWSToken = JWSToken()
-
-
-class JWTContent(BaseModel):
-    claims: dict[str, Any]
-    jws_token: JWSToken
-
-    @computed_field
-    @property
-    def compact(self) -> bytes:
-        return self.jws_token.encoded.compact
 
 
 def get_jws_algorithm(algorithm: Algorithm | Literal["none"]) -> BaseJWSAlgorithm:

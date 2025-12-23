@@ -10,7 +10,7 @@ from superjwt.definitions import (
     JOSEHeader,
     JWSToken,
     JWSTokenLifeCycle,
-    JWTClaims,
+    JWTBaseModel,
     get_jws_algorithm,
 )
 from superjwt.exceptions import (
@@ -41,12 +41,25 @@ class JWS:
         self.crit_headers_strict_check = crit_headers_strict_check
         self._allow_none_algorithm = False
 
+    def reset(self) -> None:
+        self.token = JWSTokenLifeCycle()
+        self.raw_jws = b""
+        self.has_detached_payload = False
+
+    def enable_detached_payload(self):
+        self.has_detached_payload = True
+        self.token.unsafe.encoded.has_detached_payload = True
+        self.token.validated.encoded.has_detached_payload = True
+
     def encode(
         self,
         header: JOSEHeader,
-        payload: JWTClaims,
+        payload: JWTBaseModel,
         key: BaseKey,
     ) -> bytes:
+        if self.token.validated.encoded.compact != b"..":
+            raise JWTError("JWS instance data must be reset")
+
         header_dict: dict[str, Any] = header.to_dict()
         encoded_header = json.dumps(header_dict, separators=(",", ":")).encode("utf-8")
         self.token.validated.decoded.header = header_dict
@@ -62,19 +75,19 @@ class JWS:
         self.token.validated.encoded.signature = SecretBytes(urlsafe_b64encode(signature))
         return self.token.validated.encoded.compact
 
-    def detach_payload(self):
-        self.token.validated.encoded.has_detached_payload = True
-
     def decode(
         self,
         token: str | bytes,
         key: BaseKey,
         *,
-        with_detached_payload: JWTClaims | None = None,
+        with_detached_payload: JWTBaseModel | None = None,
         disable_headers_validation: bool = False,
     ) -> JWSToken:
-        # reset token object
-        self.token = JWSTokenLifeCycle()
+        if (
+            self.token.validated.encoded.compact != b".."
+            or self.token.unsafe.encoded.compact != b".."
+        ):
+            raise JWTError("JWS instance data must be reset")
 
         # decode JWT token parts
         self.decode_parts(token, with_detached_payload)
@@ -88,15 +101,12 @@ class JWS:
         return self.token.validated
 
     def decode_parts(
-        self, token: str | bytes, detached_payload: JWTClaims | None = None
+        self, token: str | bytes, detached_payload: JWTBaseModel | None = None
     ) -> None:
         if len(token) > self.max_size:
             raise SizeExceededError(
                 f"Token size ({len(token)} bytes) exceeds maximum of {self.max_size} bytes"
             )
-        # decode detached payload if present
-        if detached_payload is not None:
-            self.has_detached_payload = True
 
         if token is not None:
             self.raw_jws = as_bytes(token)
@@ -107,11 +117,17 @@ class JWS:
         self.decode_raw_headers()
 
         # decode payload
-        if self.has_detached_payload and detached_payload is not None:
-            payload_dict: dict[str, Any] = detached_payload.to_dict()
-            encoded_payload = json.dumps(payload_dict, separators=(",", ":")).encode(
-                "utf-8"
-            )
+        if self.has_detached_payload:
+            if detached_payload is None:
+                payload_dict = {}
+                encoded_payload = b""
+            else:
+                payload_dict: dict[str, Any] = detached_payload.model_dump(
+                    exclude_none=True
+                )
+                encoded_payload = json.dumps(payload_dict, separators=(",", ":")).encode(
+                    "utf-8"
+                )
             self.token.unsafe.decoded.payload = payload_dict
             self.token.unsafe.encoded.payload = urlsafe_b64encode(encoded_payload)
         else:
@@ -215,5 +231,6 @@ class JWS:
 
         if not isinstance(self.algorithm, NoneAlgorithm):
             self.token.validated = self.token.unsafe.model_copy()
+            self.token.unsafe = JWSToken()
 
         return True
