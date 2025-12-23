@@ -1,10 +1,9 @@
 import hashlib
 import hmac
-import warnings
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Generic, TypeVar
 
-from superjwt.exceptions import JWTError, SecurityWarning
+from superjwt.exceptions import JWTError
 from superjwt.keys import BaseKey, NoneKey, OctetKey
 
 
@@ -41,11 +40,6 @@ class NoneAlgorithm(BaseJWSAlgorithm[NoneKey]):
         return b""
 
     def verify(self, _: bytes, __: bytes, ___: NoneKey) -> bool:
-        warnings.warn(
-            "using 'none' algorithm is a security hazard, anyone can forge claims in the token",
-            SecurityWarning,
-            stacklevel=3,
-        )
         return True
 
 
