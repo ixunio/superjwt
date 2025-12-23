@@ -39,7 +39,7 @@ class JWS:
         self.raw_jws: bytes = b""
         self.max_size = max_token_size
         self.crit_headers_strict_check = crit_headers_strict_check
-        self.allow_none_algorithm = False
+        self._allow_none_algorithm = False
 
     def encode(
         self,
@@ -202,7 +202,7 @@ class JWS:
         return True
 
     def verify_signature(self, key: BaseKey) -> bool:
-        if isinstance(self.algorithm, NoneAlgorithm) and not self.allow_none_algorithm:
+        if isinstance(self.algorithm, NoneAlgorithm) and not self._allow_none_algorithm:
             raise JWTError("None algorithm is not allowed")
         self.algorithm.check_key(key)
 

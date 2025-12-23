@@ -197,7 +197,7 @@ class JWT:
             JWSToken: The unsafe/not validated decoded JWT token as a raw JWSToken instance.
         """
         self.jws = JWS(algorithm="none")
-        self.jws.allow_none_algorithm = True
+        self.jws._allow_none_algorithm = True
         self.jws.decode(token=token, key=NoneKey(), disable_headers_validation=True)
-        self.jws.allow_none_algorithm = False
+        self.jws._allow_none_algorithm = False
         return self.jws.token.unsafe
