@@ -1,13 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 (2025-12-27)
 
 ### :gear: Changes
 
 - State, data integrity and consistency of JWT and JWS instances improved ([#15])
-  - A JWT instance now should always have consistent token and jws data every time an operation of encode / decode is performed successfully
-  - `JWT.token` is now a `JWSToken`
-  - `JWTCompliantClaims` replace `JWTClaims` for default claim validation with all registered claims marked optional, use `JWTClaims` if you still want iat claim to be set automatically
 - `disable_headers_validation` parameter was missing in `encode()` and `decode()`
 - b64=false in header will raise an `InvalidHeaderError` as this is not a supported feature ([#13])
 - Add compatibility for python 3.10 & 3.11, was working only for python 3.12-3.14 previously
@@ -17,7 +14,7 @@
 ### :bug: Fixes
 
 - validation for custom datetime claims is now working properly ([#7])
-- `HeaderValidationError` exception no longer throws IndexError ([#14])
+- `HeaderValidationError` exception no longer throws `IndexError` ([#14])
 - `inspect()` now works with detached payload
 
 ## v0.1.0 (2025-12-08)
