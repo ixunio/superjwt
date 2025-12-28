@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 import pydantic
 import pytest
 from superjwt import decode, encode
-from superjwt.definitions import JWTClaims, JWTCompliantClaims, check_future_dates
+from superjwt.definitions import JWTClaims, JWTDatetime, check_future_dates
 from superjwt.exceptions import (
     ClaimsValidationError,
     InvalidHeaderError,
@@ -92,7 +92,7 @@ def test_encode_decode_dict_custom_datetime_claim(secret_key):
 
 def test_empty_iat_with_exp(secret_key):
     # custom datetime claim set to None should be handled correctly
-    claims = JWTCompliantClaims(
+    claims = JWTClaims(
         iat=None,
         exp=datetime.strptime(
             "2042-04-02T00:42:42.123456+0000", "%Y-%m-%dT%H:%M:%S.%f%z"
@@ -113,6 +113,7 @@ def test_rewrite_incorrect_exp_type():
     # custom datetime claim set to invalid type should be handled correctly
 
     class JWTIncorrectExpClaim(JWTClaims):
+        iat: JWTDatetime = datetime.now(UTC)
         exp: Annotated[Any, pydantic.AfterValidator(check_future_dates)]  # type: ignore
 
     with pytest.raises(TypeError):

@@ -9,7 +9,6 @@ from superjwt.definitions import (
     JWSToken,
     JWTBaseModel,
     JWTClaims,
-    JWTCompliantClaims,
     make_key,
 )
 from superjwt.exceptions import (
@@ -46,7 +45,7 @@ class JWT:
         """Encode and sign the claims as a JWT token
 
         Args:
-            claims (JWTClaims | dict[str, Any] | None): Claims to include in the JWT.
+            claims (JWTBaseModel | dict[str, Any] | None): Claims to include in the JWT.
                 Will use default claims if not provided ('iat')
             key (str | bytes | BaseKey): The key instance to sign the JWT with.
             algorithm (Algorithm): The algorithm to use for signing the JWT.
@@ -100,10 +99,10 @@ class JWT:
         disable_claims_validation: bool = False,
     ) -> JWTBaseModel:
         if claims is None:
-            self.JWTEffectiveClaims = JWTCompliantClaims
+            self.JWTEffectiveClaims = JWTClaims
             claims_dict = {}
         elif isinstance(claims, dict):
-            self.JWTEffectiveClaims = JWTCompliantClaims
+            self.JWTEffectiveClaims = JWTClaims
             claims_dict = claims.copy()
         elif isinstance(claims, JWTBaseModel):
             self.JWTEffectiveClaims = claims.__class__
@@ -129,7 +128,7 @@ class JWT:
             return JOSEHeader.make_default(algorithm)
 
         if isinstance(headers, dict):
-            self.JWTEffectiveClaims = JWTCompliantClaims
+            self.JWTEffectiveClaims = JWTClaims
             headers_dict = headers.copy()
         elif isinstance(headers, JOSEHeader):
             headers_dict = headers.to_dict()

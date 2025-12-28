@@ -189,7 +189,7 @@ JWTDatetime = Annotated[
 ]
 
 
-class JWTClaimsDatetimeMixIn(BaseModel):
+class JWTClaimsDatetimeMixIn(JWTBaseModel):
     @model_validator(mode="after")
     def check_exp_after_nbf(self) -> Self:
         if hasattr(self, "exp") and hasattr(self, "nbf"):
@@ -199,6 +199,11 @@ class JWTClaimsDatetimeMixIn(BaseModel):
                 if nbf >= exp:
                     raise ValueError("'nbf' claim must be strictly less than 'exp' claim")
         return self
+
+    def with_issued_at(self) -> Self:
+        """Return a new JWTClaims instance with the 'iat' claim set to current time."""
+        now = datetime.now(UTC).replace(microsecond=0)
+        return self.model_copy(update={"iat": now})
 
     def with_expiration(
         self,
@@ -252,20 +257,10 @@ class JWTClaimsModel(JWTBaseModel):
     ] = None
 
 
-class JWTCompliantClaims(JWTClaimsModel, JWTClaimsDatetimeMixIn):
+class JWTClaims(JWTClaimsModel, JWTClaimsDatetimeMixIn):
     """
     JWT standard claims as per RFC 7519.
     """
-
-
-class JWTClaims(JWTCompliantClaims):
-    """
-    JWT standard claims as per RFC 7519, with 'iat' claim required and defaulting to current time.
-    """
-
-    iat: JWTDatetime = Field(
-        default_factory=lambda: datetime.now(UTC).replace(microsecond=0),
-    )  # this field does not use Annotated to avoid pylance issues with default_factory
 
 
 class JWSTokenEncoded(BaseModel):
