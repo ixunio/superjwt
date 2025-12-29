@@ -99,6 +99,7 @@ select = [
 ignore = [
     "E501",  # line length (handled by Black)
     "N803",  # argument name should be lowercase
+    "N806",  # variable in function should be lowercase
 ]
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"

@@ -2,12 +2,18 @@
 
 ## Unreleased
 
+### :sparkles: New
+
+- validate claims or headers with custom pydantic models for `decode()` ([#21])
+
 ### :gear: Changes
 
 - Refactoring of `JWTClaims` pydantic model ([#17])
     - defaulting with no `'iat'` set
     - `with_issued_at()` method added
     - modular model with reusable mixins
+- Refactoring of claims and headers validation ([#21])
+    - `encode()` and `decode()` have now the same validation behavior with `claims_validation_model` and `headers_validation_model` parameters. Disable it by setting to `None`
 
 ## v0.2.0 (2025-12-27)
 
@@ -41,7 +47,7 @@
 
 :tada: superjwt repository initialization
 
-
+[#21]: /../../issues/21
 [#17]: /../../issues/17
 [#15]: /../../issues/15
 [#14]: /../../issues/14

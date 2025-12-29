@@ -136,6 +136,23 @@ def test_encode_decode_pydantic_claims(
     with pytest.raises(ClaimsValidationError):
         jwt.encode(claims=claims, key=secret_key)
 
+    # test custom claims model validation
+    claims = JWTCustomClaims(**claims_dict)
+    # encoding valid
+    token = jwt.encode(claims=claims, key=secret_key)
+    jws_token = jwt.jws.token.validated
+    jwt.encode(claims=claims, key=secret_key, claims_validation_model=JWTCustomClaims)
+    jws_token2 = jwt.jws.token.validated
+    assert jws_token.encoded.compact == jws_token2.encoded.compact
+    # decoding
+    claims.user_id = None  # invalid type for user_id  # type: ignore
+    token = jwt.encode(claims=claims, key=secret_key, claims_validation_model=None)
+    # passes (validation with default JWTClaims)
+    jwt.decode(token=token, key=secret_key)
+    # fails (validation with JWTCustomClaims)
+    with pytest.raises(ClaimsValidationError):
+        jwt.decode(token=token, key=secret_key, claims_validation_model=JWTCustomClaims)
+
 
 def test_decode_invalid_signature(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
     wrong_key = "wrongkey_but_long_enough"
@@ -168,12 +185,12 @@ def test_encode_decode_claims_validation_disabled(
     with pytest.raises(ClaimsValidationError):
         jwt.encode(claims=unvalidated_claims, key=secret_key_random)
     encoded = jwt.encode(
-        unvalidated_claims, secret_key_random, disable_claims_validation=True
+        unvalidated_claims, secret_key_random, claims_validation_model=None
     )
     with pytest.raises(ClaimsValidationError):
         jwt.decode(token=encoded, key=secret_key_random)
     decoded = jwt.decode(
-        token=encoded, key=secret_key_random, disable_claims_validation=True
+        token=encoded, key=secret_key_random, claims_validation_model=None
     )
     decoded_claims = JWTCustomClaims.model_construct(**decoded)
 
@@ -194,13 +211,13 @@ def test_encode_decode_claims_dict_validation_disabled(
         jwt.encode(claims=unvalidated_claims_dict, key=secret_key_random)
     # run encoding again with validation disabled, does not raise error
     encoded = jwt.encode(
-        unvalidated_claims_dict, secret_key_random, disable_claims_validation=True
+        unvalidated_claims_dict, secret_key_random, claims_validation_model=None
     )
     with pytest.raises(ClaimsValidationError):
         jwt.decode(token=encoded, key=secret_key_random)
     # run decoding again with validation disabled, does not raise error
     decoded = jwt.decode(
-        token=encoded, key=secret_key_random, disable_claims_validation=True
+        token=encoded, key=secret_key_random, claims_validation_model=None
     )
     decoded_claims = JWTCustomClaims.model_construct(**decoded)
 
@@ -216,10 +233,10 @@ def test_required_field_missing(jwt: JWT, claims: JWTCustomClaims, secret_key: s
     claims.sub = None  # remove required field 'sub'  # type: ignore
     with pytest.raises(ClaimsValidationError):
         jwt.encode(claims=claims, key=secret_key)
-    encoded = jwt.encode(claims, secret_key, disable_claims_validation=True)
+    encoded = jwt.encode(claims, secret_key, claims_validation_model=None)
     with pytest.raises(ClaimsValidationError):
-        jwt.decode(token=encoded, key=secret_key)
-    decoded = jwt.decode(token=encoded, key=secret_key, disable_claims_validation=True)
+        jwt.decode(token=encoded, key=secret_key, claims_validation_model=JWTCustomClaims)
+    decoded = jwt.decode(token=encoded, key=secret_key, claims_validation_model=None)
     with pytest.raises(pydantic.ValidationError):
         JWTCustomClaims(**decoded)
 

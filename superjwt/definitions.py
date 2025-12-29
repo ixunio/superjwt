@@ -28,6 +28,7 @@ from superjwt.exceptions import (
     AlgorithmNotSupportedError,
     InvalidAlgorithmError,
     InvalidHeaderError,
+    JWTError,
 )
 from superjwt.keys import BaseKey, NoneKey, OctetKey
 
@@ -294,6 +295,11 @@ class JWSTokenDecoded(BaseModel):
     signature: SecretBytes
 
 
+class JWSTokenModel(BaseModel):
+    headers: JOSEHeader | None = None
+    claims: JWTBaseModel | None = None
+
+
 MAX_TOKEN_LENGTH: int = 16 * 1024  # 16 KB
 
 
@@ -304,6 +310,7 @@ class JWSToken(BaseModel):
     decoded: JWSTokenDecoded = JWSTokenDecoded(
         header={}, payload={}, signature=SecretBytes(b"")
     )
+    model: JWSTokenModel = JWSTokenModel()
 
 
 class JWSTokenLifeCycle(BaseModel):
@@ -326,3 +333,56 @@ def get_jws_algorithm(algorithm: Algorithm | Literal["none"]) -> BaseJWSAlgorith
 def make_key(algorithm: Algorithm | Literal["none"], key: str | bytes) -> BaseKey:
     key_type = get_jws_algorithm(algorithm).key_type
     return key_type.import_key(key)
+
+
+DefaultClaimsValidationModel = JWTClaims
+DefaultHeadersValidationModel = JOSEHeader
+
+
+def select_effective_validation_model(
+    data: JWTBaseModel | dict[str, Any] | None,
+    validation_model: type[JWTBaseModel] | None,
+    DefaultValidationModel: type[JWTBaseModel],
+) -> type[JWTBaseModel]:
+    # 1. case validation disabled
+    if validation_model is None:
+        return DefaultValidationModel
+    # 2. default case
+    elif validation_model is DefaultValidationModel:
+        # override with self model if data is a pydantic model
+        if isinstance(data, JWTBaseModel):
+            return data.__class__
+        else:
+            return DefaultValidationModel
+    # 3. custom validation model was provided, overrides default
+    elif issubclass(validation_model, JWTBaseModel):
+        return validation_model
+    raise JWTError("Invalid validation model type")
+
+
+def prepare_and_validate_model(
+    data: JWTBaseModel | dict[str, Any] | None,
+    EffectiveValidationModel: type[JWTBaseModel],
+    type_err_msg: str = "Wrong data type for pydantic model preparation",
+    default_value: dict[str, Any] = {},  # noqa: B006
+    disable_validation: bool = False,
+) -> JWTBaseModel:
+    # prepare data dict
+    # 1 . case data is None
+    if data is None:
+        data_dict = default_value
+    # 2. case data is a dict
+    elif isinstance(data, dict):
+        data_dict = data.copy()
+    # 3. case data is a pydantic model
+    elif isinstance(data, JWTBaseModel):
+        data_dict = data.to_dict()
+    else:
+        raise TypeError(type_err_msg)
+
+    # RETURN PYDANTIC MODEL WITH NO VALIDATION
+    if disable_validation:
+        return EffectiveValidationModel.model_construct(**data_dict)
+
+    # RETURN PYDANTIC MODEL WITH VALIDATION RUN
+    return EffectiveValidationModel(**data_dict)

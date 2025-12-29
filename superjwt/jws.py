@@ -1,5 +1,5 @@
 import json
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import SecretBytes, ValidationError
 
@@ -7,13 +7,17 @@ from superjwt.algorithms import BaseJWSAlgorithm, NoneAlgorithm
 from superjwt.definitions import (
     MAX_TOKEN_LENGTH,
     Algorithm,
+    DefaultHeadersValidationModel,
     JOSEHeader,
     JWSToken,
     JWSTokenLifeCycle,
     JWTBaseModel,
     get_jws_algorithm,
+    prepare_and_validate_model,
+    select_effective_validation_model,
 )
 from superjwt.exceptions import (
+    HeaderValidationError,
     InvalidHeaderError,
     JWTError,
     MalformedTokenError,
@@ -56,16 +60,25 @@ class JWS:
         header: JOSEHeader,
         payload: JWTBaseModel,
         key: BaseKey,
+        headers_validation_model: type[JOSEHeader] | None,
     ) -> bytes:
         if self.token.validated.encoded.compact != b"..":
             raise JWTError("JWS instance data must be reset")
 
-        header_dict: dict[str, Any] = header.to_dict()
+        # check header is valid
+        header = self.prepare_headers(
+            header,
+            cast("Algorithm", self.algorithm.name),
+            validation_model=headers_validation_model,
+        )
+        self.token.validated.model.headers = header
+
+        header_dict = header.to_dict()
         encoded_header = json.dumps(header_dict, separators=(",", ":")).encode("utf-8")
         self.token.validated.decoded.header = header_dict
         self.token.validated.encoded.header = urlsafe_b64encode(encoded_header)
 
-        payload_dict: dict[str, Any] = payload.to_dict()
+        payload_dict = payload.to_dict()
         encoded_payload = json.dumps(payload_dict, separators=(",", ":")).encode("utf-8")
         self.token.validated.decoded.payload = payload_dict
         self.token.validated.encoded.payload = urlsafe_b64encode(encoded_payload)
@@ -81,7 +94,7 @@ class JWS:
         key: BaseKey,
         *,
         with_detached_payload: JWTBaseModel | None = None,
-        disable_headers_validation: bool = False,
+        headers_validation_model: type[JOSEHeader] | None,
     ) -> JWSToken:
         if (
             self.token.validated.encoded.compact != b".."
@@ -93,8 +106,11 @@ class JWS:
         self.decode_parts(token, with_detached_payload)
 
         # validate headers
-        if not disable_headers_validation:
-            self.validate_header()
+        self.validate_header(
+            self.token.unsafe.decoded.header,
+            cast("Algorithm", self.algorithm.name),
+            validation_model=headers_validation_model,
+        )
 
         # verify signature
         self.verify_signature(key)
@@ -198,24 +214,54 @@ class JWS:
             )
         )
 
-    def validate_header(self) -> bool:
-        if not self.token.unsafe.decoded.header:
-            raise JWTError("JWS header was not decoded yet")
+    @staticmethod
+    def prepare_headers(
+        headers: JOSEHeader | dict[str, Any] | None,
+        algorithm: Algorithm,
+        validation_model: type[JWTBaseModel] | None,
+    ) -> JOSEHeader:
+        EffectiveValidationModel = select_effective_validation_model(
+            headers,
+            validation_model,
+            DefaultHeadersValidationModel,
+        )
 
-        # check headers
         try:
-            header = JOSEHeader.model_validate(
-                self.token.unsafe.decoded.header, context=self.crit_headers_strict_check
+            return cast(
+                "JOSEHeader",
+                prepare_and_validate_model(
+                    data=headers,
+                    EffectiveValidationModel=EffectiveValidationModel,
+                    type_err_msg="headers must be a JOSEHeader instance or a dict",
+                    default_value=JOSEHeader.make_default(algorithm).to_dict(),
+                    disable_validation=validation_model is None,
+                ),
             )
         except ValidationError as e:
-            raise InvalidHeaderError("JWS header contains invalid data") from e
+            raise HeaderValidationError(validation_errors=e.errors()) from e
 
-        if header.alg != self.algorithm.name:
-            raise InvalidHeaderError(
-                f"JWS algorithm '{header.alg}' does not match expected '{self.algorithm.name}'"
-            )
+    def validate_header(
+        self,
+        headers: dict[str, Any],
+        algorithm: Algorithm,
+        validation_model: type[JOSEHeader] | None,
+    ) -> None:
+        headers_validated = self.prepare_headers(
+            headers=headers,
+            algorithm=algorithm,
+            validation_model=validation_model,
+        )
+        headers_validated = headers_validated.model_validate(
+            headers_validated, context=self.crit_headers_strict_check
+        )
 
-        return True
+        self.token.unsafe.model.headers = headers_validated
+
+        if validation_model is not None:
+            if headers_validated.alg != self.algorithm.name:
+                raise InvalidHeaderError(
+                    f"JWS algorithm '{headers_validated.alg}' does not match expected '{self.algorithm.name}'"
+                )
 
     def verify_signature(self, key: BaseKey) -> bool:
         if isinstance(self.algorithm, NoneAlgorithm) and not self._allow_none_algorithm:
