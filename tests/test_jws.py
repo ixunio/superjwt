@@ -2,7 +2,7 @@ import pytest
 from superjwt.definitions import DefaultHeadersValidationModel, JOSEHeader
 from superjwt.exceptions import InvalidHeaderError, JWTError
 from superjwt.jws import JWS
-from superjwt.keys import OctetKey
+from superjwt.keys import OctKey
 
 from tests.conftest import JWTCustomClaims
 
@@ -19,7 +19,7 @@ def test_not_reset_jws_instance(
         "7J8anGc2Ytg-vyaTVN0ln2IjouLupxgHXiIEwxTO-oE"
     )
 
-    key = OctetKey.import_key(secret_key)
+    key = OctKey.import_key(secret_key)
     jws_HS256.encode(
         header=JOSEHeader(alg="HS256"),
         payload=claims_fixed_dt,
@@ -50,7 +50,7 @@ def test_jws_hmac_decoding(jws_HS256: JWS, claims_fixed_dt, secret_key: str):
         "7J8anGc2Ytg-vyaTVN0ln2IjouLupxgHXiIEwxTO-oE"
     )
 
-    key = OctetKey.import_key(secret_key)
+    key = OctKey.import_key(secret_key)
     decoded_claims = JWTCustomClaims(
         **jws_HS256.decode(
             token=compact, key=key, headers_validation_model=DefaultHeadersValidationModel
@@ -70,7 +70,7 @@ def test_wrong_header_algorithm(
         "7J8anGc2Ytg-vyaTVN0ln2IjouLupxgHXiIEwxTO-oE"
     )
 
-    key = OctetKey.import_key(secret_key)
+    key = OctKey.import_key(secret_key)
     headers = JOSEHeader(alg="HS256")
     headers.alg = "ABCDEF"  # wrong algorithm in header  # type: ignore
     invalid_compact = jws_HS256.encode(

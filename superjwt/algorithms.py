@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Generic, TypeVar
 
 from superjwt.exceptions import JWTError
-from superjwt.keys import BaseKey, NoneKey, OctetKey
+from superjwt.keys import BaseKey, NoneKey, OctKey
 
 
 KeyType = TypeVar("KeyType", bound=BaseKey)
@@ -43,22 +43,22 @@ class NoneAlgorithm(BaseJWSAlgorithm[NoneKey]):
         return True
 
 
-class HMACWithSHAAlgorithm(BaseJWSAlgorithm[OctetKey]):
+class HMACWithSHAAlgorithm(BaseJWSAlgorithm[OctKey]):
     """Base class for HMAC using SHA algorithms"""
 
-    key_type = OctetKey
+    key_type = OctKey
 
     def __init__(self, hash_algorithm: Any):
         self.hash_algorithm = hash_algorithm
 
-    def check_key(self, key: OctetKey) -> None:
-        if not isinstance(key, OctetKey):
+    def check_key(self, key: OctKey) -> None:
+        if not isinstance(key, OctKey):
             raise JWTError("Key must be an OctetKey for HMAC algorithms")
 
-    def sign(self, data: bytes, key: OctetKey) -> bytes:
+    def sign(self, data: bytes, key: OctKey) -> bytes:
         return hmac.new(key.private_key, data, self.hash_algorithm).digest()
 
-    def verify(self, data: bytes, signature: bytes, key: OctetKey) -> bool:
+    def verify(self, data: bytes, signature: bytes, key: OctKey) -> bool:
         return hmac.compare_digest(signature, self.sign(data, key))
 
 

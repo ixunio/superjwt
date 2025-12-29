@@ -31,7 +31,7 @@ from superjwt.exceptions import (
     JWTError,
     TokenExpiredError,
 )
-from superjwt.keys import BaseKey, NoneKey, OctetKey
+from superjwt.keys import BaseKey, NoneKey, OctKey
 
 
 try:
@@ -73,7 +73,7 @@ class AlgorithmInstance(Enum):
 
 class Key(Enum):
     NoneKey = NoneKey()
-    OctetKey = OctetKey()
+    OctKey = OctKey()
     RSAKey = None  # Placeholder
     ECKey = None  # Placeholder
     OKPKey = None  # Placeholder

@@ -39,7 +39,7 @@ class SymmetricKey(BaseKey): ...
 class AsymmetricKey(BaseKey): ...
 
 
-class OctetKey(SymmetricKey):
+class OctKey(SymmetricKey):
     """OctetKey is a symmetric key, defined by RFC7518 Section 6.4."""
 
     name = "oct"
