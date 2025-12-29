@@ -57,7 +57,7 @@ class JWS:
 
     def encode(
         self,
-        header: JOSEHeader,
+        headers: JOSEHeader,
         payload: JWTBaseModel,
         key: BaseKey,
         headers_validation_model: type[JOSEHeader] | None,
@@ -65,18 +65,18 @@ class JWS:
         if self.token.validated.encoded.compact != b"..":
             raise JWTError("JWS instance data must be reset")
 
-        # check header is valid
-        header = self.prepare_headers(
-            header,
+        # check headers is valid
+        headers = self.prepare_headers(
+            headers,
             cast("Algorithm", self.algorithm.name),
             validation_model=headers_validation_model,
         )
-        self.token.validated.model.headers = header
+        self.token.validated.model.headers = headers
 
-        header_dict = header.to_dict()
-        encoded_header = json.dumps(header_dict, separators=(",", ":")).encode("utf-8")
-        self.token.validated.decoded.header = header_dict
-        self.token.validated.encoded.header = urlsafe_b64encode(encoded_header)
+        headers_dict = headers.to_dict()
+        encoded_headers = json.dumps(headers_dict, separators=(",", ":")).encode("utf-8")
+        self.token.validated.decoded.headers = headers_dict
+        self.token.validated.encoded.headers = urlsafe_b64encode(encoded_headers)
 
         payload_dict = payload.to_dict()
         encoded_payload = json.dumps(payload_dict, separators=(",", ":")).encode("utf-8")
@@ -106,8 +106,8 @@ class JWS:
         self.decode_parts(token, with_detached_payload)
 
         # validate headers
-        self.validate_header(
-            self.token.unsafe.decoded.header,
+        self.validate_headers(
+            self.token.unsafe.decoded.headers,
             cast("Algorithm", self.algorithm.name),
             validation_model=headers_validation_model,
         )
@@ -166,7 +166,7 @@ class JWS:
         if self.has_detached_payload and payload != b"":
             raise MalformedTokenError("Detached payload conflict")
 
-        self.token.unsafe.encoded.header = header
+        self.token.unsafe.encoded.headers = header
         self.token.unsafe.encoded.payload = payload
         self.token.unsafe.encoded.signature = SecretBytes(signature)
 
@@ -194,9 +194,9 @@ class JWS:
             raise MalformedTokenError(f"{name} segment is not valid JSON") from e
 
     def decode_raw_headers(self) -> dict[str, Any]:
-        decoded = self._decode_raw_part("header", self.token.unsafe.encoded.header)
-        self.token.unsafe.decoded.header = decoded_dict = self._decode_dict_part(
-            "header", decoded
+        decoded = self._decode_raw_part("headers", self.token.unsafe.encoded.headers)
+        self.token.unsafe.decoded.headers = decoded_dict = self._decode_dict_part(
+            "headers", decoded
         )
         return decoded_dict
 
@@ -240,7 +240,7 @@ class JWS:
         except ValidationError as e:
             raise HeaderValidationError(validation_errors=e.errors()) from e
 
-    def validate_header(
+    def validate_headers(
         self,
         headers: dict[str, Any],
         algorithm: Algorithm,

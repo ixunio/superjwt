@@ -282,7 +282,7 @@ class JWTClaims(JWTClaimsModel, JWTClaimsDatetimeMixIn):
 
 
 class JWSTokenEncoded(BaseModel):
-    header: bytes
+    headers: bytes
     payload: bytes
     signature: SecretBytes
     has_detached_payload: bool = False
@@ -290,16 +290,16 @@ class JWSTokenEncoded(BaseModel):
     @computed_field
     @property
     def signing_input(self) -> bytes:
-        return b".".join((self.header, self.payload))
+        return b".".join((self.headers, self.payload))
 
     @computed_field
     @property
     def compact(self) -> bytes:
         if self.has_detached_payload:
-            return b".".join((self.header, b"", self.signature.get_secret_value()))
+            return b".".join((self.headers, b"", self.signature.get_secret_value()))
         return b".".join(
             (
-                self.header,
+                self.headers,
                 self.payload,
                 self.signature.get_secret_value(),
             )
@@ -307,7 +307,7 @@ class JWSTokenEncoded(BaseModel):
 
 
 class JWSTokenDecoded(BaseModel):
-    header: dict[str, Any]
+    headers: dict[str, Any]
     payload: dict[str, Any]
     signature: SecretBytes
 
@@ -322,10 +322,10 @@ MAX_TOKEN_LENGTH: int = 16 * 1024  # 16 KB
 
 class JWSToken(BaseModel):
     encoded: JWSTokenEncoded = JWSTokenEncoded(
-        header=b"", payload=b"", signature=SecretBytes(b"")
+        headers=b"", payload=b"", signature=SecretBytes(b"")
     )
     decoded: JWSTokenDecoded = JWSTokenDecoded(
-        header={}, payload={}, signature=SecretBytes(b"")
+        headers={}, payload={}, signature=SecretBytes(b"")
     )
     model: JWSTokenModel = JWSTokenModel()
 

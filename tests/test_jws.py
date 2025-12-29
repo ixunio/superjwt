@@ -21,7 +21,7 @@ def test_not_reset_jws_instance(
 
     key = OctKey.import_key(secret_key)
     jws_HS256.encode(
-        header=JOSEHeader(alg="HS256"),
+        headers=JOSEHeader(alg="HS256"),
         payload=claims_fixed_dt,
         key=key,
         headers_validation_model=DefaultHeadersValidationModel,
@@ -74,7 +74,7 @@ def test_wrong_header_algorithm(
     headers = JOSEHeader(alg="HS256")
     headers.alg = "ABCDEF"  # wrong algorithm in header  # type: ignore
     invalid_compact = jws_HS256.encode(
-        header=headers, payload=claims_fixed_dt, key=key, headers_validation_model=None
+        headers=headers, payload=claims_fixed_dt, key=key, headers_validation_model=None
     ).decode("utf-8")
 
     # not reset JWS instance
@@ -96,7 +96,7 @@ def test_wrong_header_algorithm(
     jws_token = jws_HS256.decode(
         token=invalid_compact, key=key, headers_validation_model=None
     )
-    assert jws_token.decoded.header["alg"] == headers.alg
+    assert jws_token.decoded.headers["alg"] == headers.alg
 
     jws_HS256.reset()
     decoded_claims = JWTCustomClaims(

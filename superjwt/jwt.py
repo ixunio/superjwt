@@ -80,7 +80,7 @@ class JWT:
         # encode as JWS
         self.jws = JWS(algorithm)
         self.jws.encode(
-            header=headers,
+            headers=headers,
             payload=claims,
             key=key,
             headers_validation_model=headers_validation_model,
