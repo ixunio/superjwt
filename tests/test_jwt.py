@@ -10,6 +10,7 @@ from superjwt.exceptions import (
     InvalidHeaderError,
     JWTError,
     SignatureVerificationFailedError,
+    TokenExpiredError,
 )
 from superjwt.jwt import JWT
 
@@ -363,3 +364,14 @@ def test_detached_payload(jwt: JWT, claims_fixed_dt, secret_key):
 def test_detached_payload_no_jws_instance(jwt: JWT):
     with pytest.raises(JWTError):
         jwt.detach_payload()
+
+
+def test_expired_token(jwt: JWT, secret_key: str):
+    claims = JWTClaims.model_construct(exp=datetime.now(UTC) - timedelta(days=1))
+    token = jwt.encode(claims=claims, key=secret_key, claims_validation_model=None)
+    with pytest.raises(TokenExpiredError):
+        jwt.encode(claims=claims, key=secret_key)
+    decoded = jwt.decode(token=token, key=secret_key, claims_validation_model=None)
+    assert decoded["exp"] == claims.to_dict()["exp"]
+    with pytest.raises(TokenExpiredError):
+        jwt.decode(token=token, key=secret_key)
