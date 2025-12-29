@@ -1,5 +1,5 @@
 import pytest
-from superjwt.definitions import JOSEHeader
+from superjwt.definitions import DefaultHeadersValidationModel, JOSEHeader
 from superjwt.exceptions import InvalidHeaderError, JWTError
 from superjwt.jws import JWS
 from superjwt.keys import OctetKey
@@ -20,14 +20,23 @@ def test_not_reset_jws_instance(
     )
 
     key = OctetKey.import_key(secret_key)
-    jws_HS256.encode(header=JOSEHeader(alg="HS256"), payload=claims_fixed_dt, key=key)
+    jws_HS256.encode(
+        header=JOSEHeader(alg="HS256"),
+        payload=claims_fixed_dt,
+        key=key,
+        headers_validation_model=DefaultHeadersValidationModel,
+    )
 
     # not reset JWS instance
     with pytest.raises(JWTError):
-        jws_HS256.decode(token=compact, key=key)
+        jws_HS256.decode(
+            token=compact, key=key, headers_validation_model=DefaultHeadersValidationModel
+        )
 
     jws_HS256.reset()
-    decoded_claims_after_reset = jws_HS256.decode(token=compact, key=key)
+    decoded_claims_after_reset = jws_HS256.decode(
+        token=compact, key=key, headers_validation_model=DefaultHeadersValidationModel
+    )
     assert decoded_claims_after_reset.decoded.payload == claims_fixed_dt.to_dict()
 
 
@@ -43,7 +52,9 @@ def test_jws_hmac_decoding(jws_HS256: JWS, claims_fixed_dt, secret_key: str):
 
     key = OctetKey.import_key(secret_key)
     decoded_claims = JWTCustomClaims(
-        **jws_HS256.decode(token=compact, key=key).decoded.payload
+        **jws_HS256.decode(
+            token=compact, key=key, headers_validation_model=DefaultHeadersValidationModel
+        ).decoded.payload
     )
     assert decoded_claims.to_dict() == claims_fixed_dt.to_dict()
 
@@ -63,25 +74,34 @@ def test_wrong_header_algorithm(
     headers = JOSEHeader(alg="HS256")
     headers.alg = "ABCDEF"  # wrong algorithm in header  # type: ignore
     invalid_compact = jws_HS256.encode(
-        header=headers, payload=claims_fixed_dt, key=key
+        header=headers, payload=claims_fixed_dt, key=key, headers_validation_model=None
     ).decode("utf-8")
 
     # not reset JWS instance
     with pytest.raises(JWTError):
-        jws_HS256.decode(token=invalid_compact, key=key)
+        jws_HS256.decode(
+            token=invalid_compact,
+            key=key,
+            headers_validation_model=DefaultHeadersValidationModel,
+        )
 
     jws_HS256.reset()
     with pytest.raises(InvalidHeaderError):
-        jws_HS256.decode(token=invalid_compact, key=key)
-
+        jws_HS256.decode(
+            token=invalid_compact,
+            key=key,
+            headers_validation_model=DefaultHeadersValidationModel,
+        )
     jws_HS256.reset()
     jws_token = jws_HS256.decode(
-        token=invalid_compact, key=key, disable_headers_validation=True
+        token=invalid_compact, key=key, headers_validation_model=None
     )
     assert jws_token.decoded.header["alg"] == headers.alg
 
     jws_HS256.reset()
     decoded_claims = JWTCustomClaims(
-        **jws_HS256.decode(token=compact, key=key).decoded.payload
+        **jws_HS256.decode(
+            token=compact, key=key, headers_validation_model=DefaultHeadersValidationModel
+        ).decoded.payload
     )
     assert decoded_claims.to_dict() == claims_fixed_dt.to_dict()
