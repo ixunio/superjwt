@@ -5,6 +5,7 @@
 ### :sparkles: New
 
 - validate claims or headers with custom pydantic models for `decode()` ([#21])
+- expired token now raises `TokenExpiredError` upon validation ([#24])
 
 ### :gear: Changes
 
@@ -47,6 +48,7 @@
 
 :tada: superjwt repository initialization
 
+[#24]: /../../issues/24
 [#21]: /../../issues/21
 [#17]: /../../issues/17
 [#15]: /../../issues/15

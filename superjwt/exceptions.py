@@ -95,6 +95,12 @@ class ClaimsValidationError(InvalidClaimsError):
         super().__init__(self.error)
 
 
+class TokenExpiredError(InvalidClaimsError):
+    """Raised when the token has expired based on its 'exp' claim."""
+
+    error = "Token has expired"
+
+
 class InvalidAlgorithmError(JWTError):
     """Base class for algorithm-related errors."""
 
