@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### :gear: Changes
+
+- Refactoring of `JWTClaims` pydantic model ([#17])
+    - defaulting with no `'iat'` set
+    - `with_issued_at()` method added
+    - modular model with reusable mixins
+
 ## v0.2.0 (2025-12-27)
 
 ### :gear: Changes
@@ -33,6 +42,7 @@
 :tada: superjwt repository initialization
 
 
+[#17]: /../../issues/17
 [#15]: /../../issues/15
 [#14]: /../../issues/14
 [#13]: /../../issues/13
