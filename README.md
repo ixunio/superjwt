@@ -121,7 +121,7 @@ decoded = decode(
     token=token,
     key=secret_key,
     algorithm="HS256",
-    claims_validation_model=MyJWTClaims,
+    validation_claims=MyJWTClaims,
 )
 #> decoded = {'sub': 123, 'iat': 1767026691, 'exp': 1767027591, 'user_id': 'b2a4c791-2cf4-4e41-9a20-8532129ff47c'}
 ```
@@ -137,7 +137,7 @@ invalid_claims = (
 )
 # disable claims validation to create an invalid token
 invalid_token = encode(
-    invalid_claims, secret_key, algorithm="HS256", claims_validation_model=None
+    invalid_claims, secret_key, algorithm="HS256", validation_claims=None
 )
 #> invalid_token = b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzIxNiwiZXhwIjoxNzY3MDI4MTE2LCJ1c2VyX2lkIjoiaW52YWxpZC11dWlkLXN0cmluZyJ9.eBJKSxoBNWtS7uojVIIUYJWC26c2GHP8o4LPZm41tp8'
 try:
@@ -145,7 +145,7 @@ try:
         token=invalid_token,
         key=secret_key,
         algorithm="HS256",
-        claims_validation_model=MyJWTClaims,
+        validation_claims=MyJWTClaims,
     )
 except ClaimsValidationError as e:
     print("Claims validation error:", e)

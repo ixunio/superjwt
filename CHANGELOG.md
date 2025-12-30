@@ -14,7 +14,7 @@
     - `with_issued_at()` method added
     - modular model with reusable mixins
 - Refactoring of claims and headers validation ([#21])
-    - `encode()` and `decode()` have now the same validation behavior with `claims_validation_model` and `headers_validation_model` parameters. Disable it by setting to `None`
+    - `encode()` and `decode()` have now the same validation behavior with `validation_claims` and `validation_headers` parameters. Disable it by setting to `None`
 
 ## v0.2.0 (2025-12-27)
 
