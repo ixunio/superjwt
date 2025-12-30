@@ -48,10 +48,15 @@ Algorithm = Literal[
     "RS256",
     "RS384",
     "RS512",
+    "PS256",
+    "PS384",
+    "PS512",
     "ES256",
+    "ES256K",
     "ES384",
     "ES512",
-    "EdDSA",
+    "Ed25519",
+    "Ed448",
 ]
 
 
@@ -63,11 +68,15 @@ class AlgorithmInstance(Enum):
     RS256 = None  # Placeholder
     RS384 = None  # Placeholder
     RS512 = None  # Placeholder
+    PS256 = None  # Placeholder
+    PS384 = None  # Placeholder
+    PS512 = None  # Placeholder
     ES256 = None  # Placeholder
+    ES256K = None  # Placeholder
     ES384 = None  # Placeholder
     ES512 = None  # Placeholder
-    EdDSA = None  # Placeholder
-    ES256K = None  # Placeholder
+    Ed25519 = None  # Placeholder
+    Ed448 = None  # Placeholder
 
 
 class Key(Enum):

@@ -102,7 +102,7 @@ def test_wrong_header_algorithm(
 
     # algorithm mismatch error
     with pytest.raises(AlgorithmMismatchError):
-        jws_HS256.decode(token=invalid_compact, key=key)
+        jws_HS256.decode(token=invalid_compact, key=key, validation_headers=None)
     jws_HS256.reset()
 
     decoded_claims = JWTCustomClaims(
