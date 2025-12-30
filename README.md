@@ -15,7 +15,7 @@ With powerful Pydantic validation features.
 </p>
 
 <img alt="GitHub Actions workflow status on main branch" src="https://img.shields.io/github/actions/workflow/status/ixunio/superjwt/ci.yml?branch=main&logo=github-actions&logoColor=white&label=CI">
-<img alt="Codecov" src="https://img.shields.io/codecov/c/github/ixunio/superjwt">
+<a href="https://codecov.io/github/ixunio/superjwt"><img src="https://codecov.io/github/ixunio/superjwt/graph/badge.svg?token=RF0O8W5LKG"/></a>
 </div>
 <div align="center">
 <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/superjwt?color=blue">
