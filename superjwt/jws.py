@@ -17,6 +17,7 @@ from superjwt.definitions import (
     prepare_and_validate_data,
 )
 from superjwt.exceptions import (
+    AlgorithmMismatchError,
     HeaderValidationError,
     InvalidHeaderError,
     JWTError,
@@ -249,7 +250,7 @@ class JWS:
         # check algorithm match
         pass_through = self.algorithm.name == "none" and self._allow_none_algorithm
         if not pass_through and headers_validated.alg != self.algorithm.name:
-            raise InvalidHeaderError(
+            raise AlgorithmMismatchError(
                 f"JWS algorithm '{headers_validated.alg}' does not match expected '{self.algorithm.name}'"
             )
 

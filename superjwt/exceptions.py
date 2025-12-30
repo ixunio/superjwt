@@ -40,7 +40,7 @@ class SizeExceededError(InvalidTokenError):
 
 
 class MalformedTokenError(InvalidTokenError):
-    """Raised when the token data format is incorrect"""
+    """Raised when the token data format is incorrect."""
 
     error = "Malformed token"
 
@@ -105,6 +105,13 @@ class InvalidAlgorithmError(JWTError):
     """Base class for algorithm-related errors."""
 
     error = "Algorithm is invalid"
+
+
+class AlgorithmMismatchError(InvalidAlgorithmError):
+    """Raised during decoding when the algorithm in the JWT header
+    does not match the expected registered algorithms."""
+
+    error = "Algorithm mismatch in header"
 
 
 class AlgorithmNotSupportedError(InvalidAlgorithmError):

@@ -1,6 +1,11 @@
 import pytest
 from superjwt.definitions import JOSEHeader
-from superjwt.exceptions import InvalidHeaderError, JWTError
+from superjwt.exceptions import (
+    AlgorithmMismatchError,
+    HeaderValidationError,
+    InvalidHeaderError,
+    JWTError,
+)
 from superjwt.jws import JWS
 from superjwt.keys import OctKey
 
@@ -67,7 +72,7 @@ def test_wrong_header_algorithm(
     headers = JOSEHeader(alg="HS256")
     headers.alg = "ABCDEF"  # wrong algorithm in header  # type: ignore
 
-    with pytest.raises(InvalidHeaderError):
+    with pytest.raises(HeaderValidationError):
         jws_HS256.encode(
             headers=headers,
             payload=claims_fixed_dt.to_dict(),
@@ -96,7 +101,7 @@ def test_wrong_header_algorithm(
     jws_HS256.reset()
 
     # algorithm mismatch error
-    with pytest.raises(InvalidHeaderError):
+    with pytest.raises(AlgorithmMismatchError):
         jws_HS256.decode(token=invalid_compact, key=key)
     jws_HS256.reset()
 

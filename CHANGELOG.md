@@ -6,6 +6,7 @@
 
 - validate claims or headers with custom pydantic models for `decode()` ([#34])
 - expired token now raises `TokenExpiredError` upon claims validation ([#24])
+- new exception `AlgorithmMismatchError` is raised during decoding when `'alg'` is valid but not declared as processable by the JWS instance ([#31])
 
 ### :gear: Changes
 
@@ -59,6 +60,7 @@
 :tada: superjwt repository initialization
 
 [#34]: /../../issues/34
+[#31]: /../../issues/31
 [#24]: /../../issues/24
 [#17]: /../../issues/17
 [#15]: /../../issues/15
