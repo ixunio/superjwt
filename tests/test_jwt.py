@@ -47,9 +47,9 @@ def test_encode_decode_dict_claims(claims_dict, secret_key):
 
     # standard claims (datetime data with various input types)
     # they will be serialized uniformly as int (timestamp) thanks to JWTClaims validation
-    assert decoded_claims_dict["iat"] == int(claims_dict["iat"].timestamp())
-    assert decoded_claims_dict["nbf"] == int(claims_dict["nbf"])
-    assert decoded_claims_dict["exp"] == int(claims_dict["exp"].timestamp())
+    assert decoded_claims_dict["iat"] == claims_dict["iat"]
+    assert decoded_claims_dict["nbf"] == claims_dict["nbf"]
+    assert decoded_claims_dict["exp"] == claims_dict["exp"]
 
     # custom claims
     # won't be any type conversion here, nor validation
@@ -224,16 +224,37 @@ def test_encode_decode_claims_dict_validation_disabled(
     check_claims_instance(claims, decoded_claims)
 
 
-def test_required_field_missing(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
+def test_custom_validation(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
     claims.sub = None  # remove required field 'sub'  # type: ignore
+    jwt.encode(
+        claims=claims, key=secret_key
+    )  # passes because compliant with default JWTClaims
     with pytest.raises(ClaimsValidationError):
-        jwt.encode(claims=claims, key=secret_key)
-    encoded = jwt.encode(claims, secret_key, validation_claims=None)
+        jwt.encode(claims=claims, key=secret_key, validation_claims=JWTCustomClaims)
+
+    claims.aud = 123  # invalid registered claim  # type: ignore
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(
+            claims=claims, key=secret_key
+        )  # no more compliant with default JWTClaims
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(claims=claims, key=secret_key, validation_claims=JWTCustomClaims)
+
+    encoded = jwt.encode(
+        claims, secret_key, validation_claims=None
+    )  # create token anyway
+    with pytest.raises(ClaimsValidationError):
+        jwt.decode(token=encoded, key=secret_key)  # fails default JWTClaims validation
     with pytest.raises(ClaimsValidationError):
         jwt.decode(token=encoded, key=secret_key, validation_claims=JWTCustomClaims)
     decoded = jwt.decode(token=encoded, key=secret_key, validation_claims=None)
     with pytest.raises(pydantic.ValidationError):
         JWTCustomClaims(**decoded)
+
+    encoded = jwt.encode(claims, secret_key, validation_claims=None)
+    jwt.detach_payload()  # switch to detached mode
+    with pytest.raises(ClaimsValidationError):
+        jwt.decode(token=encoded, key=secret_key, with_detached_payload=claims.to_dict())
 
 
 def test_unsupported_b64_header(jwt: JWT, claims: JWTCustomClaims, secret_key: str):

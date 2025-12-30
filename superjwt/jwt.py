@@ -5,15 +5,13 @@ from pydantic import ValidationError
 
 from superjwt.definitions import (
     Algorithm,
-    DefaultClaimsValidationModel,
-    DefaultHeadersValidationModel,
     JOSEHeader,
     JWSToken,
     JWTBaseModel,
     JWTClaims,
+    get_effective_data_model,
     make_key,
-    prepare_and_validate_model,
-    select_effective_validation_model,
+    prepare_and_validate_data,
 )
 from superjwt.exceptions import (
     ClaimsValidationError,
@@ -41,8 +39,8 @@ class JWT:
         algorithm: Algorithm = "HS256",
         *,
         headers: JOSEHeader | dict[str, Any] | None = None,
-        validation_claims: type[JWTBaseModel] | None = DefaultClaimsValidationModel,
-        validation_headers: type[JOSEHeader] | None = DefaultHeadersValidationModel,
+        validation_claims: type[JWTBaseModel] | None = JWTClaims,
+        validation_headers: type[JOSEHeader] | None = JOSEHeader,
     ) -> bytes:
         """Encode and sign the claims as a JWT token
 
@@ -55,10 +53,10 @@ class JWT:
                 in the JWT. Will use default JWS headers if not provided.
             validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
                 to use for claims validation. If None, claims validation is disabled.
-                Default to DefaultClaimsValidationModel or claims.__class__ if pydantic object.
+                Defaults to JWTClaims. (standard RFC 7519 registered claims)
             validation_headers (type[JOSEHeader] | None, opt.): the pydantic model
                 to use for headers validation. If None, headers validation is disabled.
-                Default to DefaultHeadersValidationModel or headers.__class__ if pydantic object.
+                Defaults to JOSEHeader. (standard JOSE Header)
 
         Returns:
             bytes: the encoded compact JWT token
@@ -68,10 +66,16 @@ class JWT:
         self.reset_token()
 
         # prepare claims data and perform validation
-        claims = self.prepare_claims(claims, validation_model=validation_claims)
-
-        # prepare headers data (validation will be done later in JWS instance)
-        headers = JWS.prepare_headers(headers, algorithm, validation_model=None)
+        if claims is None:
+            claims = JWTBaseModel()
+        try:
+            claims_dict = prepare_and_validate_data(
+                data=claims,
+                validation_model=validation_claims,
+                type_err_msg="claims must be a JWTBaseModel instance or a dict",
+            )
+        except ValidationError as e:
+            raise ClaimsValidationError(validation_errors=e.errors()) from e
 
         # prepare key
         if not isinstance(key, BaseKey):
@@ -81,11 +85,16 @@ class JWT:
         self.jws = JWS(algorithm)
         self.jws.encode(
             headers=headers,
-            payload=claims,
+            payload=claims_dict,
             key=key,
             validation_headers=validation_headers,
         )
-        self.jws.token.validated.model.claims = claims
+
+        # set claims model data
+        default_claims_model = get_effective_data_model(claims, validation_claims)
+        self.jws.token.validated.model.claims = default_claims_model.model_construct(
+            **claims_dict
+        )
 
         self.token = self.jws.token.validated
         return self.token.encoded.compact
@@ -103,27 +112,6 @@ class JWT:
 
         return self.token.encoded.compact
 
-    @staticmethod
-    def prepare_claims(
-        claims: JWTBaseModel | dict[str, Any] | None,
-        validation_model: type[JWTBaseModel] | None,
-    ) -> JWTBaseModel:
-        EffectiveValidationModel = select_effective_validation_model(
-            claims,
-            validation_model,
-            DefaultClaimsValidationModel,
-        )
-
-        try:
-            return prepare_and_validate_model(
-                data=claims,
-                EffectiveValidationModel=EffectiveValidationModel,
-                type_err_msg="claims must be a JWTBaseModel instance or a dict",
-                disable_validation=validation_model is None,
-            )
-        except ValidationError as e:
-            raise ClaimsValidationError(validation_errors=e.errors()) from e
-
     def decode(
         self,
         token: str | bytes,
@@ -131,8 +119,8 @@ class JWT:
         algorithm: Algorithm = "HS256",
         *,
         with_detached_payload: JWTClaims | dict[str, Any] | None = None,
-        validation_claims: type[JWTBaseModel] | None = DefaultClaimsValidationModel,
-        validation_headers: type[JOSEHeader] | None = DefaultHeadersValidationModel,
+        validation_claims: type[JWTBaseModel] | None = JWTClaims,
+        validation_headers: type[JOSEHeader] | None = JOSEHeader,
     ) -> dict[str, Any]:
         """Decode the JWT token with signature verification.
 
@@ -144,10 +132,10 @@ class JWT:
                 Detached payload to use for signature verification, if any.
             validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
                 to use for claims validation. If None, claims validation is disabled.
-                Default to DefaultClaimsValidationModel.
+                Defaults to JWTClaims. (standard RFC 7519 registered claims)
             validation_headers (type[JOSEHeader] | None, opt.): the pydantic model
                 to use for headers validation. If None, headers validation is disabled.
-                Default to DefaultHeadersValidationModel.
+                Defaults to JOSEHeader. (standard JOSE Header)
 
         Returns:
             dict[str, Any]: The decoded and verified JWT claims as a dictionary.
@@ -161,31 +149,58 @@ class JWT:
         if not isinstance(key, BaseKey):
             key = make_key(algorithm, key)
 
+        # CASE 1: detached payload mode
         if with_detached_payload is not None:
-            # prepare and validate detached claims
-            detached_claims = self.prepare_claims(
-                with_detached_payload, validation_model=validation_claims
-            )
-            # JWS decode with detached payload
             self.jws.enable_detached_payload()
+
+            # prepare detached claims data and perform validation
+            try:
+                claims_dict = prepare_and_validate_data(
+                    data=with_detached_payload,
+                    validation_model=validation_claims,
+                )
+            except ValidationError as e:
+                raise ClaimsValidationError(validation_errors=e.errors()) from e
+
+            # set claims model data
+            default_claims_model = get_effective_data_model(
+                claims_dict, validation_claims
+            )
+            self.jws.token.unsafe.model.claims = default_claims_model.model_construct(
+                **claims_dict
+            )
+
+            # JWS decode
             self.jws.decode(
                 token,
                 key,
-                with_detached_payload=detached_claims,
+                with_detached_payload=claims_dict,
                 validation_headers=validation_headers,
             )
-            self.jws.token.validated.model.claims = detached_claims
+
+        # CASE 2: normal mode
         else:
-            # JWS decode without detached payload
+            # JWS decode
             self.jws.decode(
                 token,
                 key,
                 validation_headers=validation_headers,
             )
             # validate claims
-            self.jws.token.validated.model.claims = self.prepare_claims(
-                self.jws.token.validated.decoded.payload,
-                validation_model=validation_claims,
+            try:
+                prepare_and_validate_data(
+                    data=self.jws.token.validated.decoded.payload,
+                    validation_model=validation_claims,
+                )
+            except ValidationError as e:
+                raise ClaimsValidationError(validation_errors=e.errors()) from e
+
+            # set claims model data
+            default_claims_model = get_effective_data_model(
+                self.jws.token.validated.decoded.payload, validation_claims
+            )
+            self.jws.token.validated.model.claims = default_claims_model.model_construct(
+                **self.jws.token.validated.decoded.payload
             )
 
         self.token = self.jws.token.validated

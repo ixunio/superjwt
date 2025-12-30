@@ -7,14 +7,13 @@ from superjwt.algorithms import BaseJWSAlgorithm, NoneAlgorithm
 from superjwt.definitions import (
     MAX_TOKEN_LENGTH,
     Algorithm,
-    DefaultHeadersValidationModel,
     JOSEHeader,
     JWSToken,
     JWSTokenLifeCycle,
     JWTBaseModel,
+    get_effective_data_model,
     get_jws_algorithm,
-    prepare_and_validate_model,
-    select_effective_validation_model,
+    prepare_and_validate_data,
 )
 from superjwt.exceptions import (
     HeaderValidationError,
@@ -33,7 +32,6 @@ class JWS:
         self,
         algorithm: Algorithm | Literal["none"],
         max_token_size: int = MAX_TOKEN_LENGTH,
-        crit_headers_strict_check: bool = False,
     ):
         self.token: JWSTokenLifeCycle = JWSTokenLifeCycle()
         self.algorithm: BaseJWSAlgorithm[BaseKey] = get_jws_algorithm(algorithm)
@@ -42,7 +40,6 @@ class JWS:
 
         self.raw_jws: bytes = b""
         self.max_size = max_token_size
-        self.crit_headers_strict_check = crit_headers_strict_check
         self._allow_none_algorithm = False
 
     def reset(self) -> None:
@@ -57,35 +54,49 @@ class JWS:
 
     def encode(
         self,
-        headers: JOSEHeader,
-        payload: JWTBaseModel,
+        headers: JOSEHeader | dict[str, Any] | None,
+        payload: dict[str, Any],
         key: BaseKey,
-        validation_headers: type[JOSEHeader] | None,
+        *,
+        validation_headers: type[JOSEHeader] | None = JOSEHeader,
     ) -> bytes:
         if self.token.validated.encoded.compact != b"..":
             raise JWTError("JWS instance data must be reset")
 
-        # check headers is valid
-        headers = self.prepare_headers(
-            headers,
-            cast("Algorithm", self.algorithm.name),
-            validation_model=validation_headers,
+        # prepare headers data and perform validation
+        if headers is None:
+            headers = JOSEHeader.make_default(cast("Algorithm", self.algorithm.name))
+
+        try:
+            headers_dict = prepare_and_validate_data(
+                data=headers,
+                validation_model=validation_headers,
+                type_err_msg="headers must be a JOSEHeader instance or a dict",
+            )
+        except ValidationError as e:
+            raise HeaderValidationError(validation_errors=e.errors()) from e
+
+        # set headers data
+        default_headers_model = get_effective_data_model(headers, validation_headers)
+        self.token.validated.model.headers = cast(
+            "JOSEHeader", default_headers_model.model_construct(**headers_dict)
         )
-        self.token.validated.model.headers = headers
-
-        headers_dict = headers.to_dict()
-        encoded_headers = json.dumps(headers_dict, separators=(",", ":")).encode("utf-8")
         self.token.validated.decoded.headers = headers_dict
-        self.token.validated.encoded.headers = urlsafe_b64encode(encoded_headers)
+        self.token.validated.encoded.headers = urlsafe_b64encode(
+            json.dumps(headers_dict, separators=(",", ":")).encode("utf-8")
+        )
 
-        payload_dict = payload.to_dict()
-        encoded_payload = json.dumps(payload_dict, separators=(",", ":")).encode("utf-8")
-        self.token.validated.decoded.payload = payload_dict
-        self.token.validated.encoded.payload = urlsafe_b64encode(encoded_payload)
+        # set payload data
+        self.token.validated.decoded.payload = payload
+        self.token.validated.encoded.payload = urlsafe_b64encode(
+            json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        )
 
+        # set signature data
         signature = self.algorithm.sign(self.token.validated.encoded.signing_input, key)
         self.token.validated.decoded.signature = SecretBytes(signature)
         self.token.validated.encoded.signature = SecretBytes(urlsafe_b64encode(signature))
+
         return self.token.validated.encoded.compact
 
     def decode(
@@ -93,8 +104,8 @@ class JWS:
         token: str | bytes,
         key: BaseKey,
         *,
-        with_detached_payload: JWTBaseModel | None = None,
-        validation_headers: type[JOSEHeader] | None,
+        with_detached_payload: dict[str, Any] | None = None,
+        validation_headers: type[JOSEHeader] | None = JOSEHeader,
     ) -> JWSToken:
         if (
             self.token.validated.encoded.compact != b".."
@@ -105,19 +116,15 @@ class JWS:
         # decode JWT token parts
         self.decode_parts(token, with_detached_payload)
 
-        # validate headers
-        self.validate_headers(
-            self.token.unsafe.decoded.headers,
-            cast("Algorithm", self.algorithm.name),
-            validation_model=validation_headers,
-        )
+        # validate headers and algorithm
+        self.validate_headers_and_algorithm(validation_headers)
 
         # verify signature
         self.verify_signature(key)
         return self.token.validated
 
     def decode_parts(
-        self, token: str | bytes, detached_payload: JWTBaseModel | None = None
+        self, token: str | bytes, detached_payload: dict[str, Any] | None = None
     ) -> None:
         if len(token) > self.max_size:
             raise SizeExceededError(
@@ -135,17 +142,13 @@ class JWS:
         # decode payload
         if self.has_detached_payload:
             if detached_payload is None:
-                payload_dict = {}
-                encoded_payload = b""
+                self.token.unsafe.decoded.payload = {}
+                self.token.unsafe.encoded.payload = urlsafe_b64encode(b"")
             else:
-                payload_dict: dict[str, Any] = detached_payload.model_dump(
-                    exclude_none=True
+                self.token.unsafe.decoded.payload = detached_payload
+                self.token.unsafe.encoded.payload = urlsafe_b64encode(
+                    json.dumps(detached_payload, separators=(",", ":")).encode("utf-8")
                 )
-                encoded_payload = json.dumps(payload_dict, separators=(",", ":")).encode(
-                    "utf-8"
-                )
-            self.token.unsafe.decoded.payload = payload_dict
-            self.token.unsafe.encoded.payload = urlsafe_b64encode(encoded_payload)
         else:
             self.decode_raw_payload()
 
@@ -214,54 +217,34 @@ class JWS:
             )
         )
 
-    @staticmethod
-    def prepare_headers(
-        headers: JOSEHeader | dict[str, Any] | None,
-        algorithm: Algorithm,
+    def validate_headers_and_algorithm(
+        self,
         validation_model: type[JWTBaseModel] | None,
-    ) -> JOSEHeader:
-        EffectiveValidationModel = select_effective_validation_model(
-            headers,
-            validation_model,
-            DefaultHeadersValidationModel,
-        )
+    ) -> None:
+        headers_dict = self.token.unsafe.decoded.headers
 
+        # validate headers
         try:
-            return cast(
-                "JOSEHeader",
-                prepare_and_validate_model(
-                    data=headers,
-                    EffectiveValidationModel=EffectiveValidationModel,
-                    type_err_msg="headers must be a JOSEHeader instance or a dict",
-                    default_value=JOSEHeader.make_default(algorithm).to_dict(),
-                    disable_validation=validation_model is None,
-                ),
+            prepare_and_validate_data(
+                data=headers_dict,
+                validation_model=validation_model,
             )
         except ValidationError as e:
             raise HeaderValidationError(validation_errors=e.errors()) from e
 
-    def validate_headers(
-        self,
-        headers: dict[str, Any],
-        algorithm: Algorithm,
-        validation_model: type[JOSEHeader] | None,
-    ) -> None:
-        headers_validated = self.prepare_headers(
-            headers=headers,
-            algorithm=algorithm,
-            validation_model=validation_model,
-        )
-        headers_validated = headers_validated.model_validate(
-            headers_validated, context=self.crit_headers_strict_check
+        # set headers model data
+        headers_dict = self.token.unsafe.decoded.headers
+        default_headers_model = get_effective_data_model(headers_dict, validation_model)
+        self.token.unsafe.model.headers = headers_validated = cast(
+            "JOSEHeader", default_headers_model.model_construct(**headers_dict)
         )
 
-        self.token.unsafe.model.headers = headers_validated
-
-        if validation_model is not None:
-            if headers_validated.alg != self.algorithm.name:
-                raise InvalidHeaderError(
-                    f"JWS algorithm '{headers_validated.alg}' does not match expected '{self.algorithm.name}'"
-                )
+        # check algorithm match
+        pass_through = self.algorithm.name == "none" and self._allow_none_algorithm
+        if not pass_through and headers_validated.alg != self.algorithm.name:
+            raise InvalidHeaderError(
+                f"JWS algorithm '{headers_validated.alg}' does not match expected '{self.algorithm.name}'"
+            )
 
     def verify_signature(self, key: BaseKey) -> bool:
         if isinstance(self.algorithm, NoneAlgorithm) and not self._allow_none_algorithm:

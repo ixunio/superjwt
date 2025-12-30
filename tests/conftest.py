@@ -75,24 +75,24 @@ def iss() -> str:
 
 
 @pytest.fixture
-def iat() -> datetime:
-    return datetime.now(UTC)
+def iat() -> float:
+    return datetime.now(UTC).timestamp()
 
 
 @pytest.fixture
-def nbf(iat: datetime) -> float:
-    return (iat + timedelta(days=30)).timestamp()
+def nbf(iat: float) -> float:
+    return (datetime.fromtimestamp(iat) + timedelta(days=30)).timestamp()
 
 
 @pytest.fixture
-def exp() -> datetime:
-    return datetime.strptime("2042-04-02T00:42:42.123456+0000", "%Y-%m-%dT%H:%M:%S.%f%z")
+def exp() -> float:
+    return datetime.strptime(
+        "2042-04-02T00:42:42.123456+0000", "%Y-%m-%dT%H:%M:%S.%f%z"
+    ).timestamp()
 
 
 @pytest.fixture
-def claims_dict(
-    sub: str, iss: str, iat: datetime, nbf: float, exp: datetime
-) -> dict[str, Any]:
+def claims_dict(sub: str, iss: str, iat: float, nbf: float, exp: float) -> dict[str, Any]:
     return {
         "iss": iss,
         "sub": sub,
@@ -100,8 +100,8 @@ def claims_dict(
         "nbf": nbf,
         "exp": exp,
         "user_id": "value",
-        "past_date": (iat - timedelta(days=1)).timestamp(),
-        "future_date": (exp + timedelta(days=1)).timestamp(),
+        "past_date": (datetime.fromtimestamp(iat) - timedelta(days=1)).timestamp(),
+        "future_date": (datetime.fromtimestamp(exp) + timedelta(days=1)).timestamp(),
     }
 
 

@@ -28,7 +28,6 @@ from superjwt.exceptions import (
     AlgorithmNotSupportedError,
     InvalidAlgorithmError,
     InvalidHeaderError,
-    JWTError,
     TokenExpiredError,
 )
 from superjwt.keys import BaseKey, NoneKey, OctKey
@@ -91,6 +90,8 @@ class JWTBaseModel(BaseModel):
 
 
 class JOSEHeader(JWTBaseModel):
+    _strict_crit_check: bool = False
+
     alg: Annotated[
         Algorithm | Literal["none"],
         Field(description="algorithm - the algorithm used to sign the JWT"),
@@ -125,7 +126,6 @@ class JOSEHeader(JWTBaseModel):
         if value is None:
             return value
 
-        crit_headers_strict_check: bool = info.context  # type: ignore
         if value is not None and len(value) == 0:  # empty list is forbidden
             raise ValueError("'crit' header must be a non-empty list of strings")
 
@@ -136,7 +136,7 @@ class JOSEHeader(JWTBaseModel):
             if el not in info.data.keys():
                 missing.append(el)
             # check for unsupported custom headers
-            elif crit_headers_strict_check and (el not in cls.model_fields.keys()):
+            elif cls._strict_crit_check and (el not in cls.model_fields.keys()):
                 unsupported.append(el)
         if missing:
             raise ValueError(f"Missing crit headers: {', '.join(missing)}")
@@ -352,54 +352,36 @@ def make_key(algorithm: Algorithm | Literal["none"], key: str | bytes) -> BaseKe
     return key_type.import_key(key)
 
 
-DefaultClaimsValidationModel = JWTClaims
-DefaultHeadersValidationModel = JOSEHeader
-
-
-def select_effective_validation_model(
-    data: JWTBaseModel | dict[str, Any] | None,
+def get_effective_data_model(
+    data: JWTBaseModel | dict[str, Any],
     validation_model: type[JWTBaseModel] | None,
-    DefaultValidationModel: type[JWTBaseModel],
 ) -> type[JWTBaseModel]:
-    # 1. case validation disabled
-    if validation_model is None:
-        return DefaultValidationModel
-    # 2. default case
-    elif validation_model is DefaultValidationModel:
-        # override with self model if data is a pydantic model
-        if isinstance(data, JWTBaseModel):
-            return data.__class__
-        else:
-            return DefaultValidationModel
-    # 3. custom validation model was provided, overrides default
-    elif issubclass(validation_model, JWTBaseModel):
+    if isinstance(data, JWTBaseModel):
+        return type(data)
+    if validation_model is not None:
         return validation_model
-    raise JWTError("Invalid validation model type")
+    return JWTBaseModel
 
 
-def prepare_and_validate_model(
-    data: JWTBaseModel | dict[str, Any] | None,
-    EffectiveValidationModel: type[JWTBaseModel],
+def prepare_and_validate_data(
+    data: JWTBaseModel | dict[str, Any],
+    validation_model: type[JWTBaseModel] | None,
+    *,
     type_err_msg: str = "Wrong data type for pydantic model preparation",
-    default_value: dict[str, Any] = {},  # noqa: B006
-    disable_validation: bool = False,
-) -> JWTBaseModel:
-    # prepare data dict
-    # 1 . case data is None
-    if data is None:
-        data_dict = default_value
-    # 2. case data is a dict
-    elif isinstance(data, dict):
+) -> dict[str, Any]:
+    # 1. Prepare data as dict for pydantic validation
+    # --> case data is a dict
+    if isinstance(data, dict):
         data_dict = data.copy()
-    # 3. case data is a pydantic model
-    elif isinstance(data, JWTBaseModel):
-        data_dict = data.to_dict()
+    # --> case data is a pydantic model
+    elif isinstance(data, BaseModel):
+        data_dict = data.model_dump(exclude_none=True)
     else:
         raise TypeError(type_err_msg)
 
-    # RETURN PYDANTIC MODEL WITH NO VALIDATION
-    if disable_validation:
-        return EffectiveValidationModel.model_construct(**data_dict)
+    # 2. Validate data
+    if validation_model is not None:
+        validation_model(**data_dict)  # run validation
 
-    # RETURN PYDANTIC MODEL WITH VALIDATION RUN
-    return EffectiveValidationModel(**data_dict)
+    # 3. Return data as dict
+    return data_dict

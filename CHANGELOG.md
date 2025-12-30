@@ -13,8 +13,9 @@
     - defaulting with no `'iat'` set
     - `with_issued_at()` method added
     - modular model with reusable mixins
-- Refactoring of claims and headers validation ([#21])
-    - `encode()` and `decode()` have now the same validation behavior with `validation_claims` and `validation_headers` parameters. Disable it by setting to `None`
+- Refactoring of claims and headers validation ([#21]) ([#30])
+    - `encode()` and `decode()` have now the same validation behavior with `validation_claims` (default to `JWTClaims`) and `validation_headers` (default to `JOSEHeader`) parameters. Disable it by setting to `None`
+    - claims data sent as dict are no longer serialized with Pydantic (datetime object will no longer work). Usage of Pydantic models is recommended instead.
 
 ## v0.2.0 (2025-12-27)
 
@@ -48,6 +49,7 @@
 
 :tada: superjwt repository initialization
 
+[#30]: /../../issues/30
 [#24]: /../../issues/24
 [#21]: /../../issues/21
 [#17]: /../../issues/17
