@@ -142,17 +142,17 @@ def test_encode_decode_pydantic_claims(
     # encoding valid
     token = jwt.encode(claims=claims, key=secret_key)
     jws_token = jwt.jws.token.validated
-    jwt.encode(claims=claims, key=secret_key, claims_validation_model=JWTCustomClaims)
+    jwt.encode(claims=claims, key=secret_key, validation_claims=JWTCustomClaims)
     jws_token2 = jwt.jws.token.validated
     assert jws_token.encoded.compact == jws_token2.encoded.compact
     # decoding
     claims.user_id = None  # invalid type for user_id  # type: ignore
-    token = jwt.encode(claims=claims, key=secret_key, claims_validation_model=None)
+    token = jwt.encode(claims=claims, key=secret_key, validation_claims=None)
     # passes (validation with default JWTClaims)
     jwt.decode(token=token, key=secret_key)
     # fails (validation with JWTCustomClaims)
     with pytest.raises(ClaimsValidationError):
-        jwt.decode(token=token, key=secret_key, claims_validation_model=JWTCustomClaims)
+        jwt.decode(token=token, key=secret_key, validation_claims=JWTCustomClaims)
 
 
 def test_decode_invalid_signature(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
@@ -185,14 +185,10 @@ def test_encode_decode_claims_validation_disabled(
     unvalidated_claims.sub = 1  # invalid type for sub  # type: ignore
     with pytest.raises(ClaimsValidationError):
         jwt.encode(claims=unvalidated_claims, key=secret_key_random)
-    encoded = jwt.encode(
-        unvalidated_claims, secret_key_random, claims_validation_model=None
-    )
+    encoded = jwt.encode(unvalidated_claims, secret_key_random, validation_claims=None)
     with pytest.raises(ClaimsValidationError):
         jwt.decode(token=encoded, key=secret_key_random)
-    decoded = jwt.decode(
-        token=encoded, key=secret_key_random, claims_validation_model=None
-    )
+    decoded = jwt.decode(token=encoded, key=secret_key_random, validation_claims=None)
     decoded_claims = JWTCustomClaims.model_construct(**decoded)
 
     decoded_claims.sub = claims.sub  # fix type for sub to match original claims
@@ -212,14 +208,12 @@ def test_encode_decode_claims_dict_validation_disabled(
         jwt.encode(claims=unvalidated_claims_dict, key=secret_key_random)
     # run encoding again with validation disabled, does not raise error
     encoded = jwt.encode(
-        unvalidated_claims_dict, secret_key_random, claims_validation_model=None
+        unvalidated_claims_dict, secret_key_random, validation_claims=None
     )
     with pytest.raises(ClaimsValidationError):
         jwt.decode(token=encoded, key=secret_key_random)
     # run decoding again with validation disabled, does not raise error
-    decoded = jwt.decode(
-        token=encoded, key=secret_key_random, claims_validation_model=None
-    )
+    decoded = jwt.decode(token=encoded, key=secret_key_random, validation_claims=None)
     decoded_claims = JWTCustomClaims.model_construct(**decoded)
 
     decoded_claims.sub = claims_dict["sub"]  # fix type for sub to match original claims
@@ -234,10 +228,10 @@ def test_required_field_missing(jwt: JWT, claims: JWTCustomClaims, secret_key: s
     claims.sub = None  # remove required field 'sub'  # type: ignore
     with pytest.raises(ClaimsValidationError):
         jwt.encode(claims=claims, key=secret_key)
-    encoded = jwt.encode(claims, secret_key, claims_validation_model=None)
+    encoded = jwt.encode(claims, secret_key, validation_claims=None)
     with pytest.raises(ClaimsValidationError):
-        jwt.decode(token=encoded, key=secret_key, claims_validation_model=JWTCustomClaims)
-    decoded = jwt.decode(token=encoded, key=secret_key, claims_validation_model=None)
+        jwt.decode(token=encoded, key=secret_key, validation_claims=JWTCustomClaims)
+    decoded = jwt.decode(token=encoded, key=secret_key, validation_claims=None)
     with pytest.raises(pydantic.ValidationError):
         JWTCustomClaims(**decoded)
 
@@ -368,10 +362,10 @@ def test_detached_payload_no_jws_instance(jwt: JWT):
 
 def test_expired_token(jwt: JWT, secret_key: str):
     claims = JWTClaims.model_construct(exp=datetime.now(UTC) - timedelta(days=1))
-    token = jwt.encode(claims=claims, key=secret_key, claims_validation_model=None)
+    token = jwt.encode(claims=claims, key=secret_key, validation_claims=None)
     with pytest.raises(TokenExpiredError):
         jwt.encode(claims=claims, key=secret_key)
-    decoded = jwt.decode(token=token, key=secret_key, claims_validation_model=None)
+    decoded = jwt.decode(token=token, key=secret_key, validation_claims=None)
     assert decoded["exp"] == claims.to_dict()["exp"]
     with pytest.raises(TokenExpiredError):
         jwt.decode(token=token, key=secret_key)

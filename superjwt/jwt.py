@@ -40,9 +40,9 @@ class JWT:
         key: str | bytes | BaseKey,
         algorithm: Algorithm = "HS256",
         *,
-        claims_validation_model: type[JWTBaseModel] | None = DefaultClaimsValidationModel,
         headers: JOSEHeader | dict[str, Any] | None = None,
-        headers_validation_model: type[JOSEHeader] | None = DefaultHeadersValidationModel,
+        validation_claims: type[JWTBaseModel] | None = DefaultClaimsValidationModel,
+        validation_headers: type[JOSEHeader] | None = DefaultHeadersValidationModel,
     ) -> bytes:
         """Encode and sign the claims as a JWT token
 
@@ -51,14 +51,14 @@ class JWT:
             key (str | bytes | BaseKey): The key instance to sign the JWT with.
             algorithm (Algorithm): The algorithm to use for signing the JWT.
                 Will default to 'HS256' (HMAC with SHA-256).
-            claims_validation_model (type[JWTBaseModel] | None, opt.): the pydantic model
-                to use for claims validation. If None, claims validation is disabled.
-                Default to DefaultClaimsValidationModel.
             headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
                 in the JWT. Will use default JWS headers if not provided.
-            headers_validation_model (type[JOSEHeader] | None, opt.): the pydantic model
+            validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
+                to use for claims validation. If None, claims validation is disabled.
+                Default to DefaultClaimsValidationModel or claims.__class__ if pydantic object.
+            validation_headers (type[JOSEHeader] | None, opt.): the pydantic model
                 to use for headers validation. If None, headers validation is disabled.
-                Default to DefaultHeadersValidationModel.
+                Default to DefaultHeadersValidationModel or headers.__class__ if pydantic object.
 
         Returns:
             bytes: the encoded compact JWT token
@@ -68,7 +68,7 @@ class JWT:
         self.reset_token()
 
         # prepare claims data and perform validation
-        claims = self.prepare_claims(claims, validation_model=claims_validation_model)
+        claims = self.prepare_claims(claims, validation_model=validation_claims)
 
         # prepare headers data (validation will be done later in JWS instance)
         headers = JWS.prepare_headers(headers, algorithm, validation_model=None)
@@ -83,7 +83,7 @@ class JWT:
             headers=headers,
             payload=claims,
             key=key,
-            headers_validation_model=headers_validation_model,
+            validation_headers=validation_headers,
         )
         self.jws.token.validated.model.claims = claims
 
@@ -131,8 +131,8 @@ class JWT:
         algorithm: Algorithm = "HS256",
         *,
         with_detached_payload: JWTClaims | dict[str, Any] | None = None,
-        claims_validation_model: type[JWTBaseModel] | None = DefaultClaimsValidationModel,
-        headers_validation_model: type[JOSEHeader] | None = DefaultHeadersValidationModel,
+        validation_claims: type[JWTBaseModel] | None = DefaultClaimsValidationModel,
+        validation_headers: type[JOSEHeader] | None = DefaultHeadersValidationModel,
     ) -> dict[str, Any]:
         """Decode the JWT token with signature verification.
 
@@ -142,10 +142,10 @@ class JWT:
             algorithm (Algorithm): The algorithm to use for verifying the JWT.
             with_detached_payload (JWTClaims | dict[str, Any] | None, opt.):
                 Detached payload to use for signature verification, if any.
-            claims_validation_model (type[JWTBaseModel] | None, opt.): the pydantic model
+            validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
                 to use for claims validation. If None, claims validation is disabled.
                 Default to DefaultClaimsValidationModel.
-            headers_validation_model (type[JOSEHeader] | None, opt.): the pydantic model
+            validation_headers (type[JOSEHeader] | None, opt.): the pydantic model
                 to use for headers validation. If None, headers validation is disabled.
                 Default to DefaultHeadersValidationModel.
 
@@ -164,7 +164,7 @@ class JWT:
         if with_detached_payload is not None:
             # prepare and validate detached claims
             detached_claims = self.prepare_claims(
-                with_detached_payload, validation_model=claims_validation_model
+                with_detached_payload, validation_model=validation_claims
             )
             # JWS decode with detached payload
             self.jws.enable_detached_payload()
@@ -172,7 +172,7 @@ class JWT:
                 token,
                 key,
                 with_detached_payload=detached_claims,
-                headers_validation_model=headers_validation_model,
+                validation_headers=validation_headers,
             )
             self.jws.token.validated.model.claims = detached_claims
         else:
@@ -180,12 +180,12 @@ class JWT:
             self.jws.decode(
                 token,
                 key,
-                headers_validation_model=headers_validation_model,
+                validation_headers=validation_headers,
             )
             # validate claims
             self.jws.token.validated.model.claims = self.prepare_claims(
                 self.jws.token.validated.decoded.payload,
-                validation_model=claims_validation_model,
+                validation_model=validation_claims,
             )
 
         self.token = self.jws.token.validated
@@ -214,7 +214,7 @@ class JWT:
         if has_detached_payload:
             self.jws.enable_detached_payload()
         self.jws._allow_none_algorithm = True
-        self.jws.decode(token=token, key=NoneKey(), headers_validation_model=None)
+        self.jws.decode(token=token, key=NoneKey(), validation_headers=None)
         self.jws._allow_none_algorithm = False
 
         self.token = self.jws.token.unsafe

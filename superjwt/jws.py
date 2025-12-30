@@ -60,7 +60,7 @@ class JWS:
         headers: JOSEHeader,
         payload: JWTBaseModel,
         key: BaseKey,
-        headers_validation_model: type[JOSEHeader] | None,
+        validation_headers: type[JOSEHeader] | None,
     ) -> bytes:
         if self.token.validated.encoded.compact != b"..":
             raise JWTError("JWS instance data must be reset")
@@ -69,7 +69,7 @@ class JWS:
         headers = self.prepare_headers(
             headers,
             cast("Algorithm", self.algorithm.name),
-            validation_model=headers_validation_model,
+            validation_model=validation_headers,
         )
         self.token.validated.model.headers = headers
 
@@ -94,7 +94,7 @@ class JWS:
         key: BaseKey,
         *,
         with_detached_payload: JWTBaseModel | None = None,
-        headers_validation_model: type[JOSEHeader] | None,
+        validation_headers: type[JOSEHeader] | None,
     ) -> JWSToken:
         if (
             self.token.validated.encoded.compact != b".."
@@ -109,7 +109,7 @@ class JWS:
         self.validate_headers(
             self.token.unsafe.decoded.headers,
             cast("Algorithm", self.algorithm.name),
-            validation_model=headers_validation_model,
+            validation_model=validation_headers,
         )
 
         # verify signature
