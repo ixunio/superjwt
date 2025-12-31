@@ -1,6 +1,6 @@
 import pytest
 from superjwt.definitions import JOSEHeader
-from superjwt.exceptions import HeaderValidationError, InvalidHeaderError, JWTError
+from superjwt.exceptions import InvalidHeaderError, JWTError
 from superjwt.jws import JWS
 from superjwt.keys import OctKey
 
@@ -91,16 +91,13 @@ def test_wrong_header_algorithm(
     jws_HS256.reset()
 
     # header validation error, alg is not a valid algorithm
-    with pytest.raises(HeaderValidationError):
-        jws_HS256.decode(
-            token=invalid_compact,
-            key=key,
-        )
+    with pytest.raises(InvalidHeaderError):
+        jws_HS256.decode(token=invalid_compact, key=key)
     jws_HS256.reset()
 
     # algorithm mismatch error
     with pytest.raises(InvalidHeaderError):
-        jws_HS256.decode(token=invalid_compact, key=key, validation_headers=None)
+        jws_HS256.decode(token=invalid_compact, key=key)
     jws_HS256.reset()
 
     decoded_claims = JWTCustomClaims(

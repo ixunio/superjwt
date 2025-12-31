@@ -9,7 +9,10 @@ from superjwt.definitions import (
     JWSToken,
     JWTBaseModel,
     JWTClaims,
+    JWTClaimsValidationDefault,
+    JWTHeadersValidationDefault,
     get_effective_data_model,
+    get_effective_data_validation_model,
     make_key,
     prepare_and_validate_data,
 )
@@ -39,8 +42,8 @@ class JWT:
         algorithm: Algorithm = "HS256",
         *,
         headers: JOSEHeader | dict[str, Any] | None = None,
-        validation_claims: type[JWTBaseModel] | None = JWTClaims,
-        validation_headers: type[JOSEHeader] | None = JOSEHeader,
+        validation_claims: type[JWTBaseModel] | None = JWTClaimsValidationDefault,
+        validation_headers: type[JOSEHeader] | None = JWTHeadersValidationDefault,
     ) -> bytes:
         """Encode and sign the claims as a JWT token
 
@@ -53,10 +56,12 @@ class JWT:
                 in the JWT. Will use default JWS headers if not provided.
             validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
                 to use for claims validation. If None, claims validation is disabled.
-                Defaults to JWTClaims. (standard RFC 7519 registered claims)
+                If 'claims' is a pydantic instance, defaults to its pydantic model.
+                Otherwise, defaults to JWTBaseModel (i.e. no validation).
             validation_headers (type[JOSEHeader] | None, opt.): the pydantic model
                 to use for headers validation. If None, headers validation is disabled.
-                Defaults to JOSEHeader. (standard JOSE Header)
+                If 'headers' is a pydantic instance, defaults to its pydantic model.
+                Otherwise, defaults to JOSEHeader (standard JOSE Header).
 
         Returns:
             bytes: the encoded compact JWT token
@@ -68,6 +73,9 @@ class JWT:
         # prepare claims data and perform validation
         if claims is None:
             claims = JWTBaseModel()
+        validation_claims = get_effective_data_validation_model(
+            claims, validation_claims, default=JWTBaseModel
+        )
         try:
             claims_dict = prepare_and_validate_data(
                 data=claims,
@@ -91,8 +99,10 @@ class JWT:
         )
 
         # set claims model data
-        default_claims_model = get_effective_data_model(claims, validation_claims)
-        self.jws.token.validated.model.claims = default_claims_model.model_construct(
+        claims_model = get_effective_data_model(
+            claims, validation_claims, default=JWTBaseModel
+        )
+        self.jws.token.validated.model.claims = claims_model.model_construct(
             **claims_dict
         )
 
@@ -119,8 +129,8 @@ class JWT:
         algorithm: Algorithm = "HS256",
         *,
         with_detached_payload: JWTClaims | dict[str, Any] | None = None,
-        validation_claims: type[JWTBaseModel] | None = JWTClaims,
-        validation_headers: type[JOSEHeader] | None = JOSEHeader,
+        validation_claims: type[JWTBaseModel] | None = None,
+        validation_headers: type[JOSEHeader] | None = JWTHeadersValidationDefault,
     ) -> dict[str, Any]:
         """Decode the JWT token with signature verification.
 
@@ -132,10 +142,9 @@ class JWT:
                 Detached payload to use for signature verification, if any.
             validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
                 to use for claims validation. If None, claims validation is disabled.
-                Defaults to JWTClaims. (standard RFC 7519 registered claims)
             validation_headers (type[JOSEHeader] | None, opt.): the pydantic model
                 to use for headers validation. If None, headers validation is disabled.
-                Defaults to JOSEHeader. (standard JOSE Header)
+                Defaults to JOSEHeader (standard JOSE Header).
 
         Returns:
             dict[str, Any]: The decoded and verified JWT claims as a dictionary.
@@ -163,10 +172,10 @@ class JWT:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
 
             # set claims model data
-            default_claims_model = get_effective_data_model(
-                claims_dict, validation_claims
+            claims_model = get_effective_data_model(
+                claims_dict, validation_claims, default=JWTBaseModel
             )
-            self.jws.token.unsafe.model.claims = default_claims_model.model_construct(
+            self.jws.token.unsafe.model.claims = claims_model.model_construct(
                 **claims_dict
             )
 
@@ -186,21 +195,23 @@ class JWT:
                 key,
                 validation_headers=validation_headers,
             )
+            claims_dict = self.jws.token.validated.decoded.payload
+
             # validate claims
             try:
                 prepare_and_validate_data(
-                    data=self.jws.token.validated.decoded.payload,
+                    data=claims_dict,
                     validation_model=validation_claims,
                 )
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
 
             # set claims model data
-            default_claims_model = get_effective_data_model(
-                self.jws.token.validated.decoded.payload, validation_claims
+            claims_model = get_effective_data_model(
+                claims_dict, validation_claims, default=JWTBaseModel
             )
-            self.jws.token.validated.model.claims = default_claims_model.model_construct(
-                **self.jws.token.validated.decoded.payload
+            self.jws.token.validated.model.claims = claims_model.model_construct(
+                **claims_dict
             )
 
         self.token = self.jws.token.validated

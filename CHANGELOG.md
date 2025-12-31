@@ -4,8 +4,8 @@
 
 ### :sparkles: New
 
-- validate claims or headers with custom pydantic models for `decode()` ([#21])
-- expired token now raises `TokenExpiredError` upon validation ([#24])
+- validate claims or headers with custom pydantic models for `decode()` ([#34])
+- expired token now raises `TokenExpiredError` upon claims validation ([#24])
 
 ### :gear: Changes
 
@@ -13,8 +13,17 @@
     - defaulting with no `'iat'` set
     - `with_issued_at()` method added
     - modular model with reusable mixins
-- Refactoring of claims and headers validation ([#21]) ([#30])
-    - `encode()` and `decode()` have now the same validation behavior with `validation_claims` (default to `JWTClaims`) and `validation_headers` (default to `JOSEHeader`) parameters. Disable it by setting to `None`
+- Refactoring of claims and headers validation ([#34])
+    - `encode()` new validation default behavior:
+        - when `claims` is passed as a pydantic instance, do validation with the pydantic model automatically
+        - when `claims` is passed as a dict or empty, no automatic validation
+        - when `headers` (optional) is passed as a pydantic instance, do validation with the pydantic model automatically
+        - when `headers` (optional) is passed as a dict, validate against `JOSEHeader`
+    - `decode()` new validation default behavior:
+        - no automatic validation for claims by default, `validation_claims` must be specified to a pydantic model
+        - headers are automatically validated against `JOSEHeader`
+    - claims & headers validation can be overridden by passing a pydantic model to `validation_claims` & `validation_headers` params in `encode()` / `decode()`
+    - claims & headers validation can be disabled by passing `None` to `validation_claims` & `validation_headers` params in `encode()` / `decode()`
     - claims data sent as dict are no longer serialized with Pydantic (datetime object will no longer work). Usage of Pydantic models is recommended instead.
 
 ## v0.2.0 (2025-12-27)
@@ -49,9 +58,8 @@
 
 :tada: superjwt repository initialization
 
-[#30]: /../../issues/30
+[#34]: /../../issues/34
 [#24]: /../../issues/24
-[#21]: /../../issues/21
 [#17]: /../../issues/17
 [#15]: /../../issues/15
 [#14]: /../../issues/14
