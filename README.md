@@ -4,7 +4,7 @@
 
 <div align="center">
 <picture>
-<img alt="SuperJWT full logo" src=/docs/assets/logo-full-superjwt.png>
+<img alt="SuperJWT full logo" src=https://raw.githubusercontent.com/ixunio/superjwt/main/docs/assets/logo-full-superjwt.png>
 </picture>
 <br />
 <em>
