@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Annotated, Any, Literal, TypeVar
+from typing import Annotated, Any, Final, Literal
 
 from pydantic import (
     AfterValidator,
@@ -361,73 +361,94 @@ def make_key(algorithm: Algorithm | Literal["none"], key: str | bytes) -> BaseKe
     return key_type.import_key(key)
 
 
-class JWTHeadersValidationDefault(JOSEHeader):
-    """
-    Placeholder pydantic model for default headers validation state.
-    """
+class JWTValidationModelConfig(BaseModel):
+    enabled: bool = True
+
+    # validation
+    default_validation_model: type[BaseModel] = JWTBaseModel
+    force_validation_on_pydantic_model: bool = True
+
+    # data storage
+    default_data_model: type[BaseModel] = JWTBaseModel
 
 
-class JWTClaimsValidationDefault(JWTClaims):
-    """
-    Placeholder pydantic model for default claims validation state.
-    """
+JWTDisabledValidationConfig = JWTValidationModelConfig(enabled=False)
+
+JWTClaimsDefaultValidationConfig = JWTValidationModelConfig(
+    default_validation_model=JWTBaseModel,
+    force_validation_on_pydantic_model=True,
+    default_data_model=JWTBaseModel,
+)
+JWTHeadersDefaultValidationConfig = JWTValidationModelConfig(
+    default_validation_model=JOSEHeader,
+    force_validation_on_pydantic_model=True,
+    default_data_model=JOSEHeader,
+)
 
 
-ValidationModelType = TypeVar("ValidationModelType", bound=type[JWTBaseModel])
+class DefaultValidationFlag: ...
+
+
+DefaultValidation: Final = DefaultValidationFlag()
 
 
 def get_effective_data_model(
     data: JWTBaseModel | dict[str, Any],
-    validation_model: ValidationModelType | None,
-    default: ValidationModelType,
-) -> ValidationModelType:
-    # Used for encoding and decoding
+    validation_model: type[BaseModel] | JWTValidationModelConfig | None,
+) -> type[BaseModel]:
+    """Determine the effective pydantic model to use for internal data storage."""
 
-    # case data is already a pydantic instance (only for encoding)
-    # --> return current model
-    if isinstance(data, BaseModel):
-        return type(data)  # type: ignore[return-value]
+    # 1. case validation is disabled (use generic)
+    if validation_model is None:
+        return JWTBaseModel
 
-    # case data is a dict (for encoding and decoding)
-    # and validation model was explicitly specified
-    # --> return model from validation_model if specified
-    if validation_model is not None and validation_model not in (
-        JWTClaimsValidationDefault,
-        JWTHeadersValidationDefault,
-    ):
-        return validation_model
-    # --> return default model otherwise
-    return default
+    # 2. case when data is not a pydantic model (a dict)
+    if not isinstance(data, BaseModel):
+        # 2.1 validation model was specified (use it)
+        if not isinstance(validation_model, JWTValidationModelConfig):
+            return validation_model
+        # 2.2 no validation model was specified (use default data model)
+        return validation_model.default_data_model
+
+    # 3. case when data is already a pydantic model (use it)
+    return type(data)
 
 
 def get_effective_data_validation_model(
     data: JWTBaseModel | dict[str, Any],
-    validation_model: ValidationModelType | None,
-    default: ValidationModelType,
-) -> ValidationModelType | None:
-    # For encoding only
+    validation_model: type[BaseModel] | JWTValidationModelConfig | None,
+) -> type[BaseModel] | None:
+    """Determine the effective pydantic model to use for internal data validation."""
 
-    # case validation was explicitly set (disabled or custom pydantic models)
-    if validation_model is None or validation_model not in (
-        JWTClaimsValidationDefault,
-        JWTHeadersValidationDefault,
-    ):
+    # 1. case validation is disabled
+    if validation_model is None:
+        return None
+
+    # 2. case validation model was specified (use it)
+    if not isinstance(validation_model, JWTValidationModelConfig):
         return validation_model
 
-    # case validation model is unspecified
-    # --> override default validation model if data is already a pydantic model
-    if isinstance(data, BaseModel):
-        return type(data)  # type: ignore[return-value]
-    # --> use specified default validation model instead (claims or headers is a dict)
-    return default
+    # 3. case validation model was not specified (is a JWTValidationModelConfig)
+    # 3.1 case data is not a pydantic model (a dict)
+    if not isinstance(data, BaseModel):
+        return validation_model.default_validation_model
+    # 3.2 case data is already a pydantic model
+    else:
+        # 3.2.1 override default behavior to use data pydantic model itself
+        if validation_model.force_validation_on_pydantic_model:
+            return type(data)
+        # 3.2.2 use default behavior
+        else:
+            return validation_model.default_validation_model
 
 
 def prepare_and_validate_data(
     data: JWTBaseModel | dict[str, Any],
-    validation_model: type[JWTBaseModel] | None,
-    *,
-    type_err_msg: str = "Wrong data type for pydantic model preparation",
+    validation_model: type[BaseModel] | None,
+    type_err_msg: str | None = None,
 ) -> dict[str, Any]:
+    """Prepare data as dict and perform pydantic validation if required."""
+
     # 1. Prepare data as dict for pydantic validation
     # --> case data is a dict
     if isinstance(data, dict):
@@ -436,7 +457,11 @@ def prepare_and_validate_data(
     elif isinstance(data, BaseModel):
         data_dict = data.model_dump(exclude_none=True)
     else:
-        raise TypeError(type_err_msg)
+        raise TypeError(
+            "Wrong type during data preparation and validation"
+            if type_err_msg is None
+            else f": {type_err_msg}"
+        )
 
     # 2. Validate data
     if validation_model is not None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### :sparkles: New
+
+- default validation behavior for claims and headers can now be customized with `JWTValidationModelConfig` ([#38])
+
 ## v0.3.0 (2025-12-30)
 
 ### :sparkles: New
@@ -59,6 +65,7 @@
 
 :tada: superjwt repository initialization
 
+[#38]: /../../issues/38
 [#34]: /../../issues/34
 [#31]: /../../issues/31
 [#24]: /../../issues/24

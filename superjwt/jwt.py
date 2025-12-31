@@ -1,16 +1,19 @@
 import logging
-from typing import Any
+from typing import Any, cast
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from superjwt.definitions import (
     Algorithm,
+    DefaultValidation,
+    DefaultValidationFlag,
     JOSEHeader,
     JWSToken,
     JWTBaseModel,
     JWTClaims,
-    JWTClaimsValidationDefault,
-    JWTHeadersValidationDefault,
+    JWTClaimsDefaultValidationConfig,
+    JWTHeadersDefaultValidationConfig,
+    JWTValidationModelConfig,
     get_effective_data_model,
     get_effective_data_validation_model,
     make_key,
@@ -28,9 +31,18 @@ logger = logging.getLogger(__name__)
 
 
 class JWT:
-    def __init__(self):
+    def __init__(
+        self,
+        default_claims_validation: JWTValidationModelConfig
+        | None = JWTClaimsDefaultValidationConfig,
+        default_headers_validation: JWTValidationModelConfig
+        | None = JWTHeadersDefaultValidationConfig,
+    ) -> None:
         self.jws: JWS
         self.token: JWSToken
+
+        self.default_claims_validation = default_claims_validation
+        self.default_headers_validation = default_headers_validation
 
     def reset_token(self) -> None:
         self.token = JWSToken()
@@ -42,8 +54,12 @@ class JWT:
         algorithm: Algorithm = "HS256",
         *,
         headers: JOSEHeader | dict[str, Any] | None = None,
-        validation_claims: type[JWTBaseModel] | None = JWTClaimsValidationDefault,
-        validation_headers: type[JOSEHeader] | None = JWTHeadersValidationDefault,
+        validation_claims: type[BaseModel]
+        | DefaultValidationFlag
+        | None = DefaultValidation,
+        validation_headers: type[BaseModel]
+        | DefaultValidationFlag
+        | None = DefaultValidation,
     ) -> bytes:
         """Encode and sign the claims as a JWT token
 
@@ -73,14 +89,13 @@ class JWT:
         # prepare claims data and perform validation
         if claims is None:
             claims = JWTBaseModel()
-        validation_claims = get_effective_data_validation_model(
-            claims, validation_claims, default=JWTBaseModel
-        )
         try:
             claims_dict = prepare_and_validate_data(
                 data=claims,
-                validation_model=validation_claims,
                 type_err_msg="claims must be a JWTBaseModel instance or a dict",
+                validation_model=self.get_validation_claims_model(
+                    claims, validation_claims
+                ),
             )
         except ValidationError as e:
             raise ClaimsValidationError(validation_errors=e.errors()) from e
@@ -90,7 +105,9 @@ class JWT:
             key = make_key(algorithm, key)
 
         # encode as JWS
-        self.jws = JWS(algorithm)
+        self.jws = JWS(
+            algorithm, default_headers_validation=self.default_headers_validation
+        )
         self.jws.encode(
             headers=headers,
             payload=claims_dict,
@@ -99,11 +116,11 @@ class JWT:
         )
 
         # set claims model data
-        claims_model = get_effective_data_model(
-            claims, validation_claims, default=JWTBaseModel
-        )
-        self.jws.token.validated.model.claims = claims_model.model_construct(
-            **claims_dict
+        self.jws.token.validated.model.claims = cast(
+            "JWTBaseModel",
+            self.get_data_claims_model(claims, validation_claims).model_construct(
+                **claims_dict
+            ),
         )
 
         self.token = self.jws.token.validated
@@ -129,8 +146,12 @@ class JWT:
         algorithm: Algorithm = "HS256",
         *,
         with_detached_payload: JWTClaims | dict[str, Any] | None = None,
-        validation_claims: type[JWTBaseModel] | None = None,
-        validation_headers: type[JOSEHeader] | None = JWTHeadersValidationDefault,
+        validation_claims: type[BaseModel]
+        | DefaultValidationFlag
+        | None = DefaultValidation,
+        validation_headers: type[BaseModel]
+        | DefaultValidationFlag
+        | None = DefaultValidation,
     ) -> dict[str, Any]:
         """Decode the JWT token with signature verification.
 
@@ -142,6 +163,7 @@ class JWT:
                 Detached payload to use for signature verification, if any.
             validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
                 to use for claims validation. If None, claims validation is disabled.
+                Defaults to JWTBaseModel (i.e. no validation).
             validation_headers (type[JOSEHeader] | None, opt.): the pydantic model
                 to use for headers validation. If None, headers validation is disabled.
                 Defaults to JOSEHeader (standard JOSE Header).
@@ -152,7 +174,9 @@ class JWT:
 
         # reset session
         self.reset_token()
-        self.jws = JWS(algorithm)
+        self.jws = JWS(
+            algorithm, default_headers_validation=self.default_headers_validation
+        )
 
         # prepare key
         if not isinstance(key, BaseKey):
@@ -166,18 +190,13 @@ class JWT:
             try:
                 claims_dict = prepare_and_validate_data(
                     data=with_detached_payload,
-                    validation_model=validation_claims,
+                    type_err_msg="detached payload must be a dict or a JWTBaseModel instance",
+                    validation_model=self.get_validation_claims_model(
+                        with_detached_payload, validation_claims
+                    ),
                 )
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
-
-            # set claims model data
-            claims_model = get_effective_data_model(
-                claims_dict, validation_claims, default=JWTBaseModel
-            )
-            self.jws.token.unsafe.model.claims = claims_model.model_construct(
-                **claims_dict
-            )
 
             # JWS decode
             self.jws.decode(
@@ -195,24 +214,25 @@ class JWT:
                 key,
                 validation_headers=validation_headers,
             )
-            claims_dict = self.jws.token.validated.decoded.payload
 
             # validate claims
             try:
-                prepare_and_validate_data(
-                    data=claims_dict,
-                    validation_model=validation_claims,
+                claims_dict = prepare_and_validate_data(
+                    data=self.jws.token.validated.decoded.payload,
+                    validation_model=self.get_validation_claims_model(
+                        self.jws.token.validated.decoded.payload, validation_claims
+                    ),
                 )
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
 
-            # set claims model data
-            claims_model = get_effective_data_model(
-                claims_dict, validation_claims, default=JWTBaseModel
-            )
-            self.jws.token.validated.model.claims = claims_model.model_construct(
+        # set claims model data
+        self.jws.token.validated.model.claims = cast(
+            "JWTBaseModel",
+            self.get_data_claims_model(claims_dict, validation_claims).model_construct(
                 **claims_dict
-            )
+            ),
+        )
 
         self.token = self.jws.token.validated
         return self.token.decoded.payload
@@ -246,3 +266,37 @@ class JWT:
         self.token = self.jws.token.unsafe
 
         return self.jws.token.unsafe
+
+    def get_data_claims_model(
+        self,
+        data: JWTBaseModel | dict[str, Any],
+        validation_claims: type[BaseModel]
+        | DefaultValidationFlag
+        | None = DefaultValidation,
+    ) -> type[BaseModel]:
+        """Get the effective data claims pydantic model"""
+
+        if validation_claims is DefaultValidation:
+            return get_effective_data_model(data, self.default_claims_validation)
+        return get_effective_data_model(
+            data,
+            cast("type[BaseModel] | None", validation_claims),
+        )
+
+    def get_validation_claims_model(
+        self,
+        data: JWTBaseModel | dict[str, Any],
+        validation_claims: type[BaseModel]
+        | DefaultValidationFlag
+        | None = DefaultValidation,
+    ) -> type[BaseModel] | None:
+        """Get the effective validation claims pydantic model"""
+
+        if validation_claims is DefaultValidation:
+            return get_effective_data_validation_model(
+                data, self.default_claims_validation
+            )
+        return get_effective_data_validation_model(
+            data,
+            cast("type[BaseModel] | None", validation_claims),
+        )
