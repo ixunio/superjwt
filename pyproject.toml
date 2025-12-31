@@ -10,7 +10,7 @@ dependencies = [
     "typing-extensions>=4.0.1",
 ]
 requires-python = ">=3.10"
-authors = [{name = "ixunio"}]
+authors = [{name = "ixunio", email = "ixunio.dev@gmail.com"}]
 description = "A super simple JWT library for Python"
 readme = "README.md"
 license = "MIT"
