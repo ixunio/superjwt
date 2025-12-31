@@ -14,12 +14,12 @@ With powerful Pydantic validation features.
 </em>
 </p>
 
-<img alt="GitHub Actions workflow status on main branch" src="https://img.shields.io/github/actions/workflow/status/ixunio/superjwt/ci.yml?branch=main&logo=github-actions&logoColor=white&label=CI">
+<a href="https://github.com/ixunio/superjwt/actions?query=event%3Apush+workflow%3ACI+branch%3Amain++"><img alt="GitHub Actions workflow status on main branch" src="https://img.shields.io/github/actions/workflow/status/ixunio/superjwt/ci.yml?branch=main&logo=github-actions&logoColor=white&label=CI"></a>
 <a href="https://codecov.io/github/ixunio/superjwt"><img src="https://codecov.io/github/ixunio/superjwt/graph/badge.svg?token=RF0O8W5LKG"/></a>
 </div>
 <div align="center">
-<img alt="PyPI - Version" src="https://img.shields.io/pypi/v/superjwt?color=blue">
-<img alt="Supported Python versions" src="https://img.shields.io/pypi/pyversions/superjwt.svg?logo=python&logoColor=white">
+<a href="https://pypi.org/project/superjwt/#history"><img alt="PyPI - Version" src="https://img.shields.io/pypi/v/superjwt?color=blue"></a>
+<a href="https://pypi.org/project/superjwt/#history"><img alt="Supported Python versions" src="https://img.shields.io/pypi/pyversions/superjwt.svg?logo=python&logoColor=white"></a>
 
 <br />
 
@@ -82,7 +82,7 @@ claims = (
 
 token: bytes = encode(claims, key=secret_key, algorithm="HS256")
 #> token = b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzQ4MywiZXhwIjoxNzY3MDI4MzgzfQ.ZXxZT8VzL8IPTov-enslCh57S2M5fQBtqULZx5zEAm8'
-decoded: dict = decode(token, key=secret_key, algorithm="HS256")
+decoded: dict = decode(token, key=secret_key, algorithm="HS256", validation_claims=JWTClaims)
 #> decoded = {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767027483, 'exp': 1767028383}
 ```
 
