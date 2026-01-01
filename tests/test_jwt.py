@@ -258,7 +258,11 @@ def test_encode_decode_claims_dict_validation_disabled(
     check_claims_instance(claims, decoded_claims)
 
 
-def test_custom_validation(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
+def test_custom_claims_validation(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
+    # test with a wrong object type for claims_validation
+    with pytest.raises(TypeError):
+        jwt.encode(claims, secret_key, "HS256", claims_validation="not_a_model")  # type: ignore
+
     claims.sub = None  # remove required field 'sub'  # type: ignore
 
     jwt.encode(
@@ -432,6 +436,8 @@ def test_unsafe_inspect(jwt: JWT, claims_fixed_dt, secret_key: str):
 def test_detached_payload(jwt: JWT, claims_fixed_dt, secret_key):
     compact = jwt.encode(claims_fixed_dt, secret_key, "HS256").compact
     compact_detached = jwt.detach_payload().compact
+    compact_detached2 = encode(claims_fixed_dt, secret_key, "HS256", detach_payload=True)
+    assert compact_detached == compact_detached2
 
     compact_raw = (
         b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
@@ -516,6 +522,10 @@ def test_claims_model_data(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
 
 
 def test_custom_headers_validation(jwt: JWT, secret_key: str):
+    # test with a wrong object type for claims_validation
+    with pytest.raises(TypeError):
+        jwt.encode({}, secret_key, "HS256", headers_validation="not_a_model")  # type: ignore
+
     class CustomHeader(JOSEHeader):
         custom_header: str
 
