@@ -208,9 +208,9 @@ class JWT:
             # validate claims
             try:
                 claims_dict = prepare_and_validate_data(
-                    data=self.jws.token.verified.decoded.payload,
+                    data=self.jws.token.verified.payload,
                     validation_model=self.get_validation_claims_model(
-                        self.jws.token.verified.decoded.payload, validation_claims
+                        self.jws.token.verified.payload, validation_claims
                     ),
                 )
             except ValidationError as e:

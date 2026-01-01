@@ -1,7 +1,7 @@
 import json
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, SecretBytes, ValidationError
+from pydantic import BaseModel, ValidationError
 
 from superjwt.algorithms import BaseJWSAlgorithm, NoneAlgorithm
 from superjwt.definitions import (
@@ -57,8 +57,8 @@ class JWS:
 
     def enable_detached_payload(self):
         self.has_detached_payload = True
-        self.token.unsafe.encoded.has_detached_payload = True
-        self.token.verified.encoded.has_detached_payload = True
+        self.token.unsafe.has_detached_payload = True
+        self.token.verified.has_detached_payload = True
 
     def encode(
         self,
@@ -70,7 +70,7 @@ class JWS:
         | DefaultValidationFlag
         | None = DefaultValidation,
     ) -> JWSToken:
-        if self.token.verified.encoded.compact != b"..":
+        if self.token.verified.compact != b"..":
             raise JWTError("JWS instance data must be reset")
 
         # prepare headers data and perform validation
@@ -94,21 +94,21 @@ class JWS:
                 **headers_dict
             ),
         )
-        self.token.verified.decoded.headers = headers_dict
-        self.token.verified.encoded.headers = urlsafe_b64encode(
+        self.token.verified.headers = headers_dict
+        self.token.verified.encoded_headers = urlsafe_b64encode(
             json.dumps(headers_dict, separators=(",", ":")).encode("utf-8")
         )
 
         # set payload data
-        self.token.verified.decoded.payload = payload
-        self.token.verified.encoded.payload = urlsafe_b64encode(
+        self.token.verified.payload = payload
+        self.token.verified.encoded_payload = urlsafe_b64encode(
             json.dumps(payload, separators=(",", ":")).encode("utf-8")
         )
 
         # set signature data
-        signature = self.algorithm.sign(self.token.verified.encoded.signing_input, key)
-        self.token.verified.decoded.signature = SecretBytes(signature)
-        self.token.verified.encoded.signature = SecretBytes(urlsafe_b64encode(signature))
+        signature = self.algorithm.sign(self.token.verified.signing_input, key)
+        self.token.verified.signature = signature
+        self.token.verified.encoded_signature = urlsafe_b64encode(signature)
 
         return self.token.verified
 
@@ -122,10 +122,7 @@ class JWS:
         | DefaultValidationFlag
         | None = DefaultValidation,
     ) -> JWSToken:
-        if (
-            self.token.verified.encoded.compact != b".."
-            or self.token.unsafe.encoded.compact != b".."
-        ):
+        if self.token.verified.compact != b".." or self.token.unsafe.compact != b"..":
             raise JWTError("JWS instance data must be reset")
 
         # decode JWT token parts
@@ -157,11 +154,11 @@ class JWS:
         # decode payload
         if self.has_detached_payload:
             if detached_payload is None:
-                self.token.unsafe.decoded.payload = {}
-                self.token.unsafe.encoded.payload = urlsafe_b64encode(b"")
+                self.token.unsafe.payload = {}
+                self.token.unsafe.encoded_payload = urlsafe_b64encode(b"")
             else:
-                self.token.unsafe.decoded.payload = detached_payload
-                self.token.unsafe.encoded.payload = urlsafe_b64encode(
+                self.token.unsafe.payload = detached_payload
+                self.token.unsafe.encoded_payload = urlsafe_b64encode(
                     json.dumps(detached_payload, separators=(",", ":")).encode("utf-8")
                 )
         else:
@@ -184,9 +181,9 @@ class JWS:
         if self.has_detached_payload and payload != b"":
             raise MalformedTokenError("Detached payload conflict")
 
-        self.token.unsafe.encoded.headers = header
-        self.token.unsafe.encoded.payload = payload
-        self.token.unsafe.encoded.signature = SecretBytes(signature)
+        self.token.unsafe.encoded_headers = header
+        self.token.unsafe.encoded_payload = payload
+        self.token.unsafe.encoded_signature = signature
 
         return header, payload
 
@@ -212,24 +209,22 @@ class JWS:
             raise MalformedTokenError(f"{name} segment is not valid JSON") from e
 
     def decode_raw_headers(self) -> dict[str, Any]:
-        decoded = self._decode_raw_part("headers", self.token.unsafe.encoded.headers)
-        self.token.unsafe.decoded.headers = decoded_dict = self._decode_dict_part(
+        decoded = self._decode_raw_part("headers", self.token.unsafe.encoded_headers)
+        self.token.unsafe.headers = decoded_dict = self._decode_dict_part(
             "headers", decoded
         )
         return decoded_dict
 
     def decode_raw_payload(self) -> dict[str, Any]:
-        decoded = self._decode_raw_part("payload", self.token.unsafe.encoded.payload)
-        self.token.unsafe.decoded.payload = decoded_dict = self._decode_dict_part(
+        decoded = self._decode_raw_part("payload", self.token.unsafe.encoded_payload)
+        self.token.unsafe.payload = decoded_dict = self._decode_dict_part(
             "payload", decoded
         )
         return decoded_dict
 
     def decode_raw_signature(self) -> None:
-        self.token.unsafe.decoded.signature = SecretBytes(
-            self._decode_raw_part(
-                "signature", self.token.unsafe.encoded.signature.get_secret_value()
-            )
+        self.token.unsafe.signature = self._decode_raw_part(
+            "signature", self.token.unsafe.encoded_signature
         )
 
     def validate_headers_and_algorithm(
@@ -238,7 +233,7 @@ class JWS:
         | DefaultValidationFlag
         | None = DefaultValidation,
     ) -> None:
-        headers_dict = self.token.unsafe.decoded.headers
+        headers_dict = self.token.unsafe.headers
 
         # validate headers
         try:
@@ -252,7 +247,7 @@ class JWS:
             raise HeaderValidationError(validation_errors=e.errors()) from e
 
         # set headers model data
-        headers_dict = self.token.unsafe.decoded.headers
+        headers_dict = self.token.unsafe.headers
         self.token.unsafe.model.headers = headers_validated = cast(
             "JOSEHeader",
             self.get_data_headers_model(headers_dict, validation_model).model_construct(
@@ -273,8 +268,8 @@ class JWS:
         self.algorithm.check_key(key)
 
         if not self.algorithm.verify(
-            self.token.unsafe.encoded.signing_input,
-            self.token.unsafe.decoded.signature.get_secret_value(),
+            self.token.unsafe.signing_input,
+            self.token.unsafe.signature,
             key,
         ):
             raise SignatureVerificationFailedError()

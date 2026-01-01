@@ -37,7 +37,7 @@ def test_not_reset_jws_instance(
 
     jws_HS256.reset()
     decoded_claims_after_reset = jws_HS256.decode(token=compact, key=key)
-    assert decoded_claims_after_reset.decoded.payload == claims_fixed_dt.to_dict()
+    assert decoded_claims_after_reset.payload == claims_fixed_dt.to_dict()
 
 
 def test_jws_hmac_decoding(jws_HS256: JWS, claims_fixed_dt, secret_key: str):
@@ -51,9 +51,7 @@ def test_jws_hmac_decoding(jws_HS256: JWS, claims_fixed_dt, secret_key: str):
     )
 
     key = OctKey.import_key(secret_key)
-    decoded_claims = JWTCustomClaims(
-        **jws_HS256.decode(token=compact, key=key).decoded.payload
-    )
+    decoded_claims = JWTCustomClaims(**jws_HS256.decode(token=compact, key=key).payload)
     assert decoded_claims.to_dict() == claims_fixed_dt.to_dict()
 
 
@@ -105,7 +103,5 @@ def test_wrong_header_algorithm(
         jws_HS256.decode(token=invalid_compact, key=key, validation_headers=None)
     jws_HS256.reset()
 
-    decoded_claims = JWTCustomClaims(
-        **jws_HS256.decode(token=compact, key=key).decoded.payload
-    )
+    decoded_claims = JWTCustomClaims(**jws_HS256.decode(token=compact, key=key).payload)
     assert decoded_claims.to_dict() == claims_fixed_dt.to_dict()

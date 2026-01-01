@@ -8,7 +8,6 @@ from pydantic import (
     Field,
     HttpUrl,
     PlainSerializer,
-    SecretBytes,
     UrlConstraints,
     ValidationInfo,
     computed_field,
@@ -290,37 +289,6 @@ class JWTClaims(JWTClaimsModel, JWTClaimsDatetimeMixIn):
     """
 
 
-class JWSTokenEncoded(BaseModel):
-    headers: bytes
-    payload: bytes
-    signature: SecretBytes
-    has_detached_payload: bool = False
-
-    @computed_field
-    @property
-    def signing_input(self) -> bytes:
-        return b".".join((self.headers, self.payload))
-
-    @computed_field
-    @property
-    def compact(self) -> bytes:
-        if self.has_detached_payload:
-            return b".".join((self.headers, b"", self.signature.get_secret_value()))
-        return b".".join(
-            (
-                self.headers,
-                self.payload,
-                self.signature.get_secret_value(),
-            )
-        )
-
-
-class JWSTokenDecoded(BaseModel):
-    headers: dict[str, Any]
-    payload: dict[str, Any]
-    signature: SecretBytes
-
-
 class JWSTokenModel(BaseModel):
     headers: JOSEHeader | None = None
     claims: JWTBaseModel | None = None
@@ -330,13 +298,34 @@ MAX_TOKEN_LENGTH: int = 16 * 1024  # 16 KB
 
 
 class JWSToken(BaseModel):
-    encoded: JWSTokenEncoded = JWSTokenEncoded(
-        headers=b"", payload=b"", signature=SecretBytes(b"")
-    )
-    decoded: JWSTokenDecoded = JWSTokenDecoded(
-        headers={}, payload={}, signature=SecretBytes(b"")
-    )
+    headers: dict[str, Any] = {}
+    payload: dict[str, Any] = {}
+    signature: bytes = b""
+
+    encoded_headers: bytes = b""
+    encoded_payload: bytes = b""
+    encoded_signature: bytes = b""
+    has_detached_payload: bool = False
+
     model: JWSTokenModel = JWSTokenModel()
+
+    @computed_field
+    @property
+    def signing_input(self) -> bytes:
+        return b".".join((self.encoded_headers, self.encoded_payload))
+
+    @computed_field
+    @property
+    def compact(self) -> bytes:
+        if self.has_detached_payload:
+            return b".".join((self.encoded_headers, b"", self.encoded_signature))
+        return b".".join(
+            (
+                self.encoded_headers,
+                self.encoded_payload,
+                self.encoded_signature,
+            )
+        )
 
 
 class JWSTokenLifeCycle(BaseModel):

@@ -76,7 +76,7 @@ def encode(
     if detach_payload:
         jws_token = jwt.detach_payload()
 
-    return jws_token.encoded.compact
+    return jws_token.compact
 
 
 def decode(
@@ -118,7 +118,7 @@ def decode(
         validation_headers=validation_headers,
     )
 
-    return jws_token.decoded.payload
+    return jws_token.payload
 
 
 def inspect(
