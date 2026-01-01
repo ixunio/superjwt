@@ -4,15 +4,25 @@
 
 ### :sparkles: New
 
-- default validation behavior for claims and headers can now be customized with `JWTValidationModelConfig` ([#38])
+- `Validation` flag can be passed to choose between two modes: ([#39])
+    - Validation.DEFAULT (default when nothing is specified)
+    - Validation.DISABLE
+- Default validation behavior for claims and headers can now be customized with `JWTValidationModelConfig` ([#38])
+
+## :gear: Changes
+
+- Refactoring of public and private interfaces ([#39])
+    - module-level `encode()`, `decode()` and `inspect()` are now thread safe and written as functions instead of a local stateful `JWT` instance
+    - `token` param in `decode()` is renamed `compact`
+    - `JWT` methods now always return a `JWSToken`
 
 ## v0.3.0 (2025-12-30)
 
 ### :sparkles: New
 
-- validate claims or headers with custom pydantic models for `decode()` ([#34])
-- expired token now raises `TokenExpiredError` upon claims validation ([#24])
-- new exception `AlgorithmMismatchError` is raised during decoding when `'alg'` is valid but not declared as processable by the JWS instance ([#31])
+- Validate claims or headers with custom pydantic models for `decode()` ([#34])
+- Expired token now raises `TokenExpiredError` upon claims validation ([#24])
+- New exception `AlgorithmMismatchError` is raised during decoding when `'alg'` is valid but not declared as processable by the JWS instance ([#31])
 
 ### :gear: Changes
 
@@ -22,23 +32,20 @@
     - modular model with reusable mixins
 - Refactoring of claims and headers validation ([#34])
     - `encode()` new validation default behavior:
-        - when `claims` is passed as a pydantic instance, do validation with the pydantic model automatically
+        - when `claims` is passed as a pydantic instance, validate against it automatically
         - when `claims` is passed as a dict or empty, no automatic validation
-        - when `headers` (optional) is passed as a pydantic instance, do validation with the pydantic model automatically
+        - when `headers` (optional) is passed as a pydantic instance, validate against it automatically
         - when `headers` (optional) is passed as a dict, validate against `JOSEHeader`
     - `decode()` new validation default behavior:
-        - no automatic validation for claims by default, `validation_claims` must be specified to a pydantic model
+        - no automatic validation for claims by default
         - headers are automatically validated against `JOSEHeader`
-    - claims & headers validation can be overridden by passing a pydantic model to `validation_claims` & `validation_headers` params in `encode()` / `decode()`
-    - claims & headers validation can be disabled by passing `None` to `validation_claims` & `validation_headers` params in `encode()` / `decode()`
-    - claims data sent as dict are no longer serialized with Pydantic (datetime object will no longer work). Usage of Pydantic models is recommended instead.
+    - claims & headers default validation can be overridden by passing a pydantic model to the validation params in `encode()` / `decode()`
 
 ## v0.2.0 (2025-12-27)
 
 ### :gear: Changes
 
 - State, data integrity and consistency of JWT and JWS instances improved ([#15])
-- `disable_headers_validation` parameter was missing in `encode()` and `decode()`
 - b64=false in header will raise an `InvalidHeaderError` as this is not a supported feature ([#13])
 - Add compatibility for python 3.10 & 3.11, was working only for python 3.12-3.14 previously
 - Better tests for datetime claims
@@ -46,7 +53,7 @@
 
 ### :bug: Fixes
 
-- validation for custom datetime claims is now working properly ([#7])
+- Validation for custom datetime claims is now working properly ([#7])
 - `HeaderValidationError` exception no longer throws `IndexError` ([#14])
 - `inspect()` now works with detached payload
 
@@ -65,6 +72,8 @@
 
 :tada: superjwt repository initialization
 
+
+[#39]: /../../issues/39
 [#38]: /../../issues/38
 [#34]: /../../issues/34
 [#31]: /../../issues/31
