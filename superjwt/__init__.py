@@ -64,7 +64,7 @@ def encode(
     """
 
     jwt = JWT()
-    jwt.encode(
+    jws_token = jwt.encode(
         claims,
         key,
         algorithm,
@@ -74,9 +74,9 @@ def encode(
     )
 
     if detach_payload:
-        jwt.detach_payload()
+        jws_token = jwt.detach_payload()
 
-    return jwt.token.encoded.compact
+    return jws_token.encoded.compact
 
 
 def decode(
@@ -109,7 +109,7 @@ def decode(
     """
 
     jwt = JWT()
-    jwt.decode(
+    jws_token = jwt.decode(
         token,
         key,
         algorithm,
@@ -118,7 +118,7 @@ def decode(
         validation_headers=validation_headers,
     )
 
-    return jwt.token.decoded.payload
+    return jws_token.decoded.payload
 
 
 def inspect(
@@ -137,6 +137,6 @@ def inspect(
     """
 
     jwt = JWT()
-    jwt.inspect(token, has_detached_payload)
+    jws_token = jwt.inspect(token, has_detached_payload)
 
-    return jwt.jws.token.unsafe
+    return jws_token

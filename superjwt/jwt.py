@@ -38,13 +38,13 @@ class JWT:
         | None = JWTHeadersDefaultValidationConfig,
     ) -> None:
         self.jws: JWS
-        self.token: JWSToken
 
         self.default_claims_validation = default_claims_validation
         self.default_headers_validation = default_headers_validation
 
     def reset_token(self) -> None:
-        self.token = JWSToken()
+        # self.token = JWSToken()
+        pass
 
     def encode(
         self,
@@ -59,7 +59,7 @@ class JWT:
         validation_headers: type[BaseModel]
         | DefaultValidationFlag
         | None = DefaultValidation,
-    ) -> bytes:
+    ) -> JWSToken:
         """Encode and sign the claims as a JWT token
 
         Args:
@@ -79,7 +79,7 @@ class JWT:
                 Otherwise, defaults to JOSEHeader (standard JOSE Header).
 
         Returns:
-            bytes: the encoded compact JWT token
+            JWSToken: a JWSToken instance representing the encoded and signed JWT token.
         """
 
         # reset session
@@ -122,21 +122,20 @@ class JWT:
             ),
         )
 
-        self.token = self.jws.token.verified
-        return self.token.encoded.compact
+        return self.jws.token.verified
 
-    def detach_payload(self) -> bytes:
+    def detach_payload(self) -> JWSToken:
         """Declare payload detached from JWT compact.
             The encoded payload part will be b""
 
         Returns:
-            bytes: the compact JWT token with an empty payload bytes instead
+            JWSToken: a JWSToken instance representing the encoded and signed JWT token.
         """
         if not hasattr(self, "jws") or not self.jws.token.verified:
             raise JWTError("JWT token has not been encoded yet")
         self.jws.enable_detached_payload()
 
-        return self.token.encoded.compact
+        return self.jws.token.verified
 
     def decode(
         self,
@@ -151,7 +150,7 @@ class JWT:
         validation_headers: type[BaseModel]
         | DefaultValidationFlag
         | None = DefaultValidation,
-    ) -> dict[str, Any]:
+    ) -> JWSToken:
         """Decode the JWT token with signature verification.
 
         Args:
@@ -168,7 +167,7 @@ class JWT:
                 Defaults to JOSEHeader (standard JOSE Header).
 
         Returns:
-            dict[str, Any]: The decoded and verified JWT claims as a dictionary.
+            JWSToken: a JWSToken instance representing the decoded and verified JWT token.
         """
 
         # reset session
@@ -233,8 +232,7 @@ class JWT:
             ),
         )
 
-        self.token = self.jws.token.verified
-        return self.token.decoded.payload
+        return self.jws.token.verified
 
     def inspect(
         self,
@@ -249,7 +247,7 @@ class JWT:
             has_detached_payload (bool, opt.): If True, indicates that the token has a detached payload.
 
         Returns:
-            JWSToken: The unsafe/not verified decoded JWT token as a raw JWSToken instance.
+            JWSToken: a JWSToken instance representing the unsafe non-verified decoded JWT token.
         """
 
         # reset session
@@ -261,8 +259,6 @@ class JWT:
         self.jws._allow_none_algorithm = True
         self.jws.decode(token=token, key=NoneKey(), validation_headers=None)
         self.jws._allow_none_algorithm = False
-
-        self.token = self.jws.token.unsafe
 
         return self.jws.token.unsafe
 

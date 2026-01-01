@@ -69,7 +69,7 @@ class JWS:
         validation_headers: type[BaseModel]
         | DefaultValidationFlag
         | None = DefaultValidation,
-    ) -> bytes:
+    ) -> JWSToken:
         if self.token.verified.encoded.compact != b"..":
             raise JWTError("JWS instance data must be reset")
 
@@ -110,7 +110,7 @@ class JWS:
         self.token.verified.decoded.signature = SecretBytes(signature)
         self.token.verified.encoded.signature = SecretBytes(urlsafe_b64encode(signature))
 
-        return self.token.verified.encoded.compact
+        return self.token.verified
 
     def decode(
         self,

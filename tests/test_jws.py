@@ -85,7 +85,7 @@ def test_wrong_header_algorithm(
         payload=claims_fixed_dt.to_dict(),
         key=key,
         validation_headers=None,
-    ).decode("utf-8")
+    ).compact
 
     # not reset JWS instance
     with pytest.raises(JWTError):
