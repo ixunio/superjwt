@@ -6,6 +6,7 @@ from typing import Any, cast
 from pydantic import BaseModel, ValidationError
 
 from superjwt.definitions import (
+    MAX_TOKEN_BYTES,
     Algorithm,
     JOSEHeader,
     JWSToken,
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 class JWT:
     def __init__(
         self,
+        max_token_bytes: int = MAX_TOKEN_BYTES,
         default_claims_validation: JWTValidationModelConfig
         | None = JWTClaimsDefaultValidationConfig,
         default_headers_validation: JWTValidationModelConfig
@@ -40,6 +42,7 @@ class JWT:
     ) -> None:
         self.jws: JWS
 
+        self.max_token_bytes = max_token_bytes
         self.default_claims_validation = default_claims_validation
         self.default_headers_validation = default_headers_validation
 
@@ -76,7 +79,9 @@ class JWT:
         """
 
         self.jws = JWS(
-            algorithm, default_headers_validation=self.default_headers_validation
+            algorithm,
+            max_token_bytes=self.max_token_bytes,
+            default_headers_validation=self.default_headers_validation,
         )
 
         # prepare claims data and perform validation
@@ -158,7 +163,9 @@ class JWT:
         """
 
         self.jws = JWS(
-            algorithm, default_headers_validation=self.default_headers_validation
+            algorithm,
+            max_token_bytes=self.max_token_bytes,
+            default_headers_validation=self.default_headers_validation,
         )
 
         # prepare key
@@ -235,7 +242,7 @@ class JWT:
             JWSToken: a JWSToken instance representing the unsafe non-verified decoded JWT token.
         """
 
-        self.jws = JWS(algorithm="none")
+        self.jws = JWS("none", max_token_bytes=self.max_token_bytes)
 
         if has_detached_payload:
             self.jws.enable_detached_payload()

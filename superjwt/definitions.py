@@ -40,6 +40,9 @@ except ImportError:
 
     UTC = timezone.utc
 
+
+MAX_TOKEN_BYTES: int = 16 * 1024  # 16 KB
+
 Algorithm = Literal[
     "HS256",
     "HS384",
@@ -292,9 +295,6 @@ class JWTClaims(JWTClaimsModel, JWTClaimsDatetimeMixIn):
 class JWSTokenModel(BaseModel):
     headers: JOSEHeader | None = None
     claims: JWTBaseModel | None = None
-
-
-MAX_TOKEN_LENGTH: int = 16 * 1024  # 16 KB
 
 
 class JWSToken(BaseModel):

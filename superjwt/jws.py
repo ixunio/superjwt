@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 
 from superjwt.algorithms import BaseJWSAlgorithm, NoneAlgorithm
 from superjwt.definitions import (
-    MAX_TOKEN_LENGTH,
+    MAX_TOKEN_BYTES,
     Algorithm,
     JOSEHeader,
     JWSToken,
@@ -38,7 +38,7 @@ class JWS:
     def __init__(
         self,
         algorithm: Algorithm | Literal["none"],
-        max_token_size: int = MAX_TOKEN_LENGTH,
+        max_token_bytes: int = MAX_TOKEN_BYTES,
         default_headers_validation: JWTValidationModelConfig
         | None = JWTHeadersDefaultValidationConfig,
     ):
@@ -48,7 +48,7 @@ class JWS:
         self.has_detached_payload: bool = False
 
         self.raw_jws: bytes = b""
-        self.max_size = max_token_size
+        self.max_token_bytes = max_token_bytes
         self.default_headers_validation = default_headers_validation
         self._allow_none_algorithm = False
 
@@ -110,6 +110,13 @@ class JWS:
         self.token.verified.signature = signature
         self.token.verified.encoded_signature = urlsafe_b64encode(signature)
 
+        # check compact size
+        if len(self.token.verified.compact) > self.max_token_bytes:
+            raise SizeExceededError(
+                f"Token size ({len(self.token.verified.compact)} bytes) "
+                f"exceeds maximum of {self.max_token_bytes} bytes"
+            )
+
         return self.token.verified
 
     def decode(
@@ -136,9 +143,9 @@ class JWS:
     def decode_parts(
         self, token: str | bytes, detached_payload: dict[str, Any] | None = None
     ) -> None:
-        if len(token) > self.max_size:
+        if len(token) > self.max_token_bytes:
             raise SizeExceededError(
-                f"Token size ({len(token)} bytes) exceeds maximum of {self.max_size} bytes"
+                f"Token size ({len(token)} bytes) exceeds maximum of {self.max_token_bytes} bytes"
             )
 
         if token is not None:
