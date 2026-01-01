@@ -18,6 +18,7 @@ from superjwt.exceptions import (
     HeadersValidationError,
     InvalidHeadersError,
     SignatureVerificationFailedError,
+    SizeExceededError,
     SuperJWTError,
     TokenExpiredError,
 )
@@ -779,3 +780,26 @@ def test_custom_default_claims_validation_policy_no_force_pydantic(
         jwt_default.encode(
             partial_claims, secret_key, "HS256"
         )  # fails with default behavior (validates against JWTCustomClaims)
+
+
+def test_size_exceeded_error(secret_key: str):
+    jwt_strict = JWT()  # default max_size is 16 KB
+    jwt_lenient = JWT(max_token_bytes=50 * 1024)  # max 50 KB
+
+    claims_big = {"data": "!" * 11_500}  # will create a compact of ~< 16 KB
+    claims_enormous = {"data": "𒃲" * 3_100}  # will create a compact of ~> 50 KB
+
+    # case passing
+    token_big = jwt_strict.encode(claims_big, secret_key, "HS256")
+    token_big2 = jwt_lenient.encode(claims_big, secret_key, "HS256")
+    assert token_big.signing_input == token_big2.signing_input
+    token_enormous = jwt_lenient.encode(claims_enormous, secret_key, "HS256")
+    jwt_lenient.decode(token_enormous.compact, secret_key, "HS256")
+    jwt_lenient.decode(token_big.compact, secret_key, "HS256")
+    jwt_strict.decode(token_big.compact, secret_key, "HS256")
+
+    # case failing
+    with pytest.raises(SizeExceededError):
+        jwt_strict.encode(claims_enormous, secret_key, "HS256")
+    with pytest.raises(SizeExceededError):
+        jwt_strict.decode(token_enormous.compact, secret_key, "HS256")
