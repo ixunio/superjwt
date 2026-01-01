@@ -62,7 +62,7 @@ claims = {"iss": "my-app", "sub": "John Doe"}
 
 token: bytes = encode(claims, secret_key, "HS256")
 #> token = b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSJ9.HwnUqTLFAMzNkMrokd0aI7c-zSJJpSVXMrYIhUyWe4s'
-decoded: dict = decode(token, secret_key, "HS256", validation_claims=JWTClaims)
+decoded: dict = decode(token, secret_key, "HS256", claims_validation=JWTClaims)
 #> decoded = {'iss': 'my-app', 'sub': 'John Doe'}
 ```
 
@@ -82,7 +82,7 @@ claims = (
 
 token: bytes = encode(claims, secret_key, "HS256")
 #> token = b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzQ4MywiZXhwIjoxNzY3MDI4MzgzfQ.ZXxZT8VzL8IPTov-enslCh57S2M5fQBtqULZx5zEAm8'
-decoded: dict = decode(token, secret_key, "HS256", validation_claims=JWTClaims)
+decoded: dict = decode(token, secret_key, "HS256", claims_validation=JWTClaims)
 #> decoded = {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767027483, 'exp': 1767028383}
 ```
 
@@ -116,7 +116,7 @@ claims = (
     .with_expiration(minutes=15)
 )
 token = encode(claims, secret_key, "HS256")
-decoded = decode(token, secret_key, "HS256", validation_claims=MyJWTClaims)
+decoded = decode(token, secret_key, "HS256", claims_validation=MyJWTClaims)
 #> decoded = {'sub': 123, 'iat': 1767026691, 'exp': 1767027591, 'user_id': 'b2a4c791-2cf4-4e41-9a20-8532129ff47c'}
 ```
 
@@ -131,10 +131,10 @@ invalid_claims = (
 )
 # disable claims validation to create an invalid token
 invalid_token = encode(
-    invalid_claims, secret_key, "HS256", validation_claims=None
+    invalid_claims, secret_key, "HS256", claims_validation=None
 )
 try:
-    decoded_invalid = decode(invalid_token, secret_key, "HS256", validation_claims=MyJWTClaims)
+    decoded_invalid = decode(invalid_token, secret_key, "HS256", claims_validation=MyJWTClaims)
 except ClaimsValidationError as e:
     print("Claims validation error:", e)
 #> Claims validation error: Claims validation failed

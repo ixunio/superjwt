@@ -8,12 +8,12 @@ from superjwt.definitions import (
     MAX_TOKEN_LENGTH,
     Algorithm,
     DefaultValidation,
-    DefaultValidationFlag,
     JOSEHeader,
     JWSToken,
     JWSTokenLifeCycle,
     JWTHeadersDefaultValidationConfig,
     JWTValidationModelConfig,
+    ValidationFlag,
     get_effective_data_model,
     get_effective_data_validation_model,
     get_jws_algorithm,
@@ -66,9 +66,7 @@ class JWS:
         payload: dict[str, Any],
         key: BaseKey,
         *,
-        validation_headers: type[BaseModel]
-        | DefaultValidationFlag
-        | None = DefaultValidation,
+        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
     ) -> JWSToken:
         if self.token.verified.compact != b"..":
             raise JWTError("JWS instance data must be reset")
@@ -80,8 +78,8 @@ class JWS:
             headers_dict = prepare_and_validate_data(
                 data=headers,
                 type_err_msg="headers must be a JOSEHeader instance or a dict",
-                validation_model=self.get_validation_headers_model(
-                    headers, validation_headers
+                validation_model=self.get_headers_validation_model(
+                    headers, headers_validation
                 ),
             )
         except ValidationError as e:
@@ -90,7 +88,7 @@ class JWS:
         # set headers data
         self.token.verified.model.headers = cast(
             "JOSEHeader",
-            self.get_data_headers_model(headers, validation_headers).model_construct(
+            self.get_headers_data_model(headers, headers_validation).model_construct(
                 **headers_dict
             ),
         )
@@ -118,9 +116,7 @@ class JWS:
         key: BaseKey,
         *,
         with_detached_payload: dict[str, Any] | None = None,
-        validation_headers: type[BaseModel]
-        | DefaultValidationFlag
-        | None = DefaultValidation,
+        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
     ) -> JWSToken:
         if self.token.verified.compact != b".." or self.token.unsafe.compact != b"..":
             raise JWTError("JWS instance data must be reset")
@@ -129,7 +125,7 @@ class JWS:
         self.decode_parts(compact, with_detached_payload)
 
         # validate headers and algorithm
-        self.validate_headers_and_algorithm(validation_headers)
+        self.validate_headers_and_algorithm(headers_validation)
 
         # verify signature
         self.verify_signature(key)
@@ -229,9 +225,7 @@ class JWS:
 
     def validate_headers_and_algorithm(
         self,
-        validation_model: type[BaseModel]
-        | DefaultValidationFlag
-        | None = DefaultValidation,
+        validation_model: type[BaseModel] | ValidationFlag | None = DefaultValidation,
     ) -> None:
         headers_dict = self.token.unsafe.headers
 
@@ -239,7 +233,7 @@ class JWS:
         try:
             prepare_and_validate_data(
                 data=headers_dict,
-                validation_model=self.get_validation_headers_model(
+                validation_model=self.get_headers_validation_model(
                     headers_dict, validation_model
                 ),
             )
@@ -250,7 +244,7 @@ class JWS:
         headers_dict = self.token.unsafe.headers
         self.token.unsafe.model.headers = headers_validated = cast(
             "JOSEHeader",
-            self.get_data_headers_model(headers_dict, validation_model).model_construct(
+            self.get_headers_data_model(headers_dict, validation_model).model_construct(
                 **headers_dict
             ),
         )
@@ -280,36 +274,32 @@ class JWS:
 
         return True
 
-    def get_data_headers_model(
+    def get_headers_data_model(
         self,
         data: JOSEHeader | dict[str, Any],
-        validation_headers: type[BaseModel]
-        | DefaultValidationFlag
-        | None = DefaultValidation,
+        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
     ) -> type[BaseModel]:
         """Get the effective data headers pydantic model"""
 
-        if validation_headers is DefaultValidation:
+        if headers_validation is DefaultValidation:
             return get_effective_data_model(data, self.default_headers_validation)
         return get_effective_data_model(
             data,
-            cast("type[BaseModel] | None", validation_headers),
+            cast("type[BaseModel] | None", headers_validation),
         )
 
-    def get_validation_headers_model(
+    def get_headers_validation_model(
         self,
         data: JOSEHeader | dict[str, Any],
-        validation_headers: type[BaseModel]
-        | DefaultValidationFlag
-        | None = DefaultValidation,
+        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
     ) -> type[BaseModel] | None:
-        """Get the effective validation headers pydantic model"""
+        """Get the effective headers validation pydantic model"""
 
-        if validation_headers is DefaultValidation:
+        if headers_validation is DefaultValidation:
             return get_effective_data_validation_model(
                 data, self.default_headers_validation
             )
         return get_effective_data_validation_model(
             data,
-            cast("type[BaseModel] | None", validation_headers),
+            cast("type[BaseModel] | None", headers_validation),
         )

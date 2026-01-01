@@ -375,10 +375,10 @@ JWTHeadersDefaultValidationConfig = JWTValidationModelConfig(
 )
 
 
-class DefaultValidationFlag: ...
+class ValidationFlag: ...
 
 
-DefaultValidation: Final = DefaultValidationFlag()
+DefaultValidation: Final = ValidationFlag()
 
 
 def get_effective_data_model(

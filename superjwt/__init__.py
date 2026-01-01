@@ -6,12 +6,12 @@ from superjwt._version import __version__
 from superjwt.definitions import (
     Algorithm,
     DefaultValidation,
-    DefaultValidationFlag,
     JOSEHeader,
     JWSToken,
     JWTBaseModel,
     JWTClaims,
     JWTDatetime,
+    ValidationFlag,
 )
 from superjwt.jwt import JWT
 from superjwt.keys import BaseKey
@@ -35,11 +35,9 @@ def encode(
     algorithm: Algorithm,
     *,
     headers: JOSEHeader | dict[str, Any] | None = None,
-    validation_claims: type[BaseModel] | DefaultValidationFlag | None = DefaultValidation,
-    validation_headers: type[BaseModel]
-    | DefaultValidationFlag
-    | None = DefaultValidation,
     detach_payload: bool = False,
+    claims_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+    headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
 ) -> bytes:
     """Encode and sign the claims as a JWT token.
 
@@ -49,15 +47,15 @@ def encode(
         algorithm (Algorithm): The algorithm to use for signing the JWT.
         headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
             in the JWT. Will use default JWS headers if not provided.
-        validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
+        detach_payload (bool, opt.): whether to produce a JWT token with detached payload.
+        claims_validation (type[JWTBaseModel] | None, opt.): the pydantic model
             to use for claims validation. If None, claims validation is disabled.
             If 'claims' is a pydantic instance, defaults to its pydantic model.
             Otherwise, defaults to JWTBaseModel (i.e. no validation).
-        validation_headers (type[JOSEHeader] | None, opt.): the pydantic model
+        headers_validation (type[JOSEHeader] | None, opt.): the pydantic model
             to use for headers validation. If None, headers validation is disabled.
             If 'headers' is a pydantic instance, defaults to its pydantic model.
             Otherwise, defaults to JOSEHeader (standard JOSE Header).
-        detach_payload (bool, opt.): whether to produce a JWT token with detached payload.
 
     Returns:
         bytes: the encoded compact JWT token
@@ -69,8 +67,8 @@ def encode(
         key,
         algorithm,
         headers=headers,
-        validation_claims=validation_claims,
-        validation_headers=validation_headers,
+        claims_validation=claims_validation,
+        headers_validation=headers_validation,
     )
 
     if detach_payload:
@@ -85,10 +83,8 @@ def decode(
     algorithm: Algorithm,
     *,
     with_detached_payload: JWTClaims | dict[str, Any] | None = None,
-    validation_claims: type[BaseModel] | DefaultValidationFlag | None = DefaultValidation,
-    validation_headers: type[BaseModel]
-    | DefaultValidationFlag
-    | None = DefaultValidation,
+    claims_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+    headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
 ) -> dict[str, Any]:
     """Decode the JWT token with signature verification.
 
@@ -98,9 +94,9 @@ def decode(
         algorithm (Algorithm): The algorithm to use for verifying the JWT.
         with_detached_payload (JWTClaims | dict[str, Any] | None, opt.):
             Detached payload to use for signature verification, if any.
-        validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
+        claims_validation (type[JWTBaseModel] | None, opt.): the pydantic model
             to use for claims validation. If None, claims validation is disabled.
-        validation_headers (type[JOSEHeader] | None, opt.): the pydantic model
+        headers_validation (type[JOSEHeader] | None, opt.): the pydantic model
             to use for headers validation. If None, headers validation is disabled.
             Defaults to JOSEHeader (standard JOSE Header).
 
@@ -114,8 +110,8 @@ def decode(
         key,
         algorithm,
         with_detached_payload=with_detached_payload,
-        validation_claims=validation_claims,
-        validation_headers=validation_headers,
+        claims_validation=claims_validation,
+        headers_validation=headers_validation,
     )
 
     return jws_token.payload
