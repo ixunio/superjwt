@@ -133,7 +133,7 @@ class JWT:
 
     def decode(
         self,
-        token: str | bytes,
+        compact: str | bytes,
         key: str | bytes | BaseKey,
         algorithm: Algorithm = "HS256",
         *,
@@ -148,7 +148,7 @@ class JWT:
         """Decode the JWT token with signature verification.
 
         Args:
-            token (str | bytes): The JWT token to decode.
+            compact (str | bytes): The JWT compact token to decode.
             key (str | bytes | BaseKey): The key instance to verify the JWT signature.
             algorithm (Algorithm): The algorithm to use for verifying the JWT.
             with_detached_payload (JWTBaseModel | dict[str, Any] | None, opt.):
@@ -190,7 +190,7 @@ class JWT:
 
             # JWS decode
             self.jws.decode(
-                token,
+                compact,
                 key,
                 with_detached_payload=claims_dict,
                 validation_headers=validation_headers,
@@ -200,7 +200,7 @@ class JWT:
         else:
             # JWS decode
             self.jws.decode(
-                token,
+                compact,
                 key,
                 validation_headers=validation_headers,
             )
@@ -228,14 +228,14 @@ class JWT:
 
     def inspect(
         self,
-        token: str | bytes,
+        compact: str | bytes,
         has_detached_payload: bool = False,
     ) -> JWSToken:
         """Decode the JWT token without signature verification.
         For debugging purposes only. Never to be used in production.
 
         Args:
-            token (str | bytes): The JWT token to decode.
+            compact (str | bytes): The JWT compact token to decode.
             has_detached_payload (bool, opt.): If True, indicates that the token has a detached payload.
 
         Returns:
@@ -248,7 +248,7 @@ class JWT:
             self.jws.enable_detached_payload()
 
         self.jws._allow_none_algorithm = True
-        self.jws.decode(token=token, key=NoneKey(), validation_headers=None)
+        self.jws.decode(compact=compact, key=NoneKey(), validation_headers=None)
         self.jws._allow_none_algorithm = False
 
         return self.jws.token.unsafe

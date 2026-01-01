@@ -114,7 +114,7 @@ class JWS:
 
     def decode(
         self,
-        token: str | bytes,
+        compact: str | bytes,
         key: BaseKey,
         *,
         with_detached_payload: dict[str, Any] | None = None,
@@ -126,7 +126,7 @@ class JWS:
             raise JWTError("JWS instance data must be reset")
 
         # decode JWT token parts
-        self.decode_parts(token, with_detached_payload)
+        self.decode_parts(compact, with_detached_payload)
 
         # validate headers and algorithm
         self.validate_headers_and_algorithm(validation_headers)

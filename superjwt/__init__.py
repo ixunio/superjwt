@@ -80,7 +80,7 @@ def encode(
 
 
 def decode(
-    token: bytes | str,
+    compact: bytes | str,
     key: str | bytes | BaseKey,
     algorithm: Algorithm,
     *,
@@ -93,7 +93,7 @@ def decode(
     """Decode the JWT token with signature verification.
 
     Args:
-        token (str | bytes): The JWT token to decode.
+        token (str | bytes): The JWT compact token to decode.
         key (str | bytes | BaseKey): The key instance to verify the JWT signature.
         algorithm (Algorithm): The algorithm to use for verifying the JWT.
         with_detached_payload (JWTClaims | dict[str, Any] | None, opt.):
@@ -110,7 +110,7 @@ def decode(
 
     jwt = JWT()
     jws_token = jwt.decode(
-        token,
+        compact,
         key,
         algorithm,
         with_detached_payload=with_detached_payload,
@@ -122,14 +122,14 @@ def decode(
 
 
 def inspect(
-    token: str | bytes,
+    compact: str | bytes,
     has_detached_payload: bool = False,
 ) -> JWSToken:
     """Decode the JWT token without signature verification.
     For debugging purposes only. Never to be used in production.
 
     Args:
-        token (str | bytes): The JWT token to decode.
+        compact (str | bytes): The JWT compact token to decode.
         has_detached_payload (bool, opt.): If True, indicates that the token has a detached payload.
 
     Returns:
@@ -137,6 +137,6 @@ def inspect(
     """
 
     jwt = JWT()
-    jws_token = jwt.inspect(token, has_detached_payload)
+    jws_token = jwt.inspect(compact, has_detached_payload)
 
     return jws_token

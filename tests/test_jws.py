@@ -33,10 +33,10 @@ def test_not_reset_jws_instance(
 
     # not reset JWS instance
     with pytest.raises(JWTError):
-        jws_HS256.decode(token=compact, key=key)
+        jws_HS256.decode(compact=compact, key=key)
 
     jws_HS256.reset()
-    decoded_claims_after_reset = jws_HS256.decode(token=compact, key=key)
+    decoded_claims_after_reset = jws_HS256.decode(compact=compact, key=key)
     assert decoded_claims_after_reset.payload == claims_fixed_dt.to_dict()
 
 
@@ -51,7 +51,7 @@ def test_jws_hmac_decoding(jws_HS256: JWS, claims_fixed_dt, secret_key: str):
     )
 
     key = OctKey.import_key(secret_key)
-    decoded_claims = JWTCustomClaims(**jws_HS256.decode(token=compact, key=key).payload)
+    decoded_claims = JWTCustomClaims(**jws_HS256.decode(compact=compact, key=key).payload)
     assert decoded_claims.to_dict() == claims_fixed_dt.to_dict()
 
 
@@ -88,20 +88,20 @@ def test_wrong_header_algorithm(
     # not reset JWS instance
     with pytest.raises(JWTError):
         jws_HS256.decode(
-            token=invalid_compact,
+            compact=invalid_compact,
             key=key,
         )
     jws_HS256.reset()
 
     # header validation error, alg is not a valid algorithm
     with pytest.raises(InvalidHeaderError):
-        jws_HS256.decode(token=invalid_compact, key=key)
+        jws_HS256.decode(compact=invalid_compact, key=key)
     jws_HS256.reset()
 
     # algorithm mismatch error
     with pytest.raises(AlgorithmMismatchError):
-        jws_HS256.decode(token=invalid_compact, key=key, validation_headers=None)
+        jws_HS256.decode(compact=invalid_compact, key=key, validation_headers=None)
     jws_HS256.reset()
 
-    decoded_claims = JWTCustomClaims(**jws_HS256.decode(token=compact, key=key).payload)
+    decoded_claims = JWTCustomClaims(**jws_HS256.decode(compact=compact, key=key).payload)
     assert decoded_claims.to_dict() == claims_fixed_dt.to_dict()
