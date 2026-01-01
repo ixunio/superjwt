@@ -42,10 +42,6 @@ class JWT:
         self.default_claims_validation = default_claims_validation
         self.default_headers_validation = default_headers_validation
 
-    def reset_token(self) -> None:
-        # self.token = JWSToken()
-        pass
-
     def encode(
         self,
         claims: JWTBaseModel | dict[str, Any] | None,
@@ -82,8 +78,9 @@ class JWT:
             JWSToken: a JWSToken instance representing the encoded and signed JWT token.
         """
 
-        # reset session
-        self.reset_token()
+        self.jws = JWS(
+            algorithm, default_headers_validation=self.default_headers_validation
+        )
 
         # prepare claims data and perform validation
         if claims is None:
@@ -104,9 +101,6 @@ class JWT:
             key = make_key(algorithm, key)
 
         # encode as JWS
-        self.jws = JWS(
-            algorithm, default_headers_validation=self.default_headers_validation
-        )
         self.jws.encode(
             headers=headers,
             payload=claims_dict,
@@ -170,8 +164,6 @@ class JWT:
             JWSToken: a JWSToken instance representing the decoded and verified JWT token.
         """
 
-        # reset session
-        self.reset_token()
         self.jws = JWS(
             algorithm, default_headers_validation=self.default_headers_validation
         )
@@ -250,12 +242,11 @@ class JWT:
             JWSToken: a JWSToken instance representing the unsafe non-verified decoded JWT token.
         """
 
-        # reset session
-        self.reset_token()
-
         self.jws = JWS(algorithm="none")
+
         if has_detached_payload:
             self.jws.enable_detached_payload()
+
         self.jws._allow_none_algorithm = True
         self.jws.decode(token=token, key=NoneKey(), validation_headers=None)
         self.jws._allow_none_algorithm = False
