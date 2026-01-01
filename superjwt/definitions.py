@@ -26,7 +26,7 @@ from superjwt.algorithms import (
 from superjwt.exceptions import (
     AlgorithmNotSupportedError,
     InvalidAlgorithmError,
-    InvalidHeaderError,
+    InvalidHeadersError,
     TokenExpiredError,
 )
 from superjwt.keys import BaseKey, NoneKey, OctKey
@@ -160,7 +160,7 @@ class JOSEHeader(JWTBaseModel):
     @model_validator(mode="after")
     def unsupported_b64_false(self) -> Self:
         if hasattr(self, "b64") and self.b64 is False:  # type: ignore
-            raise InvalidHeaderError(
+            raise InvalidHeadersError(
                 "'b64' header parameter is not supported in this implementation"
             )
         return self

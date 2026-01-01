@@ -3,7 +3,7 @@ import hmac
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Generic, TypeVar
 
-from superjwt.exceptions import JWTError
+from superjwt.exceptions import SuperJWTError
 from superjwt.keys import BaseKey, NoneKey, OctKey
 
 
@@ -34,7 +34,7 @@ class NoneAlgorithm(BaseJWSAlgorithm[NoneKey]):
 
     def check_key(self, key: NoneKey) -> None:
         if not isinstance(key, NoneKey):
-            raise JWTError("Key must be a NoneKey for 'none' algorithm")
+            raise SuperJWTError("Key must be a NoneKey for 'none' algorithm")
 
     def sign(self, _: bytes, __: NoneKey) -> bytes:
         return b""
@@ -53,7 +53,7 @@ class HMACWithSHAAlgorithm(BaseJWSAlgorithm[OctKey]):
 
     def check_key(self, key: OctKey) -> None:
         if not isinstance(key, OctKey):
-            raise JWTError("Key must be an OctetKey for HMAC algorithms")
+            raise SuperJWTError("Key must be an OctKey for HMAC algorithms")
 
     def sign(self, data: bytes, key: OctKey) -> bytes:
         return hmac.new(key.private_key, data, self.hash_algorithm).digest()

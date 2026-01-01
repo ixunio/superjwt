@@ -5,18 +5,16 @@ class SecurityWarning(UserWarning):
     """Base class for warnings of security issues."""
 
 
-class JWTError(Exception):
+class SuperJWTError(Exception):
+    """Base class for all SuperJWT related errors."""
+
     def __init__(self, message: str | None = None):
         if message is not None:
             self.error = message
         super().__init__(self.error)
 
 
-class InvalidKeyError(JWTError):
-    error = "Key is invalid"
-
-
-class InvalidTokenError(JWTError):
+class InvalidTokenError(SuperJWTError):
     """Generic exception for incorrect token format or content,
     regardless of signature verification."""
 
@@ -28,7 +26,7 @@ class InvalidTokenError(JWTError):
         super().__init__(self.error)
 
 
-class SignatureVerificationFailedError(JWTError):
+class SignatureVerificationFailedError(InvalidTokenError):
     """Raised when signature verification fails despite token
     being valid in its format. The token may have been tampered with."""
 
@@ -36,20 +34,18 @@ class SignatureVerificationFailedError(JWTError):
 
 
 class SizeExceededError(InvalidTokenError):
+    """Raised when the token size exceeds the allowed limit."""
+
     error = "Token size is too large"
 
 
-class MalformedTokenError(InvalidTokenError):
-    """Raised when the token data format is incorrect."""
+class InvalidHeadersError(InvalidTokenError):
+    """Raised when the JWT headers are invalid."""
 
-    error = "Malformed token"
-
-
-class InvalidHeaderError(InvalidTokenError):
     error = "Header data is invalid"
 
 
-class HeaderValidationError(InvalidHeaderError):
+class HeadersValidationError(InvalidHeadersError):
     """Raised when a header validation fails."""
 
     error = "Header validation failed"
@@ -70,11 +66,18 @@ class HeaderValidationError(InvalidHeaderError):
         super().__init__(self.error)
 
 
-class InvalidClaimsError(InvalidTokenError):
-    error = "Claims data is invalid"
+class AlgorithmMismatchError(InvalidHeadersError):
+    """Raised during decoding when the algorithm in the JWT header
+    does not match the expected registered algorithms."""
+
+    error = "Algorithm mismatch in header"
 
 
-class ClaimsValidationError(InvalidClaimsError):
+class InvalidPayloadError(InvalidTokenError):
+    error = "Payload data is invalid"
+
+
+class ClaimsValidationError(InvalidPayloadError):
     """Raised when a claim validation fails."""
 
     error = "Claims validation failed"
@@ -95,26 +98,23 @@ class ClaimsValidationError(InvalidClaimsError):
         super().__init__(self.error)
 
 
-class TokenExpiredError(InvalidClaimsError):
+class TokenExpiredError(ClaimsValidationError):
     """Raised when the token has expired based on its 'exp' claim."""
 
     error = "Token has expired"
 
 
-class InvalidAlgorithmError(JWTError):
+class InvalidAlgorithmError(SuperJWTError):
     """Base class for algorithm-related errors."""
 
     error = "Algorithm is invalid"
-
-
-class AlgorithmMismatchError(InvalidAlgorithmError):
-    """Raised during decoding when the algorithm in the JWT header
-    does not match the expected registered algorithms."""
-
-    error = "Algorithm mismatch in header"
 
 
 class AlgorithmNotSupportedError(InvalidAlgorithmError):
     """Raised when the specified algorithm is not supported."""
 
     error = "Algorithm not supported"
+
+
+class InvalidKeyError(SuperJWTError):
+    error = "Key is invalid"

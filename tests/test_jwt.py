@@ -15,10 +15,10 @@ from superjwt.definitions import (
 )
 from superjwt.exceptions import (
     ClaimsValidationError,
-    HeaderValidationError,
-    InvalidHeaderError,
-    JWTError,
+    HeadersValidationError,
+    InvalidHeadersError,
     SignatureVerificationFailedError,
+    SuperJWTError,
     TokenExpiredError,
 )
 from superjwt.jwt import JWT
@@ -330,7 +330,7 @@ def test_custom_claims_validation(jwt: JWT, claims: JWTCustomClaims, secret_key:
 
 def test_unsupported_b64_header(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
     # 'b64' header parameter is not supported
-    with pytest.raises(InvalidHeaderError):
+    with pytest.raises(InvalidHeadersError):
         jwt.encode(claims, secret_key, "HS256", headers={"alg": "HS256", "b64": False})
 
 
@@ -472,7 +472,7 @@ def test_detached_payload(jwt: JWT, claims_fixed_dt, secret_key):
 
 
 def test_detached_payload_no_jws_instance(jwt: JWT):
-    with pytest.raises(JWTError):
+    with pytest.raises(SuperJWTError):
         jwt.detach_payload()
 
 
@@ -537,12 +537,12 @@ def test_custom_headers_validation(jwt: JWT, secret_key: str):
     jwt.encode(
         {}, secret_key, "HS256", headers=headers, headers_validation=JOSEHeader
     )  # passes
-    with pytest.raises(HeaderValidationError):
+    with pytest.raises(HeadersValidationError):
         jwt.encode({}, secret_key, "HS256", headers=headers)
 
     # make headers no more compliant with JOSEHeader
     headers.typ = 123  # invalid type for typ # type: ignore
-    with pytest.raises(HeaderValidationError):
+    with pytest.raises(HeadersValidationError):
         jwt.encode(
             {},
             secret_key,
@@ -550,7 +550,7 @@ def test_custom_headers_validation(jwt: JWT, secret_key: str):
             headers=headers,
             headers_validation=JOSEHeader,  # no longer compliant (typ should be str)
         )
-    with pytest.raises(HeaderValidationError):
+    with pytest.raises(HeadersValidationError):
         jwt.encode({}, secret_key, "HS256", headers=headers)
 
     compact = jwt.encode(
@@ -559,13 +559,13 @@ def test_custom_headers_validation(jwt: JWT, secret_key: str):
     decoded_claims = jwt.decode(
         compact, secret_key, "HS256", headers_validation=Validation.DISABLE
     ).payload
-    with pytest.raises(HeaderValidationError):
+    with pytest.raises(HeadersValidationError):
         jwt.decode(
             compact, secret_key, "HS256"
         )  # fails because validation defaults to JOSEHeader
-    with pytest.raises(HeaderValidationError):
+    with pytest.raises(HeadersValidationError):
         jwt.decode(compact, secret_key, "HS256", headers_validation=JOSEHeader)
-    with pytest.raises(HeaderValidationError):
+    with pytest.raises(HeadersValidationError):
         jwt.decode(compact, secret_key, "HS256", headers_validation=CustomHeader)
     assert decoded_claims == {}
 
@@ -706,7 +706,7 @@ def test_custom_default_headers_validation_policy(secret_key: str):
 
     # Missing custom_header should fail validation
     invalid_headers = {"alg": "HS256"}  # missing custom_header
-    with pytest.raises(HeaderValidationError):
+    with pytest.raises(HeadersValidationError):
         jwt_custom.encode({}, secret_key, "HS256", headers=invalid_headers)
 
     # Can still override validation on encode/decode
@@ -722,7 +722,7 @@ def test_custom_default_headers_validation_policy(secret_key: str):
         compact_unvalidated, secret_key, "HS256", headers_validation=Validation.DISABLE
     )
     # Decode without specifying headers_validation should fail (uses custom default)
-    with pytest.raises(HeaderValidationError):
+    with pytest.raises(HeadersValidationError):
         jwt_custom.decode(compact_unvalidated, secret_key, "HS256")
 
     # Compare with default JWT instance behavior (validates with JOSEHeader, not CustomHeader)

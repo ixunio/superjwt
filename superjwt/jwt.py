@@ -21,7 +21,7 @@ from superjwt.definitions import (
 )
 from superjwt.exceptions import (
     ClaimsValidationError,
-    JWTError,
+    SuperJWTError,
 )
 from superjwt.jws import JWS
 from superjwt.keys import BaseKey, NoneKey
@@ -123,7 +123,7 @@ class JWT:
             JWSToken: a JWSToken instance representing the encoded and signed JWT token.
         """
         if not hasattr(self, "jws") or not self.jws.token.verified:
-            raise JWTError("JWT token has not been encoded yet")
+            raise SuperJWTError("JWT token has not been encoded yet")
         self.jws.enable_detached_payload()
 
         return self.jws.token.verified
