@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any
 
@@ -17,12 +18,15 @@ from superjwt.exceptions import (
     ClaimsValidationError,
     HeadersValidationError,
     InvalidHeadersError,
+    InvalidPayloadError,
+    InvalidTokenError,
     SignatureVerificationFailedError,
     SizeExceededError,
     SuperJWTError,
     TokenExpiredError,
 )
 from superjwt.jwt import JWT
+from superjwt.utils import urlsafe_b64encode
 
 from tests.conftest import JWTCustomClaims, check_claims_instance
 
@@ -739,7 +743,6 @@ def test_custom_default_claims_validation_policy_no_force_pydantic(
     """Test JWT instance with custom default validation but force_validation_on_pydantic_model=False."""
 
     # Create JWT instance with custom validation but without forcing Pydantic validation
-    # When force_validation_on_pydantic_model=False, Pydantic claims use default_validation_model
     custom_validation_config = JWTValidationModelConfig(
         default_validation_model=JWTClaims,  # Validate against JWTClaims
         force_validation_on_pydantic_model=False,  # Don't force Pydantic model type
@@ -747,7 +750,7 @@ def test_custom_default_claims_validation_policy_no_force_pydantic(
     )
     jwt_custom = JWT(default_claims_validation=custom_validation_config)
 
-    # Create invalid Pydantic claims (aud has wrong type)
+    # Create invalid Pydantic claims
     invalid_claims = JWTCustomClaims.model_construct(**claims_dict)
     invalid_claims.aud = 123  # invalid type  # type: ignore
 
@@ -759,27 +762,20 @@ def test_custom_default_claims_validation_policy_no_force_pydantic(
         )  # fails JWTClaims validation
 
     # Create valid claims according to JWTClaims but invalid for JWTCustomClaims
-    # (missing required 'user_id' field from JWTCustomClaims)
     partial_claims = JWTCustomClaims.model_construct(**claims_dict)
-    partial_claims.user_id = (
-        None  # invalid for JWTCustomClaims but valid for JWTClaims  # type: ignore
-    )
+    partial_claims.user_id = None  # type: ignore
 
-    # Should pass because it only validates against JWTClaims (not JWTCustomClaims)
     compact = jwt_custom.encode(partial_claims, secret_key, "HS256").compact
     decoded_claims = jwt_custom.decode(compact, secret_key, "HS256").payload
-    assert "user_id" not in decoded_claims  # user_id is None so excluded
+    assert "user_id" not in decoded_claims
 
-    # But explicitly requesting JWTCustomClaims validation should fail
     with pytest.raises(ClaimsValidationError):
         jwt_custom.decode(compact, secret_key, "HS256", claims_validation=JWTCustomClaims)
 
     # Compare with default JWT instance behavior (validates Pydantic models automatically)
     jwt_default = JWT()
     with pytest.raises(ClaimsValidationError):
-        jwt_default.encode(
-            partial_claims, secret_key, "HS256"
-        )  # fails with default behavior (validates against JWTCustomClaims)
+        jwt_default.encode(partial_claims, secret_key, "HS256")
 
 
 def test_size_exceeded_error(secret_key: str):
@@ -803,3 +799,74 @@ def test_size_exceeded_error(secret_key: str):
         jwt_strict.encode(claims_enormous, secret_key, "HS256")
     with pytest.raises(SizeExceededError):
         jwt_strict.decode(token_enormous.compact, secret_key, "HS256")
+
+
+def test_invalid_token_error_malformed_tokens(jwt: JWT, secret_key: str):
+    """Test InvalidTokenError for various malformed token formats."""
+    malformed_token_2_parts = b"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0"
+    with pytest.raises(InvalidTokenError):
+        jwt.decode(malformed_token_2_parts, secret_key, "HS256")
+
+    malformed_token_4_parts = (
+        b"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.c2lnbmF0dXJl.ZXh0cmE"
+    )
+    with pytest.raises(InvalidTokenError):
+        jwt.decode(malformed_token_4_parts, secret_key, "HS256")
+
+    # Token with empty header part
+    malformed_token_empty_header = b".eyJzdWIiOiJ0ZXN0In0.c2lnbmF0dXJl"
+    with pytest.raises(InvalidTokenError):
+        jwt.decode(malformed_token_empty_header, secret_key, "HS256")
+
+    valid_token = jwt.encode({"sub": "test"}, secret_key, "HS256").compact
+    # Corrupt the signature part with invalid base64
+    parts = valid_token.split(b".")
+    invalid_signature_token = b".".join([parts[0], parts[1], b"!!!invalid-base64!!!"])
+    with pytest.raises(InvalidTokenError):
+        jwt.decode(invalid_signature_token, secret_key, "HS256")
+
+
+def test_invalid_headers_error_base64_and_format(jwt: JWT, secret_key: str):
+    """Test InvalidHeadersError for invalid base64 encoding and non-dict headers."""
+    valid_token = jwt.encode({"sub": "test"}, secret_key, "HS256").compact
+    parts = valid_token.split(b".")
+
+    # Invalid base64 in headers
+    invalid_header_token = b".".join([b"!!!invalid-base64!!!", parts[1], parts[2]])
+    with pytest.raises(InvalidHeadersError):
+        jwt.decode(invalid_header_token, secret_key, "HS256")
+
+    # Non-dict headers
+    array_header = urlsafe_b64encode(json.dumps(["HS256"]).encode())
+    non_dict_header_token = b".".join([array_header, parts[1], parts[2]])
+    with pytest.raises(InvalidHeadersError):
+        jwt.decode(non_dict_header_token, secret_key, "HS256")
+
+    # Headers with invalid JSON (not a complete structure)
+    invalid_json_headers = urlsafe_b64encode(b"{invalid json}")
+    invalid_json_token = b".".join([invalid_json_headers, parts[1], parts[2]])
+    with pytest.raises(InvalidHeadersError):
+        jwt.decode(invalid_json_token, secret_key, "HS256")
+
+
+def test_invalid_payload_error_base64_and_format(jwt: JWT, secret_key: str):
+    """Test InvalidPayloadError for invalid base64 encoding and non-dict payload."""
+    valid_token = jwt.encode({"sub": "test"}, secret_key, "HS256").compact
+    parts = valid_token.split(b".")
+
+    # Invalid base64 in payload
+    invalid_payload_token = b".".join([parts[0], b"!!!invalid-base64!!!", parts[2]])
+    with pytest.raises(InvalidPayloadError):
+        jwt.decode(invalid_payload_token, secret_key, "HS256")
+
+    # Non-dict payload
+    array_payload = urlsafe_b64encode(json.dumps(["claim1", "claim2"]).encode())
+    non_dict_payload_token = b".".join([parts[0], array_payload, parts[2]])
+    with pytest.raises(InvalidPayloadError):
+        jwt.decode(non_dict_payload_token, secret_key, "HS256")
+
+    # Payload with invalid JSON (not a complete structure)
+    invalid_json_payload = urlsafe_b64encode(b"{invalid json}")
+    invalid_json_token = b".".join([parts[0], invalid_json_payload, parts[2]])
+    with pytest.raises(InvalidPayloadError):
+        jwt.decode(invalid_json_token, secret_key, "HS256")
