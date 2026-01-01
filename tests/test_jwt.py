@@ -10,6 +10,7 @@ from superjwt.definitions import (
     JWTClaims,
     JWTDatetime,
     JWTValidationModelConfig,
+    Validation,
     check_future_dates,
 )
 from superjwt.exceptions import (
@@ -155,7 +156,9 @@ def test_encode_decode_pydantic_claims(
     assert jws_token.compact == jws_token2.compact
     # decoding
     claims.user_id = None  # invalid type for user_id  # type: ignore
-    compact = jwt.encode(claims, secret_key, "HS256", claims_validation=None).compact
+    compact = jwt.encode(
+        claims, secret_key, "HS256", claims_validation=Validation.DISABLE
+    ).compact
     # passes (validation with default JWTClaims)
     jwt.decode(compact, secret_key, "HS256")
     # fails (validation with JWTCustomClaims)
@@ -192,14 +195,17 @@ def test_encode_decode_claims_validation_disabled(
     with pytest.raises(ClaimsValidationError):
         jwt.encode(unvalidated_claims, secret_key_random, "HS256")
     compact = jwt.encode(
-        unvalidated_claims, secret_key_random, "HS256", claims_validation=None
+        unvalidated_claims,
+        secret_key_random,
+        "HS256",
+        claims_validation=Validation.DISABLE,
     ).compact
 
     with pytest.raises(ClaimsValidationError):
         jwt.decode(compact, secret_key_random, "HS256", claims_validation=JWTCustomClaims)
     jwt.decode(compact, secret_key_random, "HS256")  # passes (no validation)
     decoded = jwt.decode(
-        compact, secret_key_random, "HS256", claims_validation=None
+        compact, secret_key_random, "HS256", claims_validation=Validation.DISABLE
     ).payload
     decoded_claims = JWTCustomClaims.model_construct(**decoded)
 
@@ -228,7 +234,10 @@ def test_encode_decode_claims_dict_validation_disabled(
         )
     # run encoding again with validation disabled, does not raise error
     compact = jwt.encode(
-        unvalidated_claims_dict, secret_key_random, "HS256", claims_validation=None
+        unvalidated_claims_dict,
+        secret_key_random,
+        "HS256",
+        claims_validation=Validation.DISABLE,
     ).compact
     jwt.decode(
         compact, secret_key_random, "HS256"
@@ -237,7 +246,7 @@ def test_encode_decode_claims_dict_validation_disabled(
         jwt.decode(compact, secret_key_random, "HS256", claims_validation=JWTClaims)
     # run decoding again with validation disabled, does not raise error
     decoded = jwt.decode(
-        compact, secret_key_random, "HS256", claims_validation=None
+        compact, secret_key_random, "HS256", claims_validation=Validation.DISABLE
     ).payload
     decoded_claims = JWTCustomClaims.model_construct(**decoded)
 
@@ -276,7 +285,7 @@ def test_custom_validation(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
         )  # same as claims_validation=JWTCustomClaims
 
     compact = jwt.encode(
-        claims, secret_key, "HS256", claims_validation=None
+        claims, secret_key, "HS256", claims_validation=Validation.DISABLE
     ).compact  # create token anyway
     jwt.decode(compact, secret_key, "HS256")  # passes (no validation)
     with pytest.raises(ClaimsValidationError):
@@ -286,13 +295,13 @@ def test_custom_validation(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
     with pytest.raises(ClaimsValidationError):
         jwt.decode(compact, secret_key, "HS256", claims_validation=JWTCustomClaims)
     decoded_claims = jwt.decode(
-        compact, secret_key, "HS256", claims_validation=None
+        compact, secret_key, "HS256", claims_validation=Validation.DISABLE
     ).payload
     with pytest.raises(pydantic.ValidationError):
         JWTCustomClaims(**decoded_claims)
 
     # test detached payload
-    jwt.encode(claims, secret_key, "HS256", claims_validation=None)
+    jwt.encode(claims, secret_key, "HS256", claims_validation=Validation.DISABLE)
     compact_detached = jwt.detach_payload().compact  # switch to detached mode
     jwt.decode(
         compact_detached, secret_key, "HS256", with_detached_payload=claims.to_dict()
@@ -332,7 +341,9 @@ def test_invalid_claims_future_dates(jwt: JWT, secret_key: str):
     }
 
     jwt.encode(claims_dict, secret_key, "HS256")  # no validation
-    jwt.encode(claims_dict, secret_key, "HS256", claims_validation=None)  # no validation
+    jwt.encode(
+        claims_dict, secret_key, "HS256", claims_validation=Validation.DISABLE
+    )  # no validation
     with pytest.raises(ClaimsValidationError):
         jwt.encode(claims_dict, secret_key, "HS256", claims_validation=JWTClaims)
 
@@ -343,7 +354,9 @@ def test_invalid_claims_future_dates(jwt: JWT, secret_key: str):
         "nbf": (now - timedelta(minutes=5)).timestamp(),
     }
     jwt.encode(claims_dict, secret_key, "HS256")  # no validation
-    jwt.encode(claims_dict, secret_key, "HS256", claims_validation=None)  # no validation
+    jwt.encode(
+        claims_dict, secret_key, "HS256", claims_validation=Validation.DISABLE
+    )  # no validation
     with pytest.raises(ClaimsValidationError):
         jwt.encode(claims_dict, secret_key, "HS256", claims_validation=JWTClaims)
 
@@ -355,7 +368,9 @@ def test_invalid_claims_future_dates(jwt: JWT, secret_key: str):
         "exp": (now + timedelta(minutes=5)).timestamp(),
     }
     jwt.encode(claims_dict, secret_key, "HS256")  # no validation
-    jwt.encode(claims_dict, secret_key, "HS256", claims_validation=None)  # no validation
+    jwt.encode(
+        claims_dict, secret_key, "HS256", claims_validation=Validation.DISABLE
+    )  # no validation
     with pytest.raises(ClaimsValidationError):
         jwt.encode(claims_dict, secret_key, "HS256", claims_validation=JWTClaims)
 
@@ -457,12 +472,14 @@ def test_detached_payload_no_jws_instance(jwt: JWT):
 
 def test_expired_token(jwt: JWT, secret_key: str):
     claims = JWTClaims.model_construct(exp=datetime.now(UTC) - timedelta(days=1))
-    compact = jwt.encode(claims, secret_key, "HS256", claims_validation=None).compact
+    compact = jwt.encode(
+        claims, secret_key, "HS256", claims_validation=Validation.DISABLE
+    ).compact
     with pytest.raises(TokenExpiredError):
         jwt.encode(claims, secret_key, "HS256")
     jwt.decode(compact, secret_key, "HS256")  # passes (no validation)
     decoded_claims = jwt.decode(
-        compact, secret_key, "HS256", claims_validation=None
+        compact, secret_key, "HS256", claims_validation=Validation.DISABLE
     ).payload
     assert decoded_claims["exp"] == claims.to_dict()["exp"]
 
@@ -473,7 +490,7 @@ def test_claims_model_data(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
     assert isinstance(token.model.claims, JWTCustomClaims)
     token = jwt.encode(claims, secret_key, "HS256")
     assert isinstance(token.model.claims, JWTCustomClaims)
-    token = jwt.encode(claims, secret_key, "HS256", claims_validation=None)
+    token = jwt.encode(claims, secret_key, "HS256", claims_validation=Validation.DISABLE)
     assert isinstance(token.model.claims, JWTBaseModel)
 
     # encode + claims as dict
@@ -483,7 +500,9 @@ def test_claims_model_data(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
     assert isinstance(token.model.claims, JWTCustomClaims)
     token = jwt.encode(claims.to_dict(), secret_key, "HS256")
     assert isinstance(token.model.claims, JWTBaseModel)
-    token = jwt.encode(claims.to_dict(), secret_key, "HS256", claims_validation=None)
+    token = jwt.encode(
+        claims.to_dict(), secret_key, "HS256", claims_validation=Validation.DISABLE
+    )
     compact = token.compact
     assert isinstance(token.model.claims, JWTBaseModel)
 
@@ -492,7 +511,7 @@ def test_claims_model_data(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
     assert isinstance(token.model.claims, JWTCustomClaims)
     token = jwt.decode(compact, secret_key, "HS256")
     assert isinstance(token.model.claims, JWTBaseModel)
-    token = jwt.decode(compact, secret_key, "HS256", claims_validation=None)
+    token = jwt.decode(compact, secret_key, "HS256", claims_validation=Validation.DISABLE)
     assert isinstance(token.model.claims, JWTBaseModel)
 
 
@@ -525,10 +544,10 @@ def test_custom_headers_validation(jwt: JWT, secret_key: str):
         jwt.encode({}, secret_key, "HS256", headers=headers)
 
     compact = jwt.encode(
-        {}, secret_key, "HS256", headers=headers, headers_validation=None
+        {}, secret_key, "HS256", headers=headers, headers_validation=Validation.DISABLE
     ).compact
     decoded_claims = jwt.decode(
-        compact, secret_key, "HS256", headers_validation=None
+        compact, secret_key, "HS256", headers_validation=Validation.DISABLE
     ).payload
     with pytest.raises(HeaderValidationError):
         jwt.decode(
@@ -554,7 +573,9 @@ def test_headers_model_data(jwt: JWT, secret_key: str):
     assert isinstance(token.model.headers, CustomHeader)
     token = jwt.encode({}, secret_key, "HS256", headers=headers)
     assert isinstance(token.model.headers, JOSEHeader)
-    token = jwt.encode({}, secret_key, "HS256", headers=headers, headers_validation=None)
+    token = jwt.encode(
+        {}, secret_key, "HS256", headers=headers, headers_validation=Validation.DISABLE
+    )
     assert isinstance(token.model.headers, JWTBaseModel)
 
     # encode + headers as dict
@@ -569,7 +590,11 @@ def test_headers_model_data(jwt: JWT, secret_key: str):
     token = jwt.encode({}, secret_key, "HS256", headers=headers.to_dict())
     assert isinstance(token.model.headers, JOSEHeader)
     token = jwt.encode(
-        {}, secret_key, "HS256", headers=headers.to_dict(), headers_validation=None
+        {},
+        secret_key,
+        "HS256",
+        headers=headers.to_dict(),
+        headers_validation=Validation.DISABLE,
     )
     compact = token.compact
     assert isinstance(token.model.headers, JWTBaseModel)
@@ -579,7 +604,9 @@ def test_headers_model_data(jwt: JWT, secret_key: str):
     assert isinstance(token.model.headers, CustomHeader)
     token = jwt.decode(compact, secret_key, "HS256")
     assert isinstance(token.model.headers, JOSEHeader)
-    token = jwt.decode(compact, secret_key, "HS256", headers_validation=None)
+    token = jwt.decode(
+        compact, secret_key, "HS256", headers_validation=Validation.DISABLE
+    )
     assert isinstance(token.model.headers, JWTBaseModel)
 
 
@@ -620,20 +647,24 @@ def test_custom_default_claims_validation_policy(
 
     # Can still override validation on encode/decode
     compact_unvalidated = jwt_strict.encode(
-        invalid_claims, secret_key, "HS256", claims_validation=None
+        invalid_claims, secret_key, "HS256", claims_validation=Validation.DISABLE
     ).compact
-    # Decode with claims_validation=None should pass (no validation)
-    jwt_strict.decode(compact_unvalidated, secret_key, "HS256", claims_validation=None)
+    # Decode with claims_validation=Validation.DISABLE should pass (no validation)
+    jwt_strict.decode(
+        compact_unvalidated, secret_key, "HS256", claims_validation=Validation.DISABLE
+    )
     # Decode without specifying claims_validation should fail (uses custom default)
     with pytest.raises(ClaimsValidationError):
         jwt_strict.decode(compact_unvalidated, secret_key, "HS256")
 
     # Same for invalid_dates_claims
     compact_invalid_dates = jwt_strict.encode(
-        invalid_dates_claims, secret_key, "HS256", claims_validation=None
+        invalid_dates_claims, secret_key, "HS256", claims_validation=Validation.DISABLE
     ).compact
-    # Decode with claims_validation=None should pass (no validation)
-    jwt_strict.decode(compact_invalid_dates, secret_key, "HS256", claims_validation=None)
+    # Decode with claims_validation=Validation.DISABLE should pass (no validation)
+    jwt_strict.decode(
+        compact_invalid_dates, secret_key, "HS256", claims_validation=Validation.DISABLE
+    )
     # Decode without specifying claims_validation should fail (uses custom default)
     with pytest.raises(ClaimsValidationError):
         jwt_strict.decode(compact_invalid_dates, secret_key, "HS256")
@@ -670,10 +701,16 @@ def test_custom_default_headers_validation_policy(secret_key: str):
 
     # Can still override validation on encode/decode
     compact_unvalidated = jwt_custom.encode(
-        {}, secret_key, "HS256", headers=invalid_headers, headers_validation=None
+        {},
+        secret_key,
+        "HS256",
+        headers=invalid_headers,
+        headers_validation=Validation.DISABLE,
     ).compact
-    # Decode with headers_validation=None should pass (no validation)
-    jwt_custom.decode(compact_unvalidated, secret_key, "HS256", headers_validation=None)
+    # Decode with headers_validation=Validation.DISABLE should pass (no validation)
+    jwt_custom.decode(
+        compact_unvalidated, secret_key, "HS256", headers_validation=Validation.DISABLE
+    )
     # Decode without specifying headers_validation should fail (uses custom default)
     with pytest.raises(HeaderValidationError):
         jwt_custom.decode(compact_unvalidated, secret_key, "HS256")

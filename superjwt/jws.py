@@ -1,4 +1,6 @@
 import json
+from collections.abc import Callable
+from inspect import isclass
 from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ValidationError
@@ -7,13 +9,12 @@ from superjwt.algorithms import BaseJWSAlgorithm, NoneAlgorithm
 from superjwt.definitions import (
     MAX_TOKEN_LENGTH,
     Algorithm,
-    DefaultValidation,
     JOSEHeader,
     JWSToken,
     JWSTokenLifeCycle,
     JWTHeadersDefaultValidationConfig,
     JWTValidationModelConfig,
-    ValidationFlag,
+    Validation,
     get_effective_data_model,
     get_effective_data_validation_model,
     get_jws_algorithm,
@@ -66,7 +67,7 @@ class JWS:
         payload: dict[str, Any],
         key: BaseKey,
         *,
-        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+        headers_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
     ) -> JWSToken:
         if self.token.verified.compact != b"..":
             raise JWTError("JWS instance data must be reset")
@@ -116,7 +117,7 @@ class JWS:
         key: BaseKey,
         *,
         with_detached_payload: dict[str, Any] | None = None,
-        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+        headers_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
     ) -> JWSToken:
         if self.token.verified.compact != b".." or self.token.unsafe.compact != b"..":
             raise JWTError("JWS instance data must be reset")
@@ -225,7 +226,7 @@ class JWS:
 
     def validate_headers_and_algorithm(
         self,
-        validation_model: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
     ) -> None:
         headers_dict = self.token.unsafe.headers
 
@@ -277,29 +278,31 @@ class JWS:
     def get_headers_data_model(
         self,
         data: JOSEHeader | dict[str, Any],
-        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
     ) -> type[BaseModel]:
-        """Get the effective data headers pydantic model"""
-
-        if headers_validation is DefaultValidation:
-            return get_effective_data_model(data, self.default_headers_validation)
-        return get_effective_data_model(
-            data,
-            cast("type[BaseModel] | None", headers_validation),
-        )
+        """Get the effective data claims pydantic model"""
+        return self.get_headers_model(get_effective_data_model, data, validation_model)
 
     def get_headers_validation_model(
         self,
         data: JOSEHeader | dict[str, Any],
-        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
     ) -> type[BaseModel] | None:
-        """Get the effective headers validation pydantic model"""
-
-        if headers_validation is DefaultValidation:
-            return get_effective_data_validation_model(
-                data, self.default_headers_validation
-            )
-        return get_effective_data_validation_model(
-            data,
-            cast("type[BaseModel] | None", headers_validation),
+        """Get the effective claims validation pydantic model"""
+        return self.get_headers_model(
+            get_effective_data_validation_model, data, validation_model
         )
+
+    def get_headers_model(
+        self,
+        fn: Callable,
+        data: JOSEHeader | dict[str, Any],
+        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
+    ) -> Any:
+        if validation_model is Validation.DISABLE or validation_model is None:
+            return fn(data, None)
+        elif validation_model is Validation.DEFAULT:
+            return fn(data, self.default_headers_validation)
+        elif isclass(validation_model) and issubclass(validation_model, BaseModel):
+            return fn(data, validation_model)
+        raise TypeError("Wrong validation object type")

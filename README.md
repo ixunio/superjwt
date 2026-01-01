@@ -93,7 +93,7 @@ from typing import Annotated
 from uuid import UUID
 
 from pydantic import AfterValidator, Field
-from superjwt import JWTClaims, decode, encode
+from superjwt import JWTClaims, Validation, decode, encode
 from superjwt.exceptions import ClaimsValidationError
 
 secret_key = "your-secret-key-of-len-32-bytes!"
@@ -129,9 +129,9 @@ invalid_claims = (
     .with_issued_at()
     .with_expiration(minutes=10)
 )
-# disable claims validation to create an invalid token
+# disable claims default validation to create an invalid token
 invalid_token = encode(
-    invalid_claims, secret_key, "HS256", claims_validation=None
+    invalid_claims, secret_key, "HS256", claims_validation=Validation.DISABLE
 )
 try:
     decoded_invalid = decode(invalid_token, secret_key, "HS256", claims_validation=MyJWTClaims)

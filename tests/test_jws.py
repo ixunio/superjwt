@@ -1,5 +1,5 @@
 import pytest
-from superjwt.definitions import JOSEHeader
+from superjwt.definitions import JOSEHeader, Validation
 from superjwt.exceptions import (
     AlgorithmMismatchError,
     HeaderValidationError,
@@ -82,7 +82,7 @@ def test_wrong_header_algorithm(
         headers=headers,
         payload=claims_fixed_dt.to_dict(),
         key=key,
-        headers_validation=None,
+        headers_validation=Validation.DISABLE,
     ).compact
 
     # not reset JWS instance
@@ -100,7 +100,9 @@ def test_wrong_header_algorithm(
 
     # algorithm mismatch error
     with pytest.raises(AlgorithmMismatchError):
-        jws_HS256.decode(compact=invalid_compact, key=key, headers_validation=None)
+        jws_HS256.decode(
+            compact=invalid_compact, key=key, headers_validation=Validation.DISABLE
+        )
     jws_HS256.reset()
 
     decoded_claims = JWTCustomClaims(**jws_HS256.decode(compact=compact, key=key).payload)

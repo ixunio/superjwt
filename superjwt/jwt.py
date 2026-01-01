@@ -1,18 +1,19 @@
 import logging
+from collections.abc import Callable
+from inspect import isclass
 from typing import Any, cast
 
 from pydantic import BaseModel, ValidationError
 
 from superjwt.definitions import (
     Algorithm,
-    DefaultValidation,
     JOSEHeader,
     JWSToken,
     JWTBaseModel,
     JWTClaimsDefaultValidationConfig,
     JWTHeadersDefaultValidationConfig,
     JWTValidationModelConfig,
-    ValidationFlag,
+    Validation,
     get_effective_data_model,
     get_effective_data_validation_model,
     make_key,
@@ -49,8 +50,8 @@ class JWT:
         algorithm: Algorithm = "HS256",
         *,
         headers: JOSEHeader | dict[str, Any] | None = None,
-        claims_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
-        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+        claims_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
+        headers_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
     ) -> JWSToken:
         """Encode and sign the claims as a JWT token
 
@@ -134,8 +135,8 @@ class JWT:
         algorithm: Algorithm = "HS256",
         *,
         with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
-        claims_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
-        headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+        claims_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
+        headers_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
     ) -> JWSToken:
         """Decode the JWT token with signature verification.
 
@@ -240,7 +241,9 @@ class JWT:
             self.jws.enable_detached_payload()
 
         self.jws._allow_none_algorithm = True
-        self.jws.decode(compact=compact, key=NoneKey(), headers_validation=None)
+        self.jws.decode(
+            compact=compact, key=NoneKey(), headers_validation=Validation.DISABLE
+        )
         self.jws._allow_none_algorithm = False
 
         return self.jws.token.unsafe
@@ -248,29 +251,31 @@ class JWT:
     def get_claims_data_model(
         self,
         data: JWTBaseModel | dict[str, Any],
-        claims_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
     ) -> type[BaseModel]:
         """Get the effective data claims pydantic model"""
-
-        if claims_validation is DefaultValidation:
-            return get_effective_data_model(data, self.default_claims_validation)
-        return get_effective_data_model(
-            data,
-            cast("type[BaseModel] | None", claims_validation),
-        )
+        return self.get_claims_model(get_effective_data_model, data, validation_model)
 
     def get_claims_validation_model(
         self,
         data: JWTBaseModel | dict[str, Any],
-        claims_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
     ) -> type[BaseModel] | None:
         """Get the effective claims validation pydantic model"""
-
-        if claims_validation is DefaultValidation:
-            return get_effective_data_validation_model(
-                data, self.default_claims_validation
-            )
-        return get_effective_data_validation_model(
-            data,
-            cast("type[BaseModel] | None", claims_validation),
+        return self.get_claims_model(
+            get_effective_data_validation_model, data, validation_model
         )
+
+    def get_claims_model(
+        self,
+        fn: Callable,
+        data: JWTBaseModel | dict[str, Any],
+        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
+    ) -> Any:
+        if validation_model is Validation.DISABLE or validation_model is None:
+            return fn(data, None)
+        elif validation_model is Validation.DEFAULT:
+            return fn(data, self.default_claims_validation)
+        elif isclass(validation_model) and issubclass(validation_model, BaseModel):
+            return fn(data, validation_model)
+        raise TypeError("Wrong validation object type")

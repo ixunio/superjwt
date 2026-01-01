@@ -5,13 +5,12 @@ from pydantic import BaseModel
 from superjwt._version import __version__
 from superjwt.definitions import (
     Algorithm,
-    DefaultValidation,
     JOSEHeader,
     JWSToken,
     JWTBaseModel,
     JWTClaims,
     JWTDatetime,
-    ValidationFlag,
+    Validation,
 )
 from superjwt.jwt import JWT
 from superjwt.keys import BaseKey
@@ -36,8 +35,8 @@ def encode(
     *,
     headers: JOSEHeader | dict[str, Any] | None = None,
     detach_payload: bool = False,
-    claims_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
-    headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+    claims_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
+    headers_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
 ) -> bytes:
     """Encode and sign the claims as a JWT token.
 
@@ -83,8 +82,8 @@ def decode(
     algorithm: Algorithm,
     *,
     with_detached_payload: JWTClaims | dict[str, Any] | None = None,
-    claims_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
-    headers_validation: type[BaseModel] | ValidationFlag | None = DefaultValidation,
+    claims_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
+    headers_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
 ) -> dict[str, Any]:
     """Decode the JWT token with signature verification.
 

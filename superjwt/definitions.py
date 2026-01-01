@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Annotated, Any, Final, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     AfterValidator,
@@ -375,10 +375,11 @@ JWTHeadersDefaultValidationConfig = JWTValidationModelConfig(
 )
 
 
-class ValidationFlag: ...
+class Validation(Enum):
+    """Flags to control validation behavior in JWT operations."""
 
-
-DefaultValidation: Final = ValidationFlag()
+    DEFAULT = "default"
+    DISABLE = "disable"
 
 
 def get_effective_data_model(
