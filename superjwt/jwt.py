@@ -10,7 +10,6 @@ from superjwt.definitions import (
     JOSEHeader,
     JWSToken,
     JWTBaseModel,
-    JWTClaims,
     JWTClaimsDefaultValidationConfig,
     JWTHeadersDefaultValidationConfig,
     JWTValidationModelConfig,
@@ -145,7 +144,7 @@ class JWT:
         key: str | bytes | BaseKey,
         algorithm: Algorithm = "HS256",
         *,
-        with_detached_payload: JWTClaims | dict[str, Any] | None = None,
+        with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
         validation_claims: type[BaseModel]
         | DefaultValidationFlag
         | None = DefaultValidation,
@@ -159,7 +158,7 @@ class JWT:
             token (str | bytes): The JWT token to decode.
             key (str | bytes | BaseKey): The key instance to verify the JWT signature.
             algorithm (Algorithm): The algorithm to use for verifying the JWT.
-            with_detached_payload (JWTClaims | dict[str, Any] | None, opt.):
+            with_detached_payload (JWTBaseModel | dict[str, Any] | None, opt.):
                 Detached payload to use for signature verification, if any.
             validation_claims (type[JWTBaseModel] | None, opt.): the pydantic model
                 to use for claims validation. If None, claims validation is disabled.
@@ -250,7 +249,7 @@ class JWT:
             has_detached_payload (bool, opt.): If True, indicates that the token has a detached payload.
 
         Returns:
-            JWSToken: The unsafe/not validated decoded JWT token as a raw JWSToken instance.
+            JWSToken: The unsafe/not verified decoded JWT token as a raw JWSToken instance.
         """
 
         # reset session
