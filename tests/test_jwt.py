@@ -149,9 +149,9 @@ def test_encode_decode_pydantic_claims(
     claims = JWTCustomClaims(**claims_dict)
     # encoding valid
     token = jwt.encode(claims, secret_key, "HS256")
-    jws_token = jwt.jws.token.validated
+    jws_token = jwt.jws.token.verified
     jwt.encode(claims, secret_key, "HS256", validation_claims=JWTCustomClaims)
-    jws_token2 = jwt.jws.token.validated
+    jws_token2 = jwt.jws.token.verified
     assert jws_token.encoded.compact == jws_token2.encoded.compact
     # decoding
     claims.user_id = None  # invalid type for user_id  # type: ignore

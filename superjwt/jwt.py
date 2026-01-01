@@ -115,14 +115,14 @@ class JWT:
         )
 
         # set claims model data
-        self.jws.token.validated.model.claims = cast(
+        self.jws.token.verified.model.claims = cast(
             "JWTBaseModel",
             self.get_data_claims_model(claims, validation_claims).model_construct(
                 **claims_dict
             ),
         )
 
-        self.token = self.jws.token.validated
+        self.token = self.jws.token.verified
         return self.token.encoded.compact
 
     def detach_payload(self) -> bytes:
@@ -132,7 +132,7 @@ class JWT:
         Returns:
             bytes: the compact JWT token with an empty payload bytes instead
         """
-        if not hasattr(self, "jws") or not self.jws.token.validated:
+        if not hasattr(self, "jws") or not self.jws.token.verified:
             raise JWTError("JWT token has not been encoded yet")
         self.jws.enable_detached_payload()
 
@@ -217,23 +217,23 @@ class JWT:
             # validate claims
             try:
                 claims_dict = prepare_and_validate_data(
-                    data=self.jws.token.validated.decoded.payload,
+                    data=self.jws.token.verified.decoded.payload,
                     validation_model=self.get_validation_claims_model(
-                        self.jws.token.validated.decoded.payload, validation_claims
+                        self.jws.token.verified.decoded.payload, validation_claims
                     ),
                 )
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
 
         # set claims model data
-        self.jws.token.validated.model.claims = cast(
+        self.jws.token.verified.model.claims = cast(
             "JWTBaseModel",
             self.get_data_claims_model(claims_dict, validation_claims).model_construct(
                 **claims_dict
             ),
         )
 
-        self.token = self.jws.token.validated
+        self.token = self.jws.token.verified
         return self.token.decoded.payload
 
     def inspect(

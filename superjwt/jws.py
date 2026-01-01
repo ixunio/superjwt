@@ -58,7 +58,7 @@ class JWS:
     def enable_detached_payload(self):
         self.has_detached_payload = True
         self.token.unsafe.encoded.has_detached_payload = True
-        self.token.validated.encoded.has_detached_payload = True
+        self.token.verified.encoded.has_detached_payload = True
 
     def encode(
         self,
@@ -70,7 +70,7 @@ class JWS:
         | DefaultValidationFlag
         | None = DefaultValidation,
     ) -> bytes:
-        if self.token.validated.encoded.compact != b"..":
+        if self.token.verified.encoded.compact != b"..":
             raise JWTError("JWS instance data must be reset")
 
         # prepare headers data and perform validation
@@ -88,29 +88,29 @@ class JWS:
             raise HeaderValidationError(validation_errors=e.errors()) from e
 
         # set headers data
-        self.token.validated.model.headers = cast(
+        self.token.verified.model.headers = cast(
             "JOSEHeader",
             self.get_data_headers_model(headers, validation_headers).model_construct(
                 **headers_dict
             ),
         )
-        self.token.validated.decoded.headers = headers_dict
-        self.token.validated.encoded.headers = urlsafe_b64encode(
+        self.token.verified.decoded.headers = headers_dict
+        self.token.verified.encoded.headers = urlsafe_b64encode(
             json.dumps(headers_dict, separators=(",", ":")).encode("utf-8")
         )
 
         # set payload data
-        self.token.validated.decoded.payload = payload
-        self.token.validated.encoded.payload = urlsafe_b64encode(
+        self.token.verified.decoded.payload = payload
+        self.token.verified.encoded.payload = urlsafe_b64encode(
             json.dumps(payload, separators=(",", ":")).encode("utf-8")
         )
 
         # set signature data
-        signature = self.algorithm.sign(self.token.validated.encoded.signing_input, key)
-        self.token.validated.decoded.signature = SecretBytes(signature)
-        self.token.validated.encoded.signature = SecretBytes(urlsafe_b64encode(signature))
+        signature = self.algorithm.sign(self.token.verified.encoded.signing_input, key)
+        self.token.verified.decoded.signature = SecretBytes(signature)
+        self.token.verified.encoded.signature = SecretBytes(urlsafe_b64encode(signature))
 
-        return self.token.validated.encoded.compact
+        return self.token.verified.encoded.compact
 
     def decode(
         self,
@@ -123,7 +123,7 @@ class JWS:
         | None = DefaultValidation,
     ) -> JWSToken:
         if (
-            self.token.validated.encoded.compact != b".."
+            self.token.verified.encoded.compact != b".."
             or self.token.unsafe.encoded.compact != b".."
         ):
             raise JWTError("JWS instance data must be reset")
@@ -136,7 +136,7 @@ class JWS:
 
         # verify signature
         self.verify_signature(key)
-        return self.token.validated
+        return self.token.verified
 
     def decode_parts(
         self, token: str | bytes, detached_payload: dict[str, Any] | None = None
@@ -280,7 +280,7 @@ class JWS:
             raise SignatureVerificationFailedError()
 
         if not isinstance(self.algorithm, NoneAlgorithm):
-            self.token.validated = self.token.unsafe.model_copy()
+            self.token.verified = self.token.unsafe.model_copy()
             self.token.unsafe = JWSToken()
 
         return True

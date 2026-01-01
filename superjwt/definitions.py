@@ -341,7 +341,7 @@ class JWSToken(BaseModel):
 
 class JWSTokenLifeCycle(BaseModel):
     unsafe: JWSToken = JWSToken()
-    validated: JWSToken = JWSToken()
+    verified: JWSToken = JWSToken()
 
 
 def get_jws_algorithm(algorithm: Algorithm | Literal["none"]) -> BaseJWSAlgorithm:
