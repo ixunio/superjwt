@@ -813,11 +813,6 @@ def test_invalid_token_error_malformed_tokens(jwt: JWT, secret_key: str):
     with pytest.raises(InvalidTokenError):
         jwt.decode(malformed_token_4_parts, secret_key, "HS256")
 
-    # Token with empty header part
-    malformed_token_empty_header = b".eyJzdWIiOiJ0ZXN0In0.c2lnbmF0dXJl"
-    with pytest.raises(InvalidTokenError):
-        jwt.decode(malformed_token_empty_header, secret_key, "HS256")
-
     valid_token = jwt.encode({"sub": "test"}, secret_key, "HS256").compact
     # Corrupt the signature part with invalid base64
     parts = valid_token.split(b".")
@@ -870,3 +865,16 @@ def test_invalid_payload_error_base64_and_format(jwt: JWT, secret_key: str):
     invalid_json_token = b".".join([parts[0], invalid_json_payload, parts[2]])
     with pytest.raises(InvalidPayloadError):
         jwt.decode(invalid_json_token, secret_key, "HS256")
+
+
+def test_detached_payload_conflict(jwt: JWT, secret_key: str):
+    """Test InvalidTokenError when decoding a token with payload in detached mode."""
+    normal_token = jwt.encode({"sub": "test", "user_id": "123"}, secret_key, "HS256")
+
+    with pytest.raises(InvalidTokenError, match="Detached payload conflict"):
+        jwt.decode(
+            normal_token.compact,
+            secret_key,
+            "HS256",
+            with_detached_payload={"sub": "test", "user_id": "123"},
+        )

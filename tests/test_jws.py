@@ -7,7 +7,7 @@ from superjwt.exceptions import (
     SuperJWTError,
 )
 from superjwt.jws import JWS
-from superjwt.keys import OctKey
+from superjwt.keys import NoneKey, OctKey
 
 from tests.conftest import JWTCustomClaims
 
@@ -32,6 +32,12 @@ def test_not_reset_jws_instance(
     )
 
     # not reset JWS instance
+    with pytest.raises(SuperJWTError):
+        jws_HS256.encode(
+            headers=JOSEHeader(alg="HS256"),
+            payload=claims_fixed_dt.to_dict(),
+            key=key,
+        )
     with pytest.raises(SuperJWTError):
         jws_HS256.decode(compact=compact, key=key)
 
@@ -107,3 +113,27 @@ def test_wrong_header_algorithm(
 
     decoded_claims = JWTCustomClaims(**jws_HS256.decode(compact=compact, key=key).payload)
     assert decoded_claims.to_dict() == claims_fixed_dt.to_dict()
+
+
+def test_none_algorithm_not_allowed(claims_fixed_dt: JWTCustomClaims):
+    """Test that 'none' algorithm raises error when not explicitly allowed."""
+
+    none_token = (
+        "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0"
+        "."
+        "eyJpc3MiOiJteWFwcCIsInN1YiI6InNvbWVvbmUifQ"
+        "."
+        "ZHVtbXk"
+    )
+
+    jws_none = JWS(algorithm="none")
+    none_key = NoneKey()
+
+    with pytest.raises(SuperJWTError, match="None algorithm is not allowed"):
+        jws_none.decode(compact=none_token, key=none_key)
+
+    jws_none._allow_none_algorithm = True
+    jws_none.reset()
+    jws_none.decode(compact=none_token, key=none_key)  # Should not raise
+    assert jws_none.token.unsafe.headers == {"alg": "none", "typ": "JWT"}
+    assert jws_none.token.unsafe.payload == {"iss": "myapp", "sub": "someone"}
