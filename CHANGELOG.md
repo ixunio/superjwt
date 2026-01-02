@@ -8,6 +8,7 @@
     - Validation.DEFAULT (default when nothing is specified)
     - Validation.DISABLE
 - Default validation behavior for claims and headers can now be customized with `JWTValidationModelConfig` ([#38])
+- `JWT` can receive a `max_token_bytes` parameter to control the allowed max token size ([#40])
 
 ## :gear: Changes
 
@@ -15,6 +16,9 @@
     - module-level `encode()`, `decode()` and `inspect()` are now thread safe and written as functions instead of a local stateful `JWT` instance
     - `token` param in `decode()` is renamed `compact`
     - `JWT` methods now always return a `JWSToken`
+- Refactoring of exception handling ([#40])
+    - base exception is now `SuperJWTError`
+    - improved exceptions hierarchy
 
 ## v0.3.0 (2025-12-30)
 
@@ -73,6 +77,7 @@
 :tada: superjwt repository initialization
 
 
+[#40]: /../../issues/40
 [#39]: /../../issues/39
 [#38]: /../../issues/38
 [#34]: /../../issues/34
