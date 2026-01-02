@@ -11,7 +11,7 @@
 - `JWT` can receive a `max_token_bytes` parameter to control the allowed max token size ([#40])
 - `JWTClaims` now raises `TokenNotYetValidError` if `'nbf'` > `'iat'` (or present time) ([#41])
 
-## :gear: Changes
+### :gear: Changes
 
 - Refactoring of public and private interfaces ([#39])
     - module-level `encode()`, `decode()` and `inspect()` are now thread safe and written as functions instead of a local stateful `JWT` instance
@@ -21,7 +21,7 @@
     - base exception is now `SuperJWTError`
     - improved exceptions hierarchy
 
-## Fixes
+### :bug: Fixes
 
 - `'exp'` and `'nbf'` validation is now performed against `'iat'` if exists, otherwise present time ([#42])
 
