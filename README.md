@@ -35,7 +35,7 @@ SuperJWT is a minimalist JWT library for Python 3.10+ that combines the simplici
 - 🔐 **Secure by default** - JWS signature algorithm required.
 - 🪶 **Minimalist** - Clean, modern code with minimal dependencies.
 - ✔️ **JWT validation** - Easy claims validation with Pydantic models.
-- 🏷️ **Type hints** - IDE autocompletion with your JWT claims or JOSE header.
+- 🏷️ **Type hints** - IDE autocompletion with your JWT claims or JOSE headers.
 
 **Install via pip:**
 
@@ -51,23 +51,21 @@ SuperJWT makes it easy to encode and decode JWT tokens with automatic validation
 
 ### Basic Usage 🐣
 
-#### With a `dict`
+Encode manually your claims from a `dict`. During decoding, validate your JWT content against the standard JWT claims.
 
 ```python
 from superjwt import JWTClaims, encode, decode
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
-claims = {"iss": "my-app", "sub": "John Doe"}
-
-token: bytes = encode(claims, secret_key, "HS256")
-#> token = b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSJ9.HwnUqTLFAMzNkMrokd0aI7c-zSJJpSVXMrYIhUyWe4s'
-decoded: dict = decode(token, secret_key, "HS256", claims_validation=JWTClaims)
-#> decoded = {'iss': 'my-app', 'sub': 'John Doe'}
+compact: bytes = encode({"iss": "my-app", "sub": "John Doe"}, secret_key, "HS256")
+#> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSJ9.HwnUqTLFAMzNkMrokd0aI7c-zSJJpSVXMrYIhUyWe4s'
+decoded: dict = decode(compact, secret_key, "HS256", claims_validation=JWTClaims)
+#> {'iss': 'my-app', 'sub': 'John Doe'}
 ```
 
-#### With a `pydantic` model
-*auto-validate JWT content and seamlessly include `'iat'` (Issued At) and `'exp'` (Expiration) claims*
+Define dynamically your claims with Pydantic and easily include `'iat'` (Issued At) and `'exp'` (Expiration).
+Validate your JWT content automatically during encoding and decoding. 
 
 ```python
 from superjwt import JWTClaims, encode, decode
@@ -80,13 +78,15 @@ claims = (
     .with_expiration(minutes=15)
 )
 
-token: bytes = encode(claims, secret_key, "HS256")
-#> token = b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzQ4MywiZXhwIjoxNzY3MDI4MzgzfQ.ZXxZT8VzL8IPTov-enslCh57S2M5fQBtqULZx5zEAm8'
-decoded: dict = decode(token, secret_key, "HS256", claims_validation=JWTClaims)
-#> decoded = {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767027483, 'exp': 1767028383}
+compact: bytes = encode(claims, secret_key, "HS256")
+#> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzQ4MywiZXhwIjoxNzY3MDI4MzgzfQ.ZXxZT8VzL8IPTov-enslCh57S2M5fQBtqULZx5zEAm8'
+decoded: dict = decode(compact, secret_key, "HS256", claims_validation=JWTClaims)
+#> {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767027483, 'exp': 1767028383}
 ```
 
 ### Custom Claims and Validation
+
+Redefine standard claims or define new custom ones. Validate automatically during encoding and decoding.
 
 ```python
 from typing import Annotated
@@ -98,7 +98,6 @@ from superjwt.exceptions import ClaimsValidationError
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
-# Define a custom pydantic model to validate claims
 class MyJWTClaims(JWTClaims):
     # redefine 'sub' as required integer
     sub: int = Field(default=...)
@@ -107,34 +106,35 @@ class MyJWTClaims(JWTClaims):
     user_id: Annotated[str, AfterValidator(lambda x: str(UUID(x, version=4)))]
 ```
 
-##### Valid Claims Example
-
 ```python
+# Example - Validation PASSING
+
 claims = (
     MyJWTClaims(sub=123, user_id="b2a4c791-2cf4-4e41-9a20-8532129ff47c")
     .with_issued_at()
     .with_expiration(minutes=15)
 )
-token = encode(claims, secret_key, "HS256")
-decoded = decode(token, secret_key, "HS256", claims_validation=MyJWTClaims)
-#> decoded = {'sub': 123, 'iat': 1767026691, 'exp': 1767027591, 'user_id': 'b2a4c791-2cf4-4e41-9a20-8532129ff47c'}
+compact = encode(claims, secret_key, "HS256")
+decoded = decode(compact, secret_key, "HS256", claims_validation=MyJWTClaims)
+#> {'sub': 123, 'iat': 1767026691, 'exp': 1767027591, 'user_id': 'b2a4c791-2cf4-4e41-9a20-8532129ff47c'}
 ```
 
-##### Invalid Claims Example
-
 ```python
+# Example - Validation FAILING
+
 # create a non-validated and invalid pydantic claims
 invalid_claims = (
     MyJWTClaims.model_construct(**{"sub": "John Doe", "user_id": "invalid-uuid-string"})
     .with_issued_at()
     .with_expiration(minutes=10)
 )
+
 # disable claims default validation to create an invalid token
-invalid_token = encode(
+invalid_compact = encode(
     invalid_claims, secret_key, "HS256", claims_validation=Validation.DISABLE
 )
 try:
-    decoded_invalid = decode(invalid_token, secret_key, "HS256", claims_validation=MyJWTClaims)
+    decode(invalid_compact, secret_key, "HS256", claims_validation=MyJWTClaims)
 except ClaimsValidationError as e:
     print("Claims validation error:", e)
 #> Claims validation error: Claims validation failed
