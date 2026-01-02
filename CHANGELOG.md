@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### :bug: Fixes
+
+- `'exp'` and `'nbf'` incorrect validation when `'iat'` was present
+
 ## v0.4.0 (2026-01-02)
 
 ### :sparkles: New
@@ -20,10 +26,6 @@
 - Refactoring of exception handling ([#40])
     - base exception is now `SuperJWTError`
     - improved exceptions hierarchy
-
-### :bug: Fixes
-
-- `'exp'` and `'nbf'` validation is now performed against `'iat'` if exists, otherwise present time ([#42])
 
 ## v0.3.0 (2025-12-30)
 

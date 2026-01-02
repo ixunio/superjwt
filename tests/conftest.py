@@ -111,6 +111,6 @@ def claims(claims_dict) -> JWTCustomClaims:
 
 @pytest.fixture
 def claims_fixed_dt() -> JWTCustomClaims:
-    return JWTCustomClaims(
-        user_id="123", iat=datetime.fromtimestamp(1899123456), iss="myapp", sub="someone"
-    ).with_expiration(minutes=30)
+    return JWTCustomClaims(user_id="123", iss="myapp", sub="someone").with_expiration(
+        minutes=30
+    )

@@ -252,14 +252,11 @@ class JWTClaims(JWTClaimsModel):
 
     @field_validator("exp")
     @classmethod
-    def validate_exp(
-        cls, value: datetime | None, info: ValidationInfo
-    ) -> datetime | None:
+    def validate_exp(cls, value: datetime | None) -> datetime | None:
         if value is None:
             return value
 
-        iat = info.data.get("iat")
-        now = datetime.now(UTC).replace(microsecond=0) if iat is None else iat
+        now = datetime.now(UTC).replace(microsecond=0)
 
         if value <= now:
             raise TokenExpiredError()
@@ -267,14 +264,11 @@ class JWTClaims(JWTClaimsModel):
 
     @field_validator("nbf")
     @classmethod
-    def validate_nbf(
-        cls, value: datetime | None, info: ValidationInfo
-    ) -> datetime | None:
+    def validate_nbf(cls, value: datetime | None) -> datetime | None:
         if value is None:
             return value
 
-        iat = info.data.get("iat")
-        now = datetime.now(UTC).replace(microsecond=0) if iat is None else iat
+        now = datetime.now(UTC).replace(microsecond=0)
 
         if value > now:
             raise TokenNotYetValidError()

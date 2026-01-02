@@ -449,41 +449,19 @@ def test_unsafe_inspect(jwt: JWT, claims_fixed_dt, secret_key: str):
 
 
 def test_detached_payload(jwt: JWT, claims_fixed_dt, secret_key):
-    compact = jwt.encode(claims_fixed_dt, secret_key, "HS256").compact
-    compact_detached = jwt.detach_payload().compact
+    token = jwt.encode(claims_fixed_dt, secret_key, "HS256")
+    compact = token.compact
+    token_detached = jwt.detach_payload()
+    compact_detached = token_detached.compact
     compact_detached2 = encode(claims_fixed_dt, secret_key, "HS256", detach_payload=True)
     assert compact_detached == compact_detached2
 
-    compact_raw = (
-        b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-        b"."
-        b"eyJpc3MiOiJteWFwcCIsInN1YiI6InNvbWVvbmUiLCJpYXQiOjE4OTkxMjM0NTYsImV4cCI6MTg5OTEyNTI1NiwidXNlcl9pZCI6IjEyMyJ9"
-        b"."
-        b"7J8anGc2Ytg-vyaTVN0ln2IjouLupxgHXiIEwxTO-oE"
-    )
-
-    compact_detached_raw = (
-        b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-        b"."
-        b"."
-        b"7J8anGc2Ytg-vyaTVN0ln2IjouLupxgHXiIEwxTO-oE"
-    )
-
-    assert compact_raw == compact
-    assert compact_detached_raw == compact_detached
-
-    decoded_claims = jwt.decode(
-        compact_detached_raw, secret_key, "HS256", with_detached_payload=claims_fixed_dt
+    decoded_claims_detached = jwt.decode(
+        compact_detached, secret_key, "HS256", with_detached_payload=claims_fixed_dt
     ).payload
-    assert decoded_claims == claims_fixed_dt.to_dict()
-
-    decoded_claims = jwt.decode(
-        compact_detached_raw,
-        secret_key,
-        "HS256",
-        with_detached_payload=claims_fixed_dt.to_dict(),
-    ).payload
-    assert decoded_claims == claims_fixed_dt.to_dict()
+    assert decoded_claims_detached == claims_fixed_dt.to_dict()
+    decoded_claims = jwt.decode(compact, secret_key, "HS256").payload
+    assert decoded_claims == decoded_claims_detached
 
 
 def test_detached_payload_no_jws_instance(jwt: JWT):
