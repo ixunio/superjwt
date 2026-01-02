@@ -59,7 +59,9 @@ from superjwt import JWTClaims, encode, decode
 secret_key = "your-secret-key-of-len-32-bytes!"
 
 compact: bytes = encode({"iss": "my-app", "sub": "John Doe"}, secret_key, "HS256")
-#> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSJ9.HwnUqTLFAMzNkMrokd0aI7c-zSJJpSVXMrYIhUyWe4s'
+#> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+#   .eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSJ9
+#   .HwnUqTLFAMzNkMrokd0aI7c-zSJJpSVXMrYIhUyWe4s'
 decoded: dict = decode(compact, secret_key, "HS256", claims_validation=JWTClaims)
 #> {'iss': 'my-app', 'sub': 'John Doe'}
 ```
@@ -79,7 +81,9 @@ claims = (
 )
 
 compact: bytes = encode(claims, secret_key, "HS256")
-#> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzQ4MywiZXhwIjoxNzY3MDI4MzgzfQ.ZXxZT8VzL8IPTov-enslCh57S2M5fQBtqULZx5zEAm8'
+#> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+#   .eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzQ4MywiZXhwIjoxNzY3MDI4MzgzfQ
+#   .ZXxZT8VzL8IPTov-enslCh57S2M5fQBtqULZx5zEAm8'
 decoded: dict = decode(compact, secret_key, "HS256", claims_validation=JWTClaims)
 #> {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767027483, 'exp': 1767028383}
 ```
@@ -111,12 +115,11 @@ class MyJWTClaims(JWTClaims):
 
 claims = (
     MyJWTClaims(sub=123, user_id="b2a4c791-2cf4-4e41-9a20-8532129ff47c")
-    .with_issued_at()
     .with_expiration(minutes=15)
 )
 compact = encode(claims, secret_key, "HS256")
 decoded = decode(compact, secret_key, "HS256", claims_validation=MyJWTClaims)
-#> {'sub': 123, 'iat': 1767026691, 'exp': 1767027591, 'user_id': 'b2a4c791-2cf4-4e41-9a20-8532129ff47c'}
+#> {'sub': 123, 'exp': 1767027591, 'user_id': 'b2a4c791-2cf4-4e41-9a20-8532129ff47c'}
 ```
 
 ```python
@@ -138,8 +141,10 @@ try:
 except ClaimsValidationError as e:
     print("Claims validation error:", e)
 #> Claims validation error: Claims validation failed
-#> claim ('sub',) = John Doe -> validation failed (int_parsing): Input should be a valid integer, unable to parse string as an integer
-#> claim ('user_id',) = invalid-uuid-string -> validation failed (value_error): Value error, badly formed hexadecimal UUID string
+#    claim ('sub',) = John Doe -> validation failed (int_parsing): 
+#      Input should be a valid integer, unable to parse string as an integer
+#    claim ('user_id',) = invalid-uuid-string -> validation failed (value_error):
+#      Value error, badly formed hexadecimal UUID string
 ```
 
 ## Documentation
