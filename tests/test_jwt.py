@@ -106,6 +106,15 @@ def test_encode_decode_dict_custom_datetime_claim(secret_key):
     assert decoded["custom_date"] == custom_dt_correct
 
 
+def test_add_iat_add_exp(secret_key):
+    # custom datetime claim set to None should be handled correctly
+    claims = JWTClaims().with_issued_at().with_expiration(minutes=30)
+    compact = encode(claims, secret_key, "HS256")
+    decoded = decode(compact, secret_key, "HS256")
+    assert "iat" in decoded
+    assert "exp" in decoded
+
+
 def test_empty_iat_with_exp(secret_key):
     # custom datetime claim set to None should be handled correctly
     claims = JWTClaims(
@@ -534,6 +543,53 @@ def test_not_yet_valid_token(jwt: JWT, secret_key: str):
     ).compact
     with pytest.raises(TokenNotYetValidError):
         jwt.decode(compact_dict, secret_key, "HS256", claims_validation=JWTClaims)
+
+
+def test_exp_nbf_validation_in_jwt_workflow(jwt: JWT, secret_key: str):
+    """Test exp/nbf validators in full encode/decode workflow."""
+    now = datetime.now(UTC).replace(microsecond=0)
+
+    # Test with claims containing all time fields using model_construct
+    # (normal validation impossible when iat is present with nbf/exp)
+    past_iat = datetime.now(UTC).replace(microsecond=0) - timedelta(days=365)
+    past_nbf = datetime.now(UTC).replace(microsecond=0) - timedelta(days=180)
+    past_exp = datetime.now(UTC).replace(microsecond=0) - timedelta(days=90)
+    valid_claims = JWTClaims.model_construct(
+        sub="user123", iat=past_iat, nbf=past_nbf, exp=past_exp
+    )
+    compact = jwt.encode(
+        valid_claims, secret_key, "HS256", claims_validation=Validation.DISABLE
+    ).compact
+    decoded = jwt.decode(
+        compact, secret_key, "HS256", claims_validation=Validation.DISABLE
+    )
+    assert decoded.payload["iat"] == int(past_iat.timestamp())
+    assert decoded.payload["nbf"] == int(past_nbf.timestamp())
+    assert decoded.payload["exp"] == int(past_exp.timestamp())
+
+    # Test encoding with past exp WITHOUT iat (validation disabled), then decode with validation
+    past_exp_claims = JWTClaims.model_construct(
+        sub="user123", exp=now - timedelta(hours=1)
+    )
+    compact_expired = jwt.encode(
+        past_exp_claims, secret_key, "HS256", claims_validation=Validation.DISABLE
+    ).compact
+
+    # Decoding with validation enabled should fail
+    with pytest.raises(TokenExpiredError):
+        jwt.decode(compact_expired, secret_key, "HS256", claims_validation=JWTClaims)
+
+    # Test encoding with future nbf WITHOUT iat (validation disabled), then decode with validation
+    future_nbf_claims = JWTClaims.model_construct(
+        sub="user123", nbf=now + timedelta(hours=1)
+    )
+    compact_not_yet = jwt.encode(
+        future_nbf_claims, secret_key, "HS256", claims_validation=Validation.DISABLE
+    ).compact
+
+    # Decoding with validation enabled should fail
+    with pytest.raises(TokenNotYetValidError):
+        jwt.decode(compact_not_yet, secret_key, "HS256", claims_validation=JWTClaims)
 
 
 def test_claims_model_data(jwt: JWT, claims: JWTCustomClaims, secret_key: str):

@@ -9,7 +9,7 @@
     - Validation.DISABLE
 - Default validation behavior for claims and headers can now be customized with `JWTValidationModelConfig` ([#38])
 - `JWT` can receive a `max_token_bytes` parameter to control the allowed max token size ([#40])
-- `JWTClaims` now raises `TokenNotYetValidError` if `'nbf'` not in the past ([#41])
+- `JWTClaims` now raises `TokenNotYetValidError` if `'nbf'` > `'iat'` (or present time) ([#41])
 
 ## :gear: Changes
 
@@ -20,6 +20,10 @@
 - Refactoring of exception handling ([#40])
     - base exception is now `SuperJWTError`
     - improved exceptions hierarchy
+
+## Fixes
+
+- `'exp'` and `'nbf'` validation is now performed against `'iat'` if exists, otherwise present time ([#42])
 
 ## v0.3.0 (2025-12-30)
 
@@ -34,7 +38,6 @@
 - Refactoring of `JWTClaims` pydantic model ([#17])
     - defaulting with no `'iat'` set
     - `with_issued_at()` method added
-    - modular model with reusable mixins
 - Refactoring of claims and headers validation ([#34])
     - `encode()` new validation default behavior:
         - when `claims` is passed as a pydantic instance, validate against it automatically
@@ -78,6 +81,7 @@
 :tada: superjwt repository initialization
 
 
+[#42]: /../../issues/42
 [#41]: /../../issues/41
 [#40]: /../../issues/40
 [#39]: /../../issues/39
