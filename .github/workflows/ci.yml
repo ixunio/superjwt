@@ -74,7 +74,7 @@ jobs:
       release_date: ${{ steps.changelog.outputs.release_date }}
       changelog_content: ${{ steps.changelog.outputs.content }}
       tag_exists: ${{ steps.check_tag.outputs.exists }}
-      is_valid: ${{ steps.check_branch.outputs.is_valid }}
+      is_valid: ${{ steps.check_repo.outputs.is_valid }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -109,24 +109,38 @@ jobs:
         id: check_branch
         run: |
           if [[ ! "${{ github.ref }}" =~ ^refs/heads/ ]]; then
-            echo "is_valid=false" >> $GITHUB_OUTPUT
+            echo "is_release_branch=false" >> $GITHUB_OUTPUT
             echo "ℹ️  Not a branch ref: ${{ github.ref }}"
             exit 0
           fi
 
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "is_valid=true" >> $GITHUB_OUTPUT
+            echo "is_release_branch=true" >> $GITHUB_OUTPUT
             echo "✅ Valid release branch: main"
           elif [[ "${{ github.ref_name }}" =~ ^v[0-9]+\.[0-9]+$ ]]; then
-            echo "is_valid=true" >> $GITHUB_OUTPUT
+            echo "is_release_branch=true" >> $GITHUB_OUTPUT
             echo "✅ Valid release branch: ${{ github.ref_name }}"
           else
-            echo "is_valid=false" >> $GITHUB_OUTPUT
+            echo "is_release_branch=false" >> $GITHUB_OUTPUT
             echo "ℹ️  Not a release branch: ${{ github.ref_name }}"
             echo "ℹ️  Releases only from 'main' or version branches (e.g., 'v1.2')"
           fi
+      
+      - name: Check repository
+        if: steps.check_tag.outputs.exists == 'false' && steps.check_branch.outputs.is_release_branch == 'true'
+        id: check_repo
+        run: |
+          if [[ "${{ github.repository }}" == "ixunio/superjwt" ]]; then
+            echo "is_valid=true" >> $GITHUB_OUTPUT
+            echo "✅ Running in main repository: ${{ github.repository }}"
+          else
+            echo "is_valid=false" >> $GITHUB_OUTPUT
+            echo "ℹ️  Not main repository: ${{ github.repository }}"
+            echo "ℹ️  Releases only from ixunio/superjwt"
+          fi
+      
       - name: Validation summary
-        if: steps.check_tag.outputs.exists == 'false' && steps.check_branch.outputs.is_valid == 'true'
+        if: steps.check_tag.outputs.exists == 'false' && steps.check_repo.outputs.is_valid == 'true'
         run: |
           echo "✅ Version: ${{ steps.current_version.outputs.version }}"
           echo "✅ Changelog date: ${{ steps.changelog.outputs.release_date }}"
