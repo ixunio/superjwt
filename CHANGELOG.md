@@ -9,6 +9,7 @@
     - Validation.DISABLE
 - Default validation behavior for claims and headers can now be customized with `JWTValidationModelConfig` ([#38])
 - `JWT` can receive a `max_token_bytes` parameter to control the allowed max token size ([#40])
+- `JWTClaims` now raises `TokenNotYetValidError` if `'nbf'` not in the past ([#41])
 
 ## :gear: Changes
 
@@ -77,6 +78,7 @@
 :tada: superjwt repository initialization
 
 
+[#41]: /../../issues/41
 [#40]: /../../issues/40
 [#39]: /../../issues/39
 [#38]: /../../issues/38

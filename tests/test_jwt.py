@@ -24,6 +24,7 @@ from superjwt.exceptions import (
     SizeExceededError,
     SuperJWTError,
     TokenExpiredError,
+    TokenNotYetValidError,
 )
 from superjwt.jwt import JWT
 from superjwt.utils import urlsafe_b64encode
@@ -493,6 +494,46 @@ def test_expired_token(jwt: JWT, secret_key: str):
         compact, secret_key, "HS256", claims_validation=Validation.DISABLE
     ).payload
     assert decoded_claims["exp"] == claims.to_dict()["exp"]
+    with pytest.raises(TokenExpiredError):
+        jwt.decode(compact, secret_key, "HS256", claims_validation=JWTClaims)
+
+    # test with dict
+    past_exp_dict = {
+        "sub": "test_user",
+        "exp": (datetime.now(UTC) - timedelta(days=365)).timestamp(),
+    }
+    compact_dict = jwt.encode(
+        past_exp_dict, secret_key, "HS256", claims_validation=Validation.DISABLE
+    ).compact
+    with pytest.raises(TokenExpiredError):
+        jwt.decode(compact_dict, secret_key, "HS256", claims_validation=JWTClaims)
+
+
+def test_not_yet_valid_token(jwt: JWT, secret_key: str):
+    claims = JWTClaims.model_construct(nbf=datetime.now(UTC) + timedelta(days=1))
+    compact = jwt.encode(
+        claims, secret_key, "HS256", claims_validation=Validation.DISABLE
+    ).compact
+    with pytest.raises(TokenNotYetValidError):
+        jwt.encode(claims, secret_key, "HS256")
+    jwt.decode(compact, secret_key, "HS256")  # passes (no validation)
+    decoded_claims = jwt.decode(
+        compact, secret_key, "HS256", claims_validation=Validation.DISABLE
+    ).payload
+    assert decoded_claims["nbf"] == claims.to_dict()["nbf"]
+    with pytest.raises(TokenNotYetValidError):
+        jwt.decode(compact, secret_key, "HS256", claims_validation=JWTClaims)
+
+    # test with dict
+    future_nbf_dict = {
+        "sub": "test_user",
+        "nbf": (datetime.now(UTC) + timedelta(days=365)).timestamp(),
+    }
+    compact_dict = jwt.encode(
+        future_nbf_dict, secret_key, "HS256", claims_validation=Validation.DISABLE
+    ).compact
+    with pytest.raises(TokenNotYetValidError):
+        jwt.decode(compact_dict, secret_key, "HS256", claims_validation=JWTClaims)
 
 
 def test_claims_model_data(jwt: JWT, claims: JWTCustomClaims, secret_key: str):

@@ -80,8 +80,7 @@ def iat() -> float:
 
 
 @pytest.fixture
-def nbf(iat: float) -> float:
-    return (datetime.fromtimestamp(iat) + timedelta(days=30)).timestamp()
+def nbf() -> None: ...
 
 
 @pytest.fixture

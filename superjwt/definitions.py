@@ -28,6 +28,7 @@ from superjwt.exceptions import (
     InvalidAlgorithmError,
     InvalidHeadersError,
     TokenExpiredError,
+    TokenNotYetValidError,
 )
 from superjwt.keys import BaseKey, NoneKey, OctKey
 
@@ -227,6 +228,22 @@ class JWTClaimsDatetimeMixIn(JWTBaseModel):
             return dt
         if value <= now:
             raise TokenExpiredError()
+        return value
+
+    @field_validator("nbf", check_fields=False)
+    @classmethod
+    def validate_nbf(cls, value: datetime | float | int | None) -> datetime | None:
+        if value is None:
+            return value
+        now = datetime.now(UTC).replace(microsecond=0)
+
+        if isinstance(value, (float, int)):
+            dt = datetime.fromtimestamp(value, tz=UTC)
+            if dt > now:
+                raise TokenNotYetValidError()
+            return dt
+        if value > now:
+            raise TokenNotYetValidError()
         return value
 
     def with_issued_at(self) -> Self:

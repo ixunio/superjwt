@@ -104,6 +104,12 @@ class TokenExpiredError(ClaimsValidationError):
     error = "Token has expired"
 
 
+class TokenNotYetValidError(ClaimsValidationError):
+    """Raised when the token is not yet valid based on its 'nbf' claim."""
+
+    error = "Token is not yet valid"
+
+
 class InvalidAlgorithmError(SuperJWTError):
     """Base class for algorithm-related errors."""
 
