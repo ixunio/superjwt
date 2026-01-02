@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.4.1 (2026-01-03)
 
 ### :bug: Fixes
 
-- `'exp'` and `'nbf'` incorrect validation when `'iat'` was present
+- `'exp'` and `'nbf'` incorrect validation when `'iat'` was present ([#47])
 
 ## v0.4.0 (2026-01-02)
 
@@ -83,6 +83,7 @@
 :tada: superjwt repository initialization
 
 
+[#47]: /../../issues/47
 [#42]: /../../issues/42
 [#41]: /../../issues/41
 [#40]: /../../issues/40
