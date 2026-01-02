@@ -277,6 +277,13 @@ class JWTClaims(JWTClaimsModel):
     def with_issued_at(self) -> Self:
         """Return a new JWTClaims instance with the 'iat' claim set to current time."""
         now = datetime.now(UTC).replace(microsecond=0)
+
+        # case iat AND exp were set
+        if self.exp is not None and self.iat is not None:
+            # preserve original delta between iat and exp
+            delta = self.exp - self.iat
+            return self.model_copy(update={"iat": now, "exp": now + delta})
+
         return self.model_copy(update={"iat": now})
 
     def with_expiration(
@@ -291,8 +298,14 @@ class JWTClaims(JWTClaimsModel):
             raise ValueError(
                 "Expiration minutes, hours, and days must be non-negative integers"
             )
-        now = datetime.now(UTC).replace(microsecond=0) if self.iat is None else self.iat
+        now = datetime.now(UTC).replace(microsecond=0)
         exp_time = now + timedelta(minutes=minutes, hours=hours, days=days)
+
+        # case iat was already set
+        if self.iat is not None:
+            # rewrite iat value
+            return self.model_copy(update={"iat": now, "exp": exp_time})
+
         return self.model_copy(update={"exp": exp_time})
 
 
