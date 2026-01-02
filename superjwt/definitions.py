@@ -97,12 +97,18 @@ class HttpsUrl(HttpUrl):
 class JWTBaseModel(BaseModel):
     model_config = {"extra": "allow", "revalidate_instances": "always"}
 
+    internal__now: Annotated[datetime | None, Field(exclude=True, repr=False)] = None
+
     def revalidate(self) -> None:
         """Re-validate the pydantic instance against its own model."""
         self.model_validate(self)
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)
+
+    def spoof_time(self, set_now: datetime | None) -> None:
+        """Spoof the current time for testing purposes. Set to None to disable spoofing."""
+        self.internal__now = set_now
 
 
 class JOSEHeader(JWTBaseModel):
@@ -247,6 +253,20 @@ class JWTClaims(JWTClaimsModel):
     JWT standard claims as per RFC 7519.
     """
 
+    @property
+    def now(self) -> datetime:
+        """Get the current time"""
+        if self.internal__now is None:
+            return datetime.now(UTC).replace(microsecond=0)
+        return self.internal__now.replace(microsecond=0)
+
+    @staticmethod
+    def get_now(info: ValidationInfo) -> datetime:
+        now = info.data["internal__now"]
+        if now is None:
+            return datetime.now(UTC).replace(microsecond=0)
+        return now.replace(microsecond=0)
+
     @model_validator(mode="after")
     def check_exp_after_nbf(self) -> Self:
         if self.exp is not None and self.nbf is not None:
@@ -256,39 +276,36 @@ class JWTClaims(JWTClaimsModel):
 
     @field_validator("exp")
     @classmethod
-    def validate_exp(cls, value: datetime | None) -> datetime | None:
+    def validate_exp(
+        cls, value: datetime | None, info: ValidationInfo
+    ) -> datetime | None:
         if value is None:
             return value
-
-        now = datetime.now(UTC).replace(microsecond=0)
-
-        if value <= now:
+        if value <= cls.get_now(info):
             raise TokenExpiredError()
         return value
 
     @field_validator("nbf")
     @classmethod
-    def validate_nbf(cls, value: datetime | None) -> datetime | None:
+    def validate_nbf(
+        cls, value: datetime | None, info: ValidationInfo
+    ) -> datetime | None:
         if value is None:
             return value
-
-        now = datetime.now(UTC).replace(microsecond=0)
-
-        if value > now:
+        if value > cls.get_now(info):
             raise TokenNotYetValidError()
         return value
 
     def with_issued_at(self) -> Self:
         """Return a new JWTClaims instance with the 'iat' claim set to current time."""
-        now = datetime.now(UTC).replace(microsecond=0)
 
         # case iat AND exp were set
         if self.exp is not None and self.iat is not None:
             # preserve original delta between iat and exp
             delta = self.exp - self.iat
-            return self.model_copy(update={"iat": now, "exp": now + delta})
+            return self.model_copy(update={"iat": self.now, "exp": self.now + delta})
 
-        return self.model_copy(update={"iat": now})
+        return self.model_copy(update={"iat": self.now})
 
     def with_expiration(
         self,
@@ -302,13 +319,12 @@ class JWTClaims(JWTClaimsModel):
             raise ValueError(
                 "Expiration minutes, hours, and days must be non-negative integers"
             )
-        now = datetime.now(UTC).replace(microsecond=0)
-        exp_time = now + timedelta(minutes=minutes, hours=hours, days=days)
+        exp_time = self.now + timedelta(minutes=minutes, hours=hours, days=days)
 
         # case iat was already set
         if self.iat is not None:
             # rewrite iat value
-            return self.model_copy(update={"iat": now, "exp": exp_time})
+            return self.model_copy(update={"iat": self.now, "exp": exp_time})
 
         return self.model_copy(update={"exp": exp_time})
 
