@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: ["main", "v*"]
+    branches: ["main", "v[0-9]*.[0-9]*"]
   push:
-    branches: ["main", "v*"]
+    branches: ["main", "v[0-9]*.[0-9]*"]
 
 permissions:
   contents: write
@@ -68,7 +68,6 @@ jobs:
   validate-release:
     name: Validate Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
     outputs:
       version: ${{ steps.current_version.outputs.version }}
       release_date: ${{ steps.changelog.outputs.release_date }}
