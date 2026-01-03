@@ -95,7 +95,7 @@ class HttpsUrl(HttpUrl):
 
 
 class JWTBaseModel(BaseModel):
-    model_config = {"extra": "allow"}
+    model_config = {"extra": "allow", "revalidate_instances": "always"}
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)
@@ -456,23 +456,23 @@ def prepare_and_validate_data(
 ) -> dict[str, Any]:
     """Prepare data as dict and perform pydantic validation if required."""
 
-    # 1. Prepare data as dict for pydantic validation
     # --> case data is a dict
     if isinstance(data, dict):
         data_dict = data.copy()
+        if validation_model is not None:
+            validation_model.model_validate(data_dict)
+        return data_dict
+
     # --> case data is a pydantic model
-    elif isinstance(data, BaseModel):
-        data_dict = data.model_dump(exclude_none=True)
+    elif isinstance(data, JWTBaseModel):
+        data_dict = data.to_dict()
+        if validation_model is not None:
+            validation_model.model_validate(data)
+        return data_dict
+
     else:
         raise TypeError(
             "Wrong type during data preparation and validation"
             if type_err_msg is None
             else f": {type_err_msg}"
         )
-
-    # 2. Validate data
-    if validation_model is not None:
-        validation_model(**data_dict)  # run validation
-
-    # 3. Return data as dict
-    return data_dict

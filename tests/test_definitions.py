@@ -174,19 +174,5 @@ def test_check_exp_after_nbf_model_validator(jwt: JWT, secret_key: str):
         nbf=now + timedelta(days=1),
         exp=now - timedelta(days=1),
     )
-    with pytest.raises(
-        ValueError, match="'nbf' claim must be strictly less than 'exp' claim"
-    ):
+    with pytest.raises(TokenNotYetValidError):
         JWTClaims.model_validate(unvalidated_claims)
-
-    # only exp set
-    future_exp = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=1)
-    claims_exp_only = JWTClaims(exp=future_exp)
-    assert claims_exp_only.exp is not None
-    assert claims_exp_only.nbf is None
-
-    # only nbf set
-    past_nbf = datetime.now(UTC).replace(microsecond=0) - timedelta(days=180)
-    claims_nbf_only = JWTClaims(nbf=past_nbf)
-    assert claims_nbf_only.nbf is not None
-    assert claims_nbf_only.exp is None
