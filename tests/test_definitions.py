@@ -175,4 +175,4 @@ def test_check_exp_after_nbf_model_validator(jwt: JWT, secret_key: str):
         exp=now - timedelta(days=1),
     )
     with pytest.raises(TokenNotYetValidError):
-        JWTClaims.model_validate(unvalidated_claims)
+        unvalidated_claims.revalidate()

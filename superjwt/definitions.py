@@ -97,6 +97,10 @@ class HttpsUrl(HttpUrl):
 class JWTBaseModel(BaseModel):
     model_config = {"extra": "allow", "revalidate_instances": "always"}
 
+    def revalidate(self) -> None:
+        """Re-validate the pydantic instance against its own model."""
+        self.model_validate(self)
+
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)
 
