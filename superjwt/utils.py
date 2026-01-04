@@ -1,6 +1,7 @@
 import base64
 import binascii
 import re
+from datetime import datetime
 
 
 def as_bytes(s: str | bytes) -> bytes:
@@ -78,3 +79,20 @@ _SSH_KEY_FORMATS = (
 
 def is_ssh_key(key: bytes) -> bool:
     return key.startswith(_SSH_KEY_FORMATS)
+
+
+def delta_datetime_timestamp(
+    dt1: datetime | float | int, dt2: datetime | float | int
+) -> float:
+    """Return the absolute difference between two datetime objects or timestamps."""
+    if isinstance(dt1, datetime):
+        ts1 = dt1.timestamp()
+    else:
+        ts1 = float(dt1)
+
+    if isinstance(dt2, datetime):
+        ts2 = dt2.timestamp()
+    else:
+        ts2 = float(dt2)
+
+    return ts1 - ts2

@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Annotated, Any, Literal
 
 from pydantic import (
-    AfterValidator,
     BaseModel,
     Field,
     HttpUrl,
@@ -31,6 +30,7 @@ from superjwt.exceptions import (
     TokenNotYetValidError,
 )
 from superjwt.keys import BaseKey, NoneKey, OctKey
+from superjwt.utils import delta_datetime_timestamp
 
 
 try:
@@ -224,19 +224,6 @@ def serialize_jwtdatetime_timestamp_to_float(value: datetime | int | float) -> f
         return value.timestamp()
 
 
-def check_future_dates(value: datetime | None, info: ValidationInfo) -> datetime | None:
-    iat = info.data.get("iat")
-    if value is None or iat is None:
-        return value
-    if not isinstance(iat, datetime) or not isinstance(value, datetime):
-        raise TypeError("Invalid type for datetime comparison")
-    if value <= iat:
-        raise ValueError(
-            f"'{info.field_name}' claim must be strictly greater than 'iat' claim"
-        )
-    return value
-
-
 JWTDatetime = Annotated[
     datetime,
     PlainSerializer(serialize_jwtdatetime_timestamp),
@@ -275,12 +262,10 @@ class JWTClaimsModel(JWTBaseModel):
         Field(
             description="not before time - the time before which the JWT must not be accepted"
         ),
-        AfterValidator(check_future_dates),
     ] = None
     exp: Annotated[
         JWTDatetime | None,
         Field(description="expiration time - the time after which the JWT expires"),
-        AfterValidator(check_future_dates),
     ] = None
     jti: Annotated[
         str | None,
@@ -293,6 +278,9 @@ class JWTClaims(JWTClaimsModel):
     JWT standard claims as per RFC 7519.
     """
 
+    internal__leeway: Annotated[float, Field(exclude=True, repr=False)] = 5.0
+    internal__allow_future_iat: Annotated[bool, Field(exclude=True, repr=False)] = True
+
     @property
     def now(self) -> datetime:
         """Get the current time."""
@@ -300,41 +288,45 @@ class JWTClaims(JWTClaimsModel):
             return datetime.now(UTC)
         return self.internal__now
 
-    @staticmethod
-    def get_now(info: ValidationInfo) -> datetime:
-        now = info.data["internal__now"]
-        if now is None:
-            return datetime.now(UTC)
-        return now
+    def set_leeway(self, leeway_seconds: float) -> None:
+        """Set the leeway (in seconds) for time-based claim validations."""
+        if leeway_seconds < 0:
+            raise ValueError("Leeway must be a non-negative float")
+        self.internal__leeway = leeway_seconds
+
+    def allow_future_iat(self) -> None:
+        """Disable the check that 'iat' claim is not in the future."""
+        self.internal__allow_future_iat = False
+
+    def disallow_future_iat(self) -> None:
+        """Enable the check that 'iat' claim is not in the future."""
+        self.internal__allow_future_iat = True
 
     @model_validator(mode="after")
-    def check_exp_after_nbf(self) -> Self:
-        if self.exp is not None and self.nbf is not None:
-            if self.nbf >= self.exp:
-                raise ValueError("'nbf' claim must be strictly less than 'exp' claim")
+    def validate_time_integrity(self) -> Self:
+        # check nbf >= iat
+        if self.nbf is not None and self.iat is not None:
+            if self.nbf < self.iat:
+                raise ValueError(
+                    "'nbf' claim must be greater than or equal to 'iat' claim"
+                )
+
+        # check iat <= now, modulo leeway
+        if self.iat is not None and self.internal__allow_future_iat:
+            if delta_datetime_timestamp(self.iat, self.now) > self.internal__leeway:
+                raise ValueError("'iat' claim must not be in the future")
+
+        # check nbf <= now, modulo leeway
+        if self.nbf is not None:
+            if delta_datetime_timestamp(self.nbf, self.now) > self.internal__leeway:
+                raise TokenNotYetValidError()
+
+        # check exp > now, modulo leeway
+        if self.exp is not None:
+            if delta_datetime_timestamp(self.now, self.exp) >= self.internal__leeway:
+                raise TokenExpiredError()
+
         return self
-
-    @field_validator("exp")
-    @classmethod
-    def validate_exp(
-        cls, value: datetime | None, info: ValidationInfo
-    ) -> datetime | None:
-        if value is None:
-            return value
-        if value <= cls.get_now(info):
-            raise TokenExpiredError()
-        return value
-
-    @field_validator("nbf")
-    @classmethod
-    def validate_nbf(
-        cls, value: datetime | None, info: ValidationInfo
-    ) -> datetime | None:
-        if value is None:
-            return value
-        if value > cls.get_now(info):
-            raise TokenNotYetValidError()
-        return value
 
     def with_issued_at(self) -> Self:
         """Return a new JWTClaims instance with the 'iat' claim set to current time."""
@@ -350,16 +342,24 @@ class JWTClaims(JWTClaimsModel):
     def with_expiration(
         self,
         *,
-        minutes: int = 0,
-        hours: int = 0,
-        days: int = 0,
+        minutes: int | None = None,
+        hours: int | None = None,
+        days: int | None = None,
     ) -> Self:
         """Return a new JWTClaims instance with the 'exp' claim set to current time plus the specified delta."""
-        if minutes < 0 or hours < 0 or days < 0:
-            raise ValueError(
-                "Expiration minutes, hours, and days must be non-negative integers"
-            )
-        exp_time = self.now + timedelta(minutes=minutes, hours=hours, days=days)
+
+        for delta in (minutes, hours, days):
+            if delta is not None and not isinstance(delta, (int, float)):
+                raise TypeError(
+                    "Expiration minutes, hours, and days must be valid numbers"
+                )
+            if delta is not None and delta <= 0:
+                raise ValueError(
+                    "Expiration minutes, hours, and days must be positive numbers"
+                )
+        exp_time = self.now + timedelta(
+            minutes=minutes or 0, hours=hours or 0, days=days or 0
+        )
 
         # case iat was already set
         if self.iat is not None:

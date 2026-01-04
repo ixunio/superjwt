@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Any
 
 import pydantic
 import pytest
@@ -14,7 +14,6 @@ from superjwt.definitions import (
     JWTDatetimeInt,
     JWTValidationModelConfig,
     Validation,
-    check_future_dates,
 )
 from superjwt.exceptions import (
     ClaimsValidationError,
@@ -137,14 +136,11 @@ def test_with_expiration_negative():
 
 
 def test_rewrite_incorrect_exp_type():
-    # custom datetime claim set to invalid type should be handled correctly
-
     class JWTIncorrectExpClaim(JWTClaims):
-        iat: JWTDatetime = datetime.now(UTC)
-        exp: Annotated[Any, pydantic.AfterValidator(check_future_dates)]  # type: ignore
+        exp: JWTDatetime  # type: ignore
 
-    with pytest.raises(TypeError):
-        JWTIncorrectExpClaim(exp=True)
+    with pytest.raises(pydantic.ValidationError):
+        JWTIncorrectExpClaim(exp=True)  # type: ignore
 
 
 def test_encode_decode_pydantic_claims(
@@ -998,8 +994,8 @@ def test_mixed_datetime_serialization_types(jwt, secret_key):
     now = datetime.now(UTC)
 
     # Create instance with specific microseconds to test precision
-    exp_time = datetime(2026, 6, 1, 12, 30, 45, 123456, tzinfo=UTC)
-    nbf_time = datetime(2025, 12, 1, 10, 15, 30, 654321, tzinfo=UTC)
+    exp_time = now + timedelta(hours=10, minutes=30, seconds=15, microseconds=123456)
+    nbf_time = now
     custom_time = datetime(2026, 3, 15, 8, 45, 22, 987654, tzinfo=UTC)
 
     claims = CustomMixedClaims(
