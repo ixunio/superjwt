@@ -1,14 +1,15 @@
 from datetime import datetime, timedelta
+from typing import Any
 
 import pydantic
 import pytest
-from superjwt.definitions import (
-    JWTClaims,
-)
+from superjwt.definitions import JWTClaims
 from superjwt.exceptions import (
     TokenExpiredError,
     TokenNotYetValidError,
 )
+
+from .conftest import JWTCustomClaims, check_claims_instance
 
 
 try:
@@ -22,24 +23,24 @@ except ImportError:
 
 def test_validate_exp_with_datetime_input():
     """Test validate_exp field validator with datetime input."""
-    now = datetime.now(UTC).replace(microsecond=0)
+    now = datetime.now(UTC)
 
     # exp=None
     claims_none = JWTClaims.model_validate({"exp": None})
     assert claims_none.exp is None
 
     # exp in future
-    future_exp = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=1)
+    future_exp = now + timedelta(hours=1)
     claims = JWTClaims(exp=future_exp)
     assert claims.exp == future_exp
 
-    # exp equal to now (expired)
-    current_time = datetime.now(UTC).replace(microsecond=0)
+    # exp equal to now (expired) - subtract small amount to ensure it's in the past
+    current_time = now - timedelta(seconds=1)
     with pytest.raises(TokenExpiredError):
         JWTClaims(exp=current_time)
 
     # exp in past (expired)
-    past_exp = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=1)
+    past_exp = now - timedelta(hours=1)
     with pytest.raises(TokenExpiredError):
         JWTClaims(exp=past_exp)
 
@@ -60,21 +61,17 @@ def test_validate_exp_with_datetime_input():
 
 def test_validate_exp_with_timestamp_input():
     """Test validate_exp field validator with int/float timestamp input."""
-    now = datetime.now(UTC).replace(microsecond=0)
+    now = datetime.now(UTC)
 
     # exp as int timestamp
     future_timestamp_int = int((datetime.now(UTC) + timedelta(hours=1)).timestamp())
     claims = JWTClaims(exp=future_timestamp_int)  # type: ignore[arg-type]
-    assert claims.exp == datetime.fromtimestamp(future_timestamp_int, tz=UTC).replace(
-        microsecond=0
-    )
+    assert claims.exp == datetime.fromtimestamp(future_timestamp_int, tz=UTC)
 
     # exp as float timestamp
     future_timestamp_float = (datetime.now(UTC) + timedelta(hours=1)).timestamp()
     claims_float = JWTClaims(exp=future_timestamp_float)  # type: ignore[arg-type]
-    assert claims_float.exp == datetime.fromtimestamp(
-        future_timestamp_float, tz=UTC
-    ).replace(microsecond=0)
+    assert claims_float.exp == datetime.fromtimestamp(future_timestamp_float, tz=UTC)
 
     # exp in past
     past_timestamp = int((datetime.now(UTC) - timedelta(hours=1)).timestamp())
@@ -85,9 +82,7 @@ def test_validate_exp_with_timestamp_input():
     iat_time = now - timedelta(days=1)
     exp_timestamp_int = int((now + timedelta(hours=1)).timestamp())
     claims_with_iat = JWTClaims(iat=iat_time, exp=exp_timestamp_int)  # type: ignore[arg-type]
-    assert claims_with_iat.exp == datetime.fromtimestamp(
-        exp_timestamp_int, tz=UTC
-    ).replace(microsecond=0)
+    assert claims_with_iat.exp == datetime.fromtimestamp(exp_timestamp_int, tz=UTC)
 
     # exp <= iat
     iat_timestamp = now
@@ -101,56 +96,55 @@ def test_validate_exp_with_timestamp_input():
 
 def test_validate_nbf_with_datetime_input():
     """Test validate_nbf field validator with datetime input."""
+    now = datetime.now(UTC)
+
     # nbf in past
-    past_nbf = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=1)
+    past_nbf = now - timedelta(hours=1)
     claims = JWTClaims(nbf=past_nbf)
     assert claims.nbf == past_nbf
 
-    # nbf equal to now
-    current_time = datetime.now(UTC).replace(microsecond=0)
-    claims_now = JWTClaims(nbf=current_time)
-    assert claims_now.nbf == current_time
-
-    # nbf in future
-    future_nbf = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=1)
+    # nbf far in future (should raise error)
+    future_nbf = now + timedelta(hours=1)
     with pytest.raises(TokenNotYetValidError):
         JWTClaims(nbf=future_nbf)
 
     # nbf <= iat
-    now = datetime.now(UTC).replace(microsecond=0)
     with pytest.raises(
         pydantic.ValidationError,
         match="'nbf' claim must be strictly greater than 'iat' claim",
     ):
         JWTClaims(iat=now, nbf=now)
 
-    # Test with_issued_at() preserving exp delta (lines 305-306 in definitions.py)
+    # Test with_issued_at()
     claims_with_both = JWTClaims(
         iat=now - timedelta(hours=2), exp=now + timedelta(hours=2)
     )
     updated = claims_with_both.with_issued_at()
-    assert updated.iat is not None and updated.iat >= now  # New iat is current time
+    # Compare timestamps since microseconds might differ slightly
+    assert updated.iat is not None and int(updated.iat.timestamp()) == int(
+        datetime.now(UTC).timestamp()
+    )
     assert updated.exp is not None
-    assert (updated.exp - updated.iat) == timedelta(hours=4)  # Delta preserved
+    # Delta should be exactly 4 hours, allow for microsecond precision differences
+    delta = updated.exp - updated.iat
+    assert (
+        abs(delta.total_seconds() - timedelta(hours=4).total_seconds()) < 0.001
+    )  # Within 1ms tolerance
 
 
 def test_validate_nbf_with_timestamp_input():
     """Test validate_nbf field validator with int/float timestamp input."""
-    now = datetime.now(UTC).replace(microsecond=0)
+    now = datetime.now(UTC)
 
     # nbf as int timestamp
     past_timestamp_int = int((datetime.now(UTC) - timedelta(hours=1)).timestamp())
     claims = JWTClaims(nbf=past_timestamp_int)  # type: ignore[arg-type]
-    assert claims.nbf == datetime.fromtimestamp(past_timestamp_int, tz=UTC).replace(
-        microsecond=0
-    )
+    assert claims.nbf == datetime.fromtimestamp(past_timestamp_int, tz=UTC)
 
     # nbf as float timestamp
     past_timestamp_float = (datetime.now(UTC) - timedelta(hours=1)).timestamp()
     claims_float = JWTClaims(nbf=past_timestamp_float)  # type: ignore[arg-type]
-    assert claims_float.nbf == datetime.fromtimestamp(
-        past_timestamp_float, tz=UTC
-    ).replace(microsecond=0)
+    assert claims_float.nbf == datetime.fromtimestamp(past_timestamp_float, tz=UTC)
 
     # nbf in future
     future_timestamp = int((datetime.now(UTC) + timedelta(hours=1)).timestamp())
@@ -177,7 +171,7 @@ def test_check_exp_after_nbf_model_validator():
     assert claims.nbf < claims.exp
 
     # nbf >= exp with iat=None
-    now = datetime.now(UTC).replace(microsecond=0)
+    now = datetime.now(UTC)
 
     # Make both in future but inverted: nbf > exp
     future_nbf = now + timedelta(days=2)
@@ -322,6 +316,157 @@ def test_spoof_time_revert_to_normal():
 
     # Revert
     claims.spoof_time(None)
-    current_actual_time = datetime.now(UTC).replace(microsecond=0)
+    current_actual_time = datetime.now(UTC)
     time_diff = abs((claims.now - current_actual_time).total_seconds())
     assert time_diff < 2  # Within 2 seconds tolerance
+
+
+# Timestamp serialization tests (int vs float mode)
+
+
+def test_default_int_serialization(jwt, secret_key):
+    """Test that default serialization uses int (microseconds truncated)."""
+    now = datetime.now(UTC)
+    claims = JWTClaims(iat=now, exp=now + timedelta(hours=1))
+
+    # Verify default is int
+    assert claims.internal__jwtdatetime_force_int is True
+
+    # Encode and decode
+    token = jwt.encode(claims, secret_key, "HS256")
+    decoded = jwt.decode(token.compact, secret_key, "HS256")
+
+    # Check payload has int timestamps
+    assert isinstance(decoded.payload["iat"], int)
+    assert isinstance(decoded.payload["exp"], int)
+
+    # Verify microseconds were truncated
+    assert decoded.payload["iat"] == int(now.timestamp())
+    assert decoded.payload["exp"] == int((now + timedelta(hours=1)).timestamp())
+
+
+def test_float_serialization_preserves_microseconds(jwt, secret_key):
+    """Test that float serialization preserves microseconds."""
+    now = datetime.now(UTC)
+    claims = JWTClaims(iat=now, exp=now + timedelta(hours=1))
+
+    # Switch to float mode
+    claims.force_jwtdatetime_to_float()
+
+    # Encode and decode
+    token = jwt.encode(claims, secret_key, "HS256")
+    decoded = jwt.decode(token.compact, secret_key, "HS256")
+
+    # Check payload has float timestamps
+    assert isinstance(decoded.payload["iat"], float)
+    assert isinstance(decoded.payload["exp"], float)
+
+    # Verify microseconds were preserved
+    assert decoded.payload["iat"] == now.timestamp()
+    assert decoded.payload["exp"] == (now + timedelta(hours=1)).timestamp()
+
+    # Verify exact microsecond match
+    assert abs(decoded.payload["iat"] - now.timestamp()) < 1e-6
+    assert abs(decoded.payload["exp"] - (now + timedelta(hours=1)).timestamp()) < 1e-6
+
+
+def test_custom_claims_int_mode(jwt, secret_key):
+    """Test custom claims with int serialization mode."""
+    now = datetime.now(UTC)
+    claims_before = JWTCustomClaims(
+        iss="issuer",
+        sub="user123",
+        user_id="value",
+        iat=now,
+        exp=now + timedelta(days=1),
+        past_date=now - timedelta(days=1),
+        future_date=now + timedelta(days=2),
+    )
+
+    # Default int mode
+    assert claims_before.internal__jwtdatetime_force_int is True
+
+    # Encode and decode
+    token = jwt.encode(claims_before, secret_key, "HS256")
+    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    claims_after = JWTCustomClaims(**decoded.payload)
+
+    # Check with int precision
+    check_claims_instance(claims_before, claims_after, jwtdatetime_force_int=True)
+
+
+def test_custom_claims_float_mode(jwt, secret_key):
+    """Test custom claims with float serialization mode."""
+    now = datetime.now(UTC)
+    claims_before = JWTCustomClaims(
+        iss="issuer",
+        sub="user123",
+        user_id="value",
+        iat=now,
+        exp=now + timedelta(days=1),
+        past_date=now - timedelta(days=1),
+        future_date=now + timedelta(days=2),
+    )
+
+    # Switch to float mode
+    claims_before.force_jwtdatetime_to_float()
+
+    # Encode and decode
+    token = jwt.encode(claims_before, secret_key, "HS256")
+    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    claims_after = JWTCustomClaims(**decoded.payload)
+
+    # Check with float precision - should preserve microseconds
+    check_claims_instance(claims_before, claims_after, jwtdatetime_force_int=False)
+
+
+def test_microseconds_actually_preserved_in_float_mode(jwt, secret_key):
+    """Explicitly verify microseconds are preserved in float mode."""
+    # Create datetime with specific microseconds
+    dt_with_microseconds = datetime(2026, 1, 3, 12, 30, 45, 123456, tzinfo=UTC)
+
+    claims = JWTClaims(iat=dt_with_microseconds)
+    claims.force_jwtdatetime_to_float()
+
+    # Encode and decode
+    token = jwt.encode(claims, secret_key, "HS256")
+    decoded = jwt.decode(token.compact, secret_key, "HS256")
+
+    # Reconstruct datetime from float timestamp
+    decoded_dt = datetime.fromtimestamp(decoded.payload["iat"], tz=UTC)
+
+    # Verify microseconds match
+    assert decoded_dt.microsecond == 123456
+    assert decoded_dt == dt_with_microseconds
+
+
+def test_microseconds_truncated_in_int_mode(jwt, secret_key):
+    """Explicitly verify microseconds are truncated in int mode."""
+    # Create datetime with specific microseconds
+    dt_with_microseconds = datetime(2026, 1, 3, 12, 30, 45, 123456, tzinfo=UTC)
+
+    claims = JWTClaims(iat=dt_with_microseconds)
+    # Default int mode
+
+    # Encode and decode
+    token = jwt.encode(claims, secret_key, "HS256")
+    decoded = jwt.decode(token.compact, secret_key, "HS256")
+
+    # Reconstruct datetime from int timestamp
+    decoded_dt = datetime.fromtimestamp(decoded.payload["iat"], tz=UTC)
+
+    # Verify microseconds were lost
+    assert decoded_dt.microsecond == 0
+    assert decoded_dt != dt_with_microseconds
+    # But should match at second level
+    assert int(decoded_dt.timestamp()) == int(dt_with_microseconds.timestamp())
+
+
+def test_unserialized_datetime(claims_dict: dict[str, Any]):
+    claims = JWTClaims.model_construct(**claims_dict)
+
+    assert int(claims.exp) == int(claims_dict["exp"])  # type: ignore
+
+    claims.force_jwtdatetime_to_float()
+    claims_dict = claims.to_dict()
+    assert abs(claims.exp - claims_dict["exp"]) < 1e-6

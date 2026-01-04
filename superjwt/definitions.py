@@ -94,17 +94,34 @@ class HttpsUrl(HttpUrl):
     _constraints = UrlConstraints(max_length=2083, allowed_schemes=["https"])
 
 
+DEFAULT_JWTDATETIME_FORCE_INT: bool = True
+
+
 class JWTBaseModel(BaseModel):
     model_config = {"extra": "allow", "revalidate_instances": "always"}
 
     internal__now: Annotated[datetime | None, Field(exclude=True, repr=False)] = None
+    internal__jwtdatetime_force_int: Annotated[bool, Field(exclude=True, repr=False)] = (
+        DEFAULT_JWTDATETIME_FORCE_INT
+    )
 
     def revalidate(self) -> None:
         """Re-validate the pydantic instance against its own model."""
         self.model_validate(self)
 
     def to_dict(self) -> dict[str, Any]:
-        return self.model_dump(exclude_none=True)
+        return self.model_dump(
+            exclude_none=True,
+            context={"jwtdatetime_force_int": self.internal__jwtdatetime_force_int},
+        )
+
+    def force_jwtdatetime_to_int(self) -> None:
+        """Force JWTDatetime fields to be serialized as integers (seconds since epoch)."""
+        self.internal__jwtdatetime_force_int = True
+
+    def force_jwtdatetime_to_float(self) -> None:
+        """Force JWTDatetime fields to be serialized as floats (seconds since epoch with microseconds)."""
+        self.internal__jwtdatetime_force_int = False
 
     def spoof_time(self, set_now: datetime | None) -> None:
         """Spoof the current time for testing purposes. Set to None to disable spoofing."""
@@ -180,17 +197,31 @@ class JOSEHeader(JWTBaseModel):
         return self
 
 
-def remove_subsecond(dt: datetime) -> datetime:
-    return dt.replace(microsecond=0)
+def serialize_jwtdatetime_timestamp(
+    value: datetime | int | float, info: ValidationInfo
+) -> int | float:
+    jwtdatetime_force_int = getattr(info, "context", {}).get(
+        "jwtdatetime_force_int", DEFAULT_JWTDATETIME_FORCE_INT
+    )
+    if jwtdatetime_force_int is True:
+        return serialize_jwtdatetime_timestamp_to_int(value)
+    elif jwtdatetime_force_int is False:
+        return serialize_jwtdatetime_timestamp_to_float(value)
+    raise ValueError("Invalid timestamp config type")
 
 
-def serialize_second_timestamps(value: datetime | int | float) -> int:
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
+def serialize_jwtdatetime_timestamp_to_int(value: datetime | int | float) -> int:
+    if isinstance(value, (int, float)):
         return int(value)
-    if isinstance(value, datetime):
+    else:
         return int(value.timestamp())
+
+
+def serialize_jwtdatetime_timestamp_to_float(value: datetime | int | float) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    else:
+        return value.timestamp()
 
 
 def check_future_dates(value: datetime | None, info: ValidationInfo) -> datetime | None:
@@ -208,8 +239,17 @@ def check_future_dates(value: datetime | None, info: ValidationInfo) -> datetime
 
 JWTDatetime = Annotated[
     datetime,
-    AfterValidator(remove_subsecond),
-    PlainSerializer(serialize_second_timestamps),
+    PlainSerializer(serialize_jwtdatetime_timestamp),
+]
+
+JWTDatetimeInt = Annotated[
+    datetime,
+    PlainSerializer(serialize_jwtdatetime_timestamp_to_int),
+]
+
+JWTDatetimeFloat = Annotated[
+    datetime,
+    PlainSerializer(serialize_jwtdatetime_timestamp_to_float),
 ]
 
 
@@ -255,17 +295,17 @@ class JWTClaims(JWTClaimsModel):
 
     @property
     def now(self) -> datetime:
-        """Get the current time"""
+        """Get the current time."""
         if self.internal__now is None:
-            return datetime.now(UTC).replace(microsecond=0)
-        return self.internal__now.replace(microsecond=0)
+            return datetime.now(UTC)
+        return self.internal__now
 
     @staticmethod
     def get_now(info: ValidationInfo) -> datetime:
         now = info.data["internal__now"]
         if now is None:
-            return datetime.now(UTC).replace(microsecond=0)
-        return now.replace(microsecond=0)
+            return datetime.now(UTC)
+        return now
 
     @model_validator(mode="after")
     def check_exp_after_nbf(self) -> Self:

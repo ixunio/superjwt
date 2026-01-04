@@ -31,14 +31,38 @@ class JWTCustomClaims(JWTClaims):
 
 
 def check_claims_instance(
-    claim_before: JWTCustomClaims, claim_after: JWTCustomClaims
+    claim_before: JWTCustomClaims,
+    claim_after: JWTCustomClaims,
+    jwtdatetime_force_int: bool,
 ) -> None:
     assert claim_after.iss == claim_before.iss
     assert claim_after.sub == claim_before.sub
     assert claim_after.aud is None
-    assert claim_after.iat == claim_before.iat
-    assert claim_after.nbf == claim_before.nbf
-    assert claim_after.exp == claim_before.exp
+
+    # Compare timestamps based on serialization mode
+    if jwtdatetime_force_int is False:
+        # Float mode: microseconds must be preserved exactly
+        if claim_after.iat is not None and claim_before.iat is not None:
+            assert float(claim_after.iat.timestamp()) == float(
+                claim_before.iat.timestamp()
+            )
+        if claim_after.nbf is not None and claim_before.nbf is not None:
+            assert float(claim_after.nbf.timestamp()) == float(
+                claim_before.nbf.timestamp()
+            )
+        if claim_after.exp is not None and claim_before.exp is not None:
+            assert float(claim_after.exp.timestamp()) == float(
+                claim_before.exp.timestamp()
+            )
+    else:
+        # Int mode: compare at second-level precision (microseconds truncated)
+        if claim_after.iat is not None and claim_before.iat is not None:
+            assert int(claim_after.iat.timestamp()) == int(claim_before.iat.timestamp())
+        if claim_after.nbf is not None and claim_before.nbf is not None:
+            assert int(claim_after.nbf.timestamp()) == int(claim_before.nbf.timestamp())
+        if claim_after.exp is not None and claim_before.exp is not None:
+            assert int(claim_after.exp.timestamp()) == int(claim_before.exp.timestamp())
+
     assert claim_after.jti is None
     assert claim_after.user_id == claim_before.user_id
     assert claim_after.optional_id is None
