@@ -67,14 +67,14 @@ class JWT:
                 Will default to 'HS256' (HMAC with SHA-256).
             headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
                 in the JWT. Will use default JWS headers if not provided.
-            claims_validation (type[JWTBaseModel] | None, opt.): the pydantic model
-                to use for claims validation. If None, claims validation is disabled.
-                If 'claims' is a pydantic instance, defaults to its pydantic model.
-                Otherwise, defaults to JWTBaseModel (i.e. no validation).
-            headers_validation (type[JOSEHeader] | None, opt.): the pydantic model
-                to use for headers validation. If None, headers validation is disabled.
-                If 'headers' is a pydantic instance, defaults to its pydantic model.
-                Otherwise, defaults to JOSEHeader (standard JOSE Header).
+            claims_validation (type[JWTBaseModel] | JWTValidationCfg | Validation | None, opt.):
+                Validation configuration for claims. Can be a pydantic model class, a JWTValidationCfg
+                instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
+                or None (disables validation).
+            headers_validation (type[JOSEHeader] | JWTValidationCfg | Validation | None, opt.):
+                Validation configuration for headers. Can be a pydantic model class, a JWTValidationCfg
+                instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
+                or None (no validation).
 
         Returns:
             JWSToken: a JWSToken instance representing the encoded and signed JWT token.
@@ -156,12 +156,14 @@ class JWT:
             algorithm (Algorithm): The algorithm to use for verifying the JWT.
             with_detached_payload (JWTBaseModel | dict[str, Any] | None, opt.):
                 Detached payload to use for signature verification, if any.
-            claims_validation (type[JWTBaseModel] | None, opt.): the pydantic model
-                to use for claims validation. If None, claims validation is disabled.
-                Defaults to JWTBaseModel (i.e. no validation).
-            headers_validation (type[JOSEHeader] | None, opt.): the pydantic model
-                to use for headers validation. If None, headers validation is disabled.
-                Defaults to JOSEHeader (standard JOSE Header).
+            claims_validation (type[JWTBaseModel] | JWTValidationCfg | Validation | None, opt.):
+                Validation configuration for claims. Can be a pydantic model class, a JWTValidationCfg
+                instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
+                or None (disables validation).
+            headers_validation (type[JOSEHeader] | JWTValidationCfg | Validation | None, opt.):
+                Validation configuration for headers. Can be a pydantic model class, a JWTValidationCfg
+                instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
+                or None (no validation).
 
         Returns:
             JWSToken: a JWSToken instance representing the decoded and verified JWT token.
