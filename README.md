@@ -28,7 +28,7 @@ With powerful Pydantic validation features.
 
 ## Overview & Installation
 
-SuperJWT is a minimalist JWT library for Python 3.10+ that combines the simplicity of JWT encoding/decoding with the power of [Pydantic](https://docs.pydantic.dev/latest/) validation. It supports JWS (JSON Web Signature) format with HMAC-SHA2 algorithms and includes advanced features like token inspection and detached payload mode.
+SuperJWT is a minimalist JWT library for Python 3.10+ that combines the simplicity of JWT encoding/decoding with the power of [Pydantic](https://docs.pydantic.dev/latest/) validation. It supports JWS (JSON Web Signature) format with HMAC-SHA2 algorithms and includes advanced features like enhanced time integrity checks, compact token inspection, custom timestamp serialization, detached payload mode, time spoofing and more.
 
 **Key Features:**
 
@@ -146,6 +146,33 @@ except ClaimsValidationError as e:
 #    claim ('user_id',) = invalid-uuid-string -> validation failed (value_error):
 #      Value error, badly formed hexadecimal UUID string
 ```
+
+### Compact Token Inspection
+
+> [!CAUTION]
+> When using `inspect()`, the JWT is not verified! Never trust the embedded data until it is at least verified by `decode()`.
+
+```python
+from superjwt import JWSToken, inspect
+
+compact = (
+    b"eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0"
+    b"."
+    b"eyJjYW5fSV90cnVzdF95b3UiOiJubyJ9"
+    b"."
+    b"BsUynvYTk4w4_TCS39qAUoovSmS7hJxG4fahZGK9RrY"
+)
+
+token: JWSToken = inspect(compact)
+
+token.payload
+#> {'can_I_trust_you': 'no'}
+
+token.headers
+#> {'alg': 'none', 'typ': 'JWT'}
+```
+
+
 
 ## Documentation
 
