@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from superjwt.algorithms import BaseJWSAlgorithm, NoneAlgorithm
 from superjwt.definitions import (
     MAX_TOKEN_BYTES,
-    Algorithm,
+    Alg,
     JOSEHeader,
     JWSToken,
     JWSTokenLifeCycle,
@@ -35,7 +35,7 @@ from superjwt.utils import as_bytes, urlsafe_b64decode, urlsafe_b64encode
 class JWS:
     def __init__(
         self,
-        algorithm: Algorithm | Literal["none"],
+        algorithm: Alg | Literal["none"] | str,
         max_token_bytes: int = MAX_TOKEN_BYTES,
         default_headers_validation: JWTValidationCfg = JWTHeadersDefaultValidationCfg,
     ):
@@ -75,7 +75,7 @@ class JWS:
 
         # prepare headers data and perform validation
         if headers is None:
-            headers = JOSEHeader.make_default(cast("Algorithm", self.algorithm.name))
+            headers = JOSEHeader.make_default(cast("Alg", self.algorithm.name))
         try:
             headers_dict = prepare_and_validate_data(
                 data=headers,

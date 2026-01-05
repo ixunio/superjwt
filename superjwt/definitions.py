@@ -45,42 +45,66 @@ except ImportError:
 
 MAX_TOKEN_BYTES: int = 16 * 1024  # 16 KB
 
-Algorithm = Literal[
-    "HS256",
-    "HS384",
-    "HS512",
-    "RS256",
-    "RS384",
-    "RS512",
-    "PS256",
-    "PS384",
-    "PS512",
-    "ES256",
-    "ES256K",
-    "ES384",
-    "ES512",
-    "Ed25519",
-    "Ed448",
-]
+
+class Alg(str, Enum):
+    """JWS/JWT Algorithm names with associated implementation instances."""
+
+    HS256 = "HS256"
+    HS384 = "HS384"
+    HS512 = "HS512"
+    RS256 = "RS256"
+    RS384 = "RS384"
+    RS512 = "RS512"
+    PS256 = "PS256"
+    PS384 = "PS384"
+    PS512 = "PS512"
+    ES256 = "ES256"
+    ES256K = "ES256K"
+    ES384 = "ES384"
+    ES512 = "ES512"
+    Ed25519 = "Ed25519"
+    Ed448 = "Ed448"
+
+    def get_instance(self) -> BaseJWSAlgorithm:
+        instance = ALG_INSTANCES.get(self.value)
+        if instance is None:
+            raise AlgorithmNotSupportedError(
+                f"JWS Algorithm '{self.value}' is not yet implemented"
+            )
+        return instance
+
+    @classmethod
+    def get_instance_by_name(cls, name: str) -> BaseJWSAlgorithm:
+        if name not in ALG_INSTANCES:
+            raise InvalidAlgorithmError(
+                f"Algorithm '{name}' is not a valid JWS algorithm"
+            )
+        instance = ALG_INSTANCES[name]
+        if instance is None:
+            raise AlgorithmNotSupportedError(
+                f"JWS Algorithm '{name}' is not yet implemented"
+            )
+        return instance
 
 
-class AlgorithmInstance(Enum):
-    none = NoneAlgorithm()
-    HS256 = HS256Algorithm()
-    HS384 = HS384Algorithm()
-    HS512 = HS512Algorithm()
-    RS256 = None  # Placeholder
-    RS384 = None  # Placeholder
-    RS512 = None  # Placeholder
-    PS256 = None  # Placeholder
-    PS384 = None  # Placeholder
-    PS512 = None  # Placeholder
-    ES256 = None  # Placeholder
-    ES256K = None  # Placeholder
-    ES384 = None  # Placeholder
-    ES512 = None  # Placeholder
-    Ed25519 = None  # Placeholder
-    Ed448 = None  # Placeholder
+ALG_INSTANCES: dict[str, BaseJWSAlgorithm | None] = {
+    "none": NoneAlgorithm(),
+    "HS256": HS256Algorithm(),
+    "HS384": HS384Algorithm(),
+    "HS512": HS512Algorithm(),
+    "RS256": None,  # Placeholder
+    "RS384": None,  # Placeholder
+    "RS512": None,  # Placeholder
+    "PS256": None,  # Placeholder
+    "PS384": None,  # Placeholder
+    "PS512": None,  # Placeholder
+    "ES256": None,  # Placeholder
+    "ES256K": None,  # Placeholder
+    "ES384": None,  # Placeholder
+    "ES512": None,  # Placeholder
+    "Ed25519": None,  # Placeholder
+    "Ed448": None,  # Placeholder
+}
 
 
 class Key(Enum):
@@ -134,7 +158,7 @@ class JOSEHeader(JWTBaseModel):
     _strict_crit_check: bool = False
 
     alg: Annotated[
-        Algorithm | Literal["none"],
+        Alg | Literal["none"] | str,
         Field(description="algorithm - the algorithm used to sign the JWT"),
     ]
 
@@ -158,8 +182,22 @@ class JOSEHeader(JWTBaseModel):
     ] = None
 
     @classmethod
-    def make_default(cls, algorithm: Algorithm) -> Self:
+    def make_default(cls, algorithm: Alg | str) -> Self:
         return cls(alg=algorithm, typ="JWT")
+
+    @field_validator("alg")
+    @classmethod
+    def validate_alg(cls, value: Alg | str) -> Alg | str:
+        """Validate that the algorithm is a valid algorithm name."""
+        # Get the string value (works for both Algorithm enum and str)
+        algo_str = value.value if isinstance(value, Alg) else value
+
+        # Check if it's a valid algorithm (including "none")
+        valid_algorithms = set(member.value for member in Alg) | {"none"}
+        if algo_str not in valid_algorithms:
+            raise ValueError(f"'{algo_str}' is not a valid algorithm")
+
+        return value
 
     @field_validator("crit")
     @classmethod
@@ -419,19 +457,16 @@ class JWSTokenLifeCycle(BaseModel):
     verified: JWSToken = JWSToken()
 
 
-def get_jws_algorithm(algorithm: Algorithm | Literal["none"]) -> BaseJWSAlgorithm:
-    if algorithm not in AlgorithmInstance.__members__:
-        raise InvalidAlgorithmError(
-            f"Algorithm '{algorithm}' is not a valid JWS algorithm"
-        )
-    if (algo_jws := getattr(AlgorithmInstance, algorithm).value) is None:
-        raise AlgorithmNotSupportedError(
-            f"JWS Algorithm '{algorithm}' is not yet implemented"
-        )
-    return algo_jws
+def get_jws_algorithm(algorithm: Alg | Literal["none"] | str) -> BaseJWSAlgorithm:
+    # Convert to algorithm instance
+    if isinstance(algorithm, Alg):
+        return algorithm.get_instance()
+    else:
+        # Handle string input (including "none")
+        return Alg.get_instance_by_name(algorithm)
 
 
-def make_key(algorithm: Algorithm | Literal["none"], key: str | bytes) -> BaseKey:
+def make_key(algorithm: Alg | Literal["none"] | str, key: str | bytes) -> BaseKey:
     key_type = get_jws_algorithm(algorithm).key_type
     return key_type.import_key(key)
 

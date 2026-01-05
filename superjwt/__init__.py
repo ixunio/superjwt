@@ -2,7 +2,7 @@ from typing import Any
 
 from superjwt._version import __version__
 from superjwt.definitions import (
-    Algorithm,
+    Alg,
     JOSEHeader,
     JWSToken,
     JWTBaseModel,
@@ -19,6 +19,7 @@ from superjwt.keys import BaseKey
 
 __all__ = [
     "JWT",
+    "Alg",
     "JOSEHeader",
     "JWTClaims",
     "JWTDatetime",
@@ -34,7 +35,7 @@ __all__ = [
 def encode(
     claims: JWTBaseModel | dict[str, Any] | None,
     key: str | bytes | BaseKey,
-    algorithm: Algorithm,
+    algorithm: Alg | str,
     *,
     headers: JOSEHeader | dict[str, Any] | None = None,
     detach_payload: bool = False,
@@ -88,7 +89,7 @@ def encode(
 def decode(
     compact: bytes | str,
     key: str | bytes | BaseKey,
-    algorithm: Algorithm,
+    algorithm: Alg | str,
     *,
     with_detached_payload: JWTClaims | dict[str, Any] | None = None,
     claims_validation: type[JWTBaseModel]

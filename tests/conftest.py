@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from pydantic import Field
-from superjwt.definitions import JWTClaims, JWTDatetime
+from superjwt.definitions import Alg, JWTClaims, JWTDatetime
 from superjwt.jws import JWS
 from superjwt.jwt import JWT
 
@@ -75,7 +75,7 @@ def jwt() -> JWT:
 
 @pytest.fixture
 def jws_HS256() -> JWS:  # noqa: N802
-    return JWS(algorithm="HS256")
+    return JWS(algorithm=Alg.HS256)
 
 
 @pytest.fixture

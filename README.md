@@ -54,15 +54,15 @@ SuperJWT makes it easy to encode and decode JWT tokens with automatic validation
 Encode manually your claims from a `dict`. During decoding, validate your JWT content against the standard JWT claims.
 
 ```python
-from superjwt import JWTClaims, encode, decode
+from superjwt import Alg, JWTClaims, encode, decode
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
-compact: bytes = encode({"iss": "my-app", "sub": "John Doe"}, secret_key, "HS256")
+compact: bytes = encode({"iss": "my-app", "sub": "John Doe"}, secret_key, Alg.HS256)
 #> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
 #   .eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSJ9
 #   .HwnUqTLFAMzNkMrokd0aI7c-zSJJpSVXMrYIhUyWe4s'
-decoded: dict = decode(compact, secret_key, "HS256", claims_validation=JWTClaims)
+decoded: dict = decode(compact, secret_key, Alg.HS256, claims_validation=JWTClaims)
 #> {'iss': 'my-app', 'sub': 'John Doe'}
 ```
 
@@ -70,7 +70,7 @@ Define dynamically your claims with Pydantic and easily include `'iat'` (Issued 
 Validate your JWT content automatically during encoding and decoding. 
 
 ```python
-from superjwt import JWTClaims, encode, decode
+from superjwt import Alg, JWTClaims, encode, decode
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
@@ -80,11 +80,11 @@ claims = (
     .with_expiration(minutes=15)
 )
 
-compact: bytes = encode(claims, secret_key, "HS256")
+compact: bytes = encode(claims, secret_key, Alg.HS256)
 #> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
 #   .eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzQ4MywiZXhwIjoxNzY3MDI4MzgzfQ
 #   .ZXxZT8VzL8IPTov-enslCh57S2M5fQBtqULZx5zEAm8'
-decoded: dict = decode(compact, secret_key, "HS256", claims_validation=JWTClaims)
+decoded: dict = decode(compact, secret_key, Alg.HS256, claims_validation=JWTClaims)
 #> {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767027483, 'exp': 1767028383}
 ```
 
@@ -97,7 +97,7 @@ from typing import Annotated
 from uuid import UUID
 
 from pydantic import AfterValidator, Field
-from superjwt import JWTClaims, Validation, decode, encode
+from superjwt import Alg, JWTClaims, Validation, decode, encode
 from superjwt.exceptions import ClaimsValidationError
 
 secret_key = "your-secret-key-of-len-32-bytes!"
@@ -117,8 +117,8 @@ claims = (
     MyJWTClaims(sub=123, user_id="b2a4c791-2cf4-4e41-9a20-8532129ff47c")
     .with_expiration(minutes=15)
 )
-compact = encode(claims, secret_key, "HS256")
-decoded = decode(compact, secret_key, "HS256", claims_validation=MyJWTClaims)
+compact = encode(claims, secret_key, Alg.HS256)
+decoded = decode(compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)
 #> {'sub': 123, 'exp': 1767027591, 'user_id': 'b2a4c791-2cf4-4e41-9a20-8532129ff47c'}
 ```
 
@@ -134,10 +134,10 @@ invalid_claims = (
 
 # disable claims default validation to create an invalid token
 invalid_compact = encode(
-    invalid_claims, secret_key, "HS256", claims_validation=Validation.DISABLE
+    invalid_claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
 )
 try:
-    decode(invalid_compact, secret_key, "HS256", claims_validation=MyJWTClaims)
+    decode(invalid_compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)
 except ClaimsValidationError as e:
     print("Claims validation error:", e)
 #> Claims validation error: Claims validation failed
@@ -156,7 +156,7 @@ except ClaimsValidationError as e:
 from superjwt import JWSToken, inspect
 
 compact = (
-    b"eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0"
+    b"eyJhbGciOiJOb05lIiwidHlwIjoiSldUIn0"
     b"."
     b"eyJjYW5fSV90cnVzdF95b3UiOiJubyJ9"
     b"."
@@ -169,7 +169,7 @@ token.payload
 #> {'can_I_trust_you': 'no'}
 
 token.headers
-#> {'alg': 'none', 'typ': 'JWT'}
+#> {'alg': 'NoNe', 'typ': 'JWT'}
 ```
 
 

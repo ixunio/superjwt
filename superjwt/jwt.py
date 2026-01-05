@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from superjwt.definitions import (
     MAX_TOKEN_BYTES,
-    Algorithm,
+    Alg,
     JOSEHeader,
     JWSToken,
     JWTBaseModel,
@@ -46,7 +46,7 @@ class JWT:
         self,
         claims: JWTBaseModel | dict[str, Any] | None,
         key: str | bytes | BaseKey,
-        algorithm: Algorithm = "HS256",
+        algorithm: Alg | str,
         *,
         headers: JOSEHeader | dict[str, Any] | None = None,
         claims_validation: type[JWTBaseModel]
@@ -136,7 +136,7 @@ class JWT:
         self,
         compact: str | bytes,
         key: str | bytes | BaseKey,
-        algorithm: Algorithm = "HS256",
+        algorithm: Alg | str,
         *,
         with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
         claims_validation: type[JWTBaseModel]

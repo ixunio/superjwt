@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 from superjwt.definitions import (
+    Alg,
     JOSEHeader,
     JWTBaseModel,
     JWTClaims,
@@ -62,11 +63,11 @@ def test_jwt_custom_validation_config_with_dict_data():
 
     # Encode with custom validation config
     token = jwt.encode(
-        claims_dict, secret_key, "HS256", claims_validation=custom_validation
+        claims_dict, secret_key, Alg.HS256, claims_validation=custom_validation
     )
 
     # Verify timestamps are floats (from custom config)
-    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
     assert isinstance(decoded.payload["iat"], float)
     assert isinstance(decoded.payload["exp"], float)
 
@@ -92,11 +93,11 @@ def test_jwt_custom_validation_config_with_pydantic_model():
     )
 
     # Should validate against JWTClaims (not CustomClaims) because auto_validate is False
-    token = jwt.encode(claims, secret_key, "HS256", claims_validation=custom_validation)
+    token = jwt.encode(claims, secret_key, Alg.HS256, claims_validation=custom_validation)
     assert token.compact is not None
 
     # Verify decoding works
-    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
     assert decoded.payload["sub"] == "user123"
     assert decoded.payload["user_id"] == "uid123"
 
@@ -114,13 +115,13 @@ def test_jwt_validation_config_disabled():
 
     # Should succeed because validation is disabled
     token = jwt.encode(
-        invalid_claims, secret_key, "HS256", claims_validation=no_validation
+        invalid_claims, secret_key, Alg.HS256, claims_validation=no_validation
     )
     assert token.compact is not None
 
     # Decode also succeeds with validation disabled
     decoded = jwt.decode(
-        token.compact, secret_key, "HS256", claims_validation=no_validation
+        token.compact, secret_key, Alg.HS256, claims_validation=no_validation
     )
     assert decoded.payload["sub"] == 12345
 
@@ -139,7 +140,9 @@ def test_jwt_validation_config_with_custom_now():
     }
 
     # Encode with validation disabled to create the token
-    token = jwt.encode(claims, secret_key, "HS256", claims_validation=Validation.DISABLE)
+    token = jwt.encode(
+        claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    )
 
     # Create validation config with spoofed 'now' set to past
     spoofed_validation = JWTValidationCfg(
@@ -149,7 +152,7 @@ def test_jwt_validation_config_with_custom_now():
 
     # Should succeed because we spoofed the time to be within validity
     decoded = jwt.decode(
-        token.compact, secret_key, "HS256", claims_validation=spoofed_validation
+        token.compact, secret_key, Alg.HS256, claims_validation=spoofed_validation
     )
     assert decoded.payload["sub"] == "user123"
 
@@ -157,7 +160,7 @@ def test_jwt_validation_config_with_custom_now():
     strict_validation = JWTValidationCfg(validation_model=JWTClaims)
     with pytest.raises(TokenExpiredError):
         jwt.decode(
-            token.compact, secret_key, "HS256", claims_validation=strict_validation
+            token.compact, secret_key, Alg.HS256, claims_validation=strict_validation
         )
 
 
@@ -175,7 +178,9 @@ def test_jwt_validation_config_with_custom_leeway():
     }
 
     # Encode with validation disabled
-    token = jwt.encode(claims, secret_key, "HS256", claims_validation=Validation.DISABLE)
+    token = jwt.encode(
+        claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    )
 
     # Default leeway (5 seconds) with JWTClaims validation should fail
     default_leeway_validation = JWTValidationCfg(
@@ -186,7 +191,7 @@ def test_jwt_validation_config_with_custom_leeway():
         jwt.decode(
             token.compact,
             secret_key,
-            "HS256",
+            Alg.HS256,
             claims_validation=default_leeway_validation,
         )
 
@@ -197,7 +202,7 @@ def test_jwt_validation_config_with_custom_leeway():
     )
 
     decoded = jwt.decode(
-        token.compact, secret_key, "HS256", claims_validation=large_leeway_validation
+        token.compact, secret_key, Alg.HS256, claims_validation=large_leeway_validation
     )
     assert decoded.payload["sub"] == "user123"
 
@@ -221,11 +226,11 @@ def test_jwt_validation_config_allow_future_iat():
         validation_model=JWTClaims,
         allow_future_iat=True,  # Allow future iat
     )
-    token = jwt.encode(claims, secret_key, "HS256", claims_validation=encode_validation)
+    token = jwt.encode(claims, secret_key, Alg.HS256, claims_validation=encode_validation)
 
     # Decoding with allow_future_iat=True should also succeed
     decoded = jwt.decode(
-        token.compact, secret_key, "HS256", claims_validation=encode_validation
+        token.compact, secret_key, Alg.HS256, claims_validation=encode_validation
     )
     assert decoded.payload["sub"] == "user123"
 
@@ -237,7 +242,7 @@ def test_jwt_validation_config_allow_future_iat():
 
     with pytest.raises(ClaimsValidationError):  # ValidationError for future iat
         jwt.decode(
-            token.compact, secret_key, "HS256", claims_validation=strict_validation
+            token.compact, secret_key, Alg.HS256, claims_validation=strict_validation
         )
 
 
@@ -262,12 +267,12 @@ def test_jwt_validation_config_combine_multiple_params():
     )
 
     token = jwt.encode(
-        claims_dict, secret_key, "HS256", claims_validation=encode_validation
+        claims_dict, secret_key, Alg.HS256, claims_validation=encode_validation
     )
 
     # Verify float timestamps
     decoded = jwt.decode(
-        token.compact, secret_key, "HS256", claims_validation=Validation.DISABLE
+        token.compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
     )
     assert isinstance(decoded.payload["iat"], float)
     assert isinstance(decoded.payload["exp"], float)
@@ -281,7 +286,7 @@ def test_jwt_validation_config_combine_multiple_params():
     )
 
     decoded2 = jwt.decode(
-        token.compact, secret_key, "HS256", claims_validation=decode_validation
+        token.compact, secret_key, Alg.HS256, claims_validation=decode_validation
     )
     assert decoded2.payload["sub"] == "user123"
 
@@ -310,7 +315,7 @@ def test_jwt_custom_headers_validation_config_with_dict():
     token = jwt.encode(
         claims,
         secret_key,
-        "HS256",
+        Alg.HS256,
         headers=headers_dict,
         headers_validation=custom_headers_validation,
     )
@@ -319,7 +324,7 @@ def test_jwt_custom_headers_validation_config_with_dict():
     decoded = jwt.decode(
         token.compact,
         secret_key,
-        "HS256",
+        Alg.HS256,
         headers_validation=custom_headers_validation,
     )
     assert decoded.headers["kid"] == "key-123"
@@ -344,14 +349,14 @@ def test_jwt_custom_headers_validation_config_with_pydantic():
     token = jwt.encode(
         claims,
         secret_key,
-        "HS256",
+        Alg.HS256,
         headers=headers,
         headers_validation=custom_validation,
     )
 
     # Decode and verify custom fields are preserved
     decoded = jwt.decode(
-        token.compact, secret_key, "HS256", headers_validation=Validation.DISABLE
+        token.compact, secret_key, Alg.HS256, headers_validation=Validation.DISABLE
     )
     assert decoded.headers["custom_field"] == "test-value"
     assert decoded.headers["version"] == 2
@@ -373,7 +378,7 @@ def test_jwt_headers_validation_config_disabled():
     token = jwt.encode(
         claims,
         secret_key,
-        "HS256",
+        Alg.HS256,
         headers=custom_headers,
         headers_validation=no_validation,
     )
@@ -381,7 +386,7 @@ def test_jwt_headers_validation_config_disabled():
 
     # Decode also succeeds with validation disabled
     decoded = jwt.decode(
-        token.compact, secret_key, "HS256", headers_validation=no_validation
+        token.compact, secret_key, Alg.HS256, headers_validation=no_validation
     )
     assert decoded.headers["custom"] == "value"
 
@@ -409,7 +414,7 @@ def test_jwt_encode_decode_different_validation_configs():
         exp=datetime.now(UTC) + timedelta(hours=1),
     )
 
-    token = jwt.encode(claims, secret_key, "HS256", claims_validation=encode_config)
+    token = jwt.encode(claims, secret_key, Alg.HS256, claims_validation=encode_config)
 
     # Decode with strict validation (int timestamps, smaller leeway)
     decode_config = JWTValidationCfg(
@@ -420,7 +425,7 @@ def test_jwt_encode_decode_different_validation_configs():
 
     # Should still decode successfully
     decoded = jwt.decode(
-        token.compact, secret_key, "HS256", claims_validation=decode_config
+        token.compact, secret_key, Alg.HS256, claims_validation=decode_config
     )
     assert decoded.payload["sub"] == "user123"
 
@@ -444,7 +449,7 @@ def test_jwt_validation_config_does_not_mutate_default():
     )
 
     claims = {"sub": "user123", "iat": datetime.now(UTC).timestamp()}
-    jwt.encode(claims, secret_key, "HS256", claims_validation=custom_config)
+    jwt.encode(claims, secret_key, Alg.HS256, claims_validation=custom_config)
 
     # Verify the default config wasn't mutated
     assert jwt.default_claims_validation.validation_model == JWTBaseModel
@@ -453,10 +458,10 @@ def test_jwt_validation_config_does_not_mutate_default():
 
     # Subsequent operations should use default config
     claims2 = JWTClaims(sub="user456", iat=datetime.now(UTC))
-    token2 = jwt.encode(claims2, secret_key, "HS256")  # Uses default
+    token2 = jwt.encode(claims2, secret_key, Alg.HS256)  # Uses default
 
     decoded = jwt.decode(
-        token2.compact, secret_key, "HS256", claims_validation=Validation.DISABLE
+        token2.compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
     )
     # Should have int timestamps (from default config)
     assert isinstance(decoded.payload["iat"], int)
@@ -489,7 +494,7 @@ def test_jwt_validation_config_overrides_model_internal_values():
 
     # Encoding should fail because config's allow_future_iat=False overrides model's True
     with pytest.raises(ClaimsValidationError):
-        jwt.encode(claims, secret_key, "HS256", claims_validation=strict_validation)
+        jwt.encode(claims, secret_key, Alg.HS256, claims_validation=strict_validation)
 
     # Now test with permissive config that allows future iat
     permissive_validation = JWTValidationCfg(
@@ -501,6 +506,6 @@ def test_jwt_validation_config_overrides_model_internal_values():
 
     # This should succeed because config overrides model
     token = jwt.encode(
-        claims, secret_key, "HS256", claims_validation=permissive_validation
+        claims, secret_key, Alg.HS256, claims_validation=permissive_validation
     )
     assert token.compact is not None

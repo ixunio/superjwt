@@ -2,8 +2,10 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
-from superjwt.definitions import JWTClaims
+from superjwt.definitions import Alg, JWTClaims
 from superjwt.exceptions import (
+    AlgorithmNotSupportedError,
+    InvalidAlgorithmError,
     TokenExpiredError,
     TokenNotYetValidError,
 )
@@ -442,8 +444,8 @@ def test_default_int_serialization(jwt, secret_key):
     assert claims.internal__jwtdatetime_force_int is True
 
     # Encode and decode
-    token = jwt.encode(claims, secret_key, "HS256")
-    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    token = jwt.encode(claims, secret_key, Alg.HS256)
+    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
 
     # Check payload has int timestamps
     assert isinstance(decoded.payload["iat"], int)
@@ -463,8 +465,8 @@ def test_float_serialization_preserves_microseconds(jwt, secret_key):
     claims.force_jwtdatetime_to_float()
 
     # Encode and decode
-    token = jwt.encode(claims, secret_key, "HS256")
-    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    token = jwt.encode(claims, secret_key, Alg.HS256)
+    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
 
     # Check payload has float timestamps
     assert isinstance(decoded.payload["iat"], float)
@@ -496,8 +498,8 @@ def test_custom_claims_int_mode(jwt, secret_key):
     assert claims_before.internal__jwtdatetime_force_int is True
 
     # Encode and decode
-    token = jwt.encode(claims_before, secret_key, "HS256")
-    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    token = jwt.encode(claims_before, secret_key, Alg.HS256)
+    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
     claims_after = JWTCustomClaims(**decoded.payload)
 
     # Check with int precision
@@ -521,8 +523,8 @@ def test_custom_claims_float_mode(jwt, secret_key):
     claims_before.force_jwtdatetime_to_float()
 
     # Encode and decode
-    token = jwt.encode(claims_before, secret_key, "HS256")
-    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    token = jwt.encode(claims_before, secret_key, Alg.HS256)
+    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
     claims_after = JWTCustomClaims(**decoded.payload)
 
     # Check with float precision - should preserve microseconds
@@ -538,8 +540,8 @@ def test_microseconds_actually_preserved_in_float_mode(jwt, secret_key):
     claims.force_jwtdatetime_to_float()
 
     # Encode and decode
-    token = jwt.encode(claims, secret_key, "HS256")
-    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    token = jwt.encode(claims, secret_key, Alg.HS256)
+    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
 
     # Reconstruct datetime from float timestamp
     decoded_dt = datetime.fromtimestamp(decoded.payload["iat"], tz=UTC)
@@ -558,8 +560,8 @@ def test_microseconds_truncated_in_int_mode(jwt, secret_key):
     # Default int mode
 
     # Encode and decode
-    token = jwt.encode(claims, secret_key, "HS256")
-    decoded = jwt.decode(token.compact, secret_key, "HS256")
+    token = jwt.encode(claims, secret_key, Alg.HS256)
+    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
 
     # Reconstruct datetime from int timestamp
     decoded_dt = datetime.fromtimestamp(decoded.payload["iat"], tz=UTC)
@@ -580,3 +582,42 @@ def test_unserialized_datetime(claims_dict: dict[str, Any]):
     claims.force_jwtdatetime_to_float()
     claims_dict_float = claims.to_dict()
     assert abs(claims.exp - claims_dict_float["exp"]) < 1e-6
+
+
+class TestAlgEnum:
+    """Test suite for the Alg enum methods."""
+
+    def test_get_instance_not_implemented(self):
+        """Test that get_instance() raises AlgorithmNotSupportedError for unimplemented algorithms."""
+        # RS256 is defined but not yet implemented (ALG_INSTANCES[RS256] = None)
+        with pytest.raises(
+            AlgorithmNotSupportedError, match=r"RS256.*not yet implemented"
+        ):
+            Alg.RS256.get_instance()
+
+    def test_get_instance_by_name_invalid_algorithm(self):
+        """Test that get_instance_by_name() raises InvalidAlgorithmError for invalid algorithm names."""
+        with pytest.raises(
+            InvalidAlgorithmError, match=r"INVALID.*not a valid JWS algorithm"
+        ):
+            Alg.get_instance_by_name("INVALID")
+
+    def test_get_instance_by_name_not_implemented(self):
+        """Test that get_instance_by_name() raises AlgorithmNotSupportedError for unimplemented algorithms."""
+        # PS256 is defined but not yet implemented (ALG_INSTANCES[PS256] = None)
+        with pytest.raises(
+            AlgorithmNotSupportedError, match=r"PS256.*not yet implemented"
+        ):
+            Alg.get_instance_by_name("PS256")
+
+    def test_get_instance_success(self):
+        """Test that get_instance() successfully returns an algorithm instance for implemented algorithms."""
+        instance = Alg.HS256.get_instance()
+        assert instance is not None
+        assert instance.__class__.__name__ == "HS256Algorithm"
+
+    def test_get_instance_by_name_success(self):
+        """Test that get_instance_by_name() successfully returns an algorithm instance for implemented algorithms."""
+        instance = Alg.get_instance_by_name("HS256")
+        assert instance is not None
+        assert instance.__class__.__name__ == "HS256Algorithm"
