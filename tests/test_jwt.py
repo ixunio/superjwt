@@ -12,7 +12,7 @@ from superjwt.definitions import (
     JWTDatetime,
     JWTDatetimeFloat,
     JWTDatetimeInt,
-    JWTValidationModelConfig,
+    JWTValidationCfg,
     Validation,
 )
 from superjwt.exceptions import (
@@ -704,10 +704,10 @@ def test_custom_default_claims_validation_policy(
     """Test JWT instance with custom default claims validation policy."""
 
     # Create JWT instance with strict claims validation by default (JWTClaims)
-    custom_validation_config = JWTValidationModelConfig(
-        default_validation_model=JWTClaims,
-        force_validation_on_pydantic_model=True,
-        default_data_model=JWTClaims,
+    custom_validation_config = JWTValidationCfg(
+        validation_model=JWTClaims,
+        auto_validate_pydantic_model=True,
+        data_model=JWTClaims,
     )
     jwt_strict = JWT(default_claims_validation=custom_validation_config)
 
@@ -769,10 +769,10 @@ def test_custom_default_headers_validation_policy(secret_key: str):
         custom_header: str
 
     # Create JWT instance with custom headers validation by default
-    custom_validation_config = JWTValidationModelConfig(
-        default_validation_model=CustomHeader,
-        force_validation_on_pydantic_model=True,
-        default_data_model=CustomHeader,
+    custom_validation_config = JWTValidationCfg(
+        validation_model=CustomHeader,
+        auto_validate_pydantic_model=True,
+        data_model=CustomHeader,
     )
     jwt_custom = JWT(default_headers_validation=custom_validation_config)
 
@@ -816,10 +816,10 @@ def test_custom_default_claims_validation_policy_no_force_pydantic(
     """Test JWT instance with custom default validation but force_validation_on_pydantic_model=False."""
 
     # Create JWT instance with custom validation but without forcing Pydantic validation
-    custom_validation_config = JWTValidationModelConfig(
-        default_validation_model=JWTClaims,  # Validate against JWTClaims
-        force_validation_on_pydantic_model=False,  # Don't force Pydantic model type
-        default_data_model=JWTBaseModel,
+    custom_validation_config = JWTValidationCfg(
+        validation_model=JWTClaims,  # Validate against JWTClaims
+        auto_validate_pydantic_model=False,  # Don't force Pydantic model type
+        data_model=JWTBaseModel,
     )
     jwt_custom = JWT(default_claims_validation=custom_validation_config)
 

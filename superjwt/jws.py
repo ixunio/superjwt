@@ -1,9 +1,7 @@
 import json
-from collections.abc import Callable
-from inspect import isclass
 from typing import Any, Literal, cast
 
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from superjwt.algorithms import BaseJWSAlgorithm, NoneAlgorithm
 from superjwt.definitions import (
@@ -12,12 +10,12 @@ from superjwt.definitions import (
     JOSEHeader,
     JWSToken,
     JWSTokenLifeCycle,
-    JWTHeadersDefaultValidationConfig,
-    JWTValidationModelConfig,
+    JWTHeadersDefaultValidationCfg,
+    JWTValidationCfg,
     Validation,
-    get_effective_data_model,
-    get_effective_data_validation_model,
+    get_data_model,
     get_jws_algorithm,
+    get_validation_config,
     prepare_and_validate_data,
 )
 from superjwt.exceptions import (
@@ -39,8 +37,7 @@ class JWS:
         self,
         algorithm: Algorithm | Literal["none"],
         max_token_bytes: int = MAX_TOKEN_BYTES,
-        default_headers_validation: JWTValidationModelConfig
-        | None = JWTHeadersDefaultValidationConfig,
+        default_headers_validation: JWTValidationCfg = JWTHeadersDefaultValidationCfg,
     ):
         self.token: JWSTokenLifeCycle = JWSTokenLifeCycle()
         self.algorithm: BaseJWSAlgorithm[BaseKey] = get_jws_algorithm(algorithm)
@@ -68,7 +65,10 @@ class JWS:
         payload: dict[str, Any],
         key: BaseKey,
         *,
-        headers_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
+        headers_validation: type[JOSEHeader]
+        | JWTValidationCfg
+        | Validation
+        | None = Validation.DEFAULT,
     ) -> JWSToken:
         if self.token.verified.compact != b"..":
             raise SuperJWTError("JWS instance data must be reset")
@@ -79,10 +79,7 @@ class JWS:
         try:
             headers_dict = prepare_and_validate_data(
                 data=headers,
-                type_err_msg="headers must be a JOSEHeader instance or a dict",
-                validation_model=self.get_headers_validation_model(
-                    headers, headers_validation
-                ),
+                validation=self.get_headers_validation_config(headers_validation),
             )
         except ValidationError as e:
             raise HeadersValidationError(validation_errors=e.errors()) from e
@@ -125,7 +122,10 @@ class JWS:
         key: BaseKey,
         *,
         with_detached_payload: dict[str, Any] | None = None,
-        headers_validation: type[BaseModel] | Validation | None = Validation.DEFAULT,
+        headers_validation: type[JOSEHeader]
+        | JWTValidationCfg
+        | Validation
+        | None = Validation.DEFAULT,
     ) -> JWSToken:
         if self.token.verified.compact != b".." or self.token.unsafe.compact != b"..":
             raise SuperJWTError("JWS instance data must be reset")
@@ -236,7 +236,10 @@ class JWS:
 
     def validate_headers_and_algorithm(
         self,
-        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
+        validation_model: type[JOSEHeader]
+        | JWTValidationCfg
+        | Validation
+        | None = Validation.DEFAULT,
     ) -> None:
         headers_dict = self.token.unsafe.headers
 
@@ -244,21 +247,16 @@ class JWS:
         try:
             prepare_and_validate_data(
                 data=headers_dict,
-                validation_model=self.get_headers_validation_model(
-                    headers_dict, validation_model
-                ),
+                validation=self.get_headers_validation_config(validation_model),
             )
         except ValidationError as e:
             raise HeadersValidationError(validation_errors=e.errors()) from e
 
         # set headers model data
         headers_dict = self.token.unsafe.headers
-        self.token.unsafe.model.headers = headers_validated = cast(
-            "JOSEHeader",
-            self.get_headers_data_model(headers_dict, validation_model).model_construct(
-                **headers_dict
-            ),
-        )
+        self.token.unsafe.model.headers = headers_validated = self.get_headers_data_model(
+            headers_dict, validation_model
+        ).model_construct(**headers_dict)
 
         # check algorithm match
         pass_through = self.algorithm.name == "none" and self._allow_none_algorithm
@@ -288,31 +286,24 @@ class JWS:
     def get_headers_data_model(
         self,
         data: JOSEHeader | dict[str, Any],
-        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
-    ) -> type[BaseModel]:
-        """Get the effective data claims pydantic model"""
-        return self.get_headers_model(get_effective_data_model, data, validation_model)
-
-    def get_headers_validation_model(
-        self,
-        data: JOSEHeader | dict[str, Any],
-        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
-    ) -> type[BaseModel] | None:
-        """Get the effective claims validation pydantic model"""
-        return self.get_headers_model(
-            get_effective_data_validation_model, data, validation_model
+        validation: type[JOSEHeader]
+        | JWTValidationCfg
+        | Validation
+        | None = Validation.DEFAULT,
+    ) -> type[JOSEHeader]:
+        return cast(
+            "type[JOSEHeader]",
+            get_data_model(data, validation, self.default_headers_validation, JOSEHeader),
         )
 
-    def get_headers_model(
+    def get_headers_validation_config(
         self,
-        fn: Callable,
-        data: JOSEHeader | dict[str, Any],
-        validation_model: type[BaseModel] | Validation | None = Validation.DEFAULT,
-    ) -> Any:
-        if validation_model is Validation.DISABLE or validation_model is None:
-            return fn(data, None)
-        elif validation_model is Validation.DEFAULT:
-            return fn(data, self.default_headers_validation)
-        elif isclass(validation_model) and issubclass(validation_model, BaseModel):
-            return fn(data, validation_model)
-        raise TypeError("Wrong validation object type")
+        validation: type[JOSEHeader]
+        | JWTValidationCfg
+        | Validation
+        | None = Validation.DEFAULT,
+    ) -> JWTValidationCfg | type[JOSEHeader]:
+        return cast(
+            "JWTValidationCfg | type[JOSEHeader]",
+            get_validation_config(validation, self.default_headers_validation),
+        )

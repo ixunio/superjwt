@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
+from inspect import isclass
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -95,6 +96,7 @@ class HttpsUrl(HttpUrl):
 
 
 DEFAULT_JWTDATETIME_FORCE_INT: bool = True
+DEFAULT_LEEWAY_SECONDS: float = 5.0
 
 
 class JWTBaseModel(BaseModel):
@@ -273,13 +275,20 @@ class JWTClaimsModel(JWTBaseModel):
     ] = None
 
 
+DEFAULT_ALLOW_FUTURE_IAT: bool = False
+
+
 class JWTClaims(JWTClaimsModel):
     """
     JWT standard claims as per RFC 7519.
     """
 
-    internal__leeway: Annotated[float, Field(exclude=True, repr=False)] = 5.0
-    internal__allow_future_iat: Annotated[bool, Field(exclude=True, repr=False)] = True
+    internal__leeway: Annotated[float, Field(exclude=True, repr=False)] = (
+        DEFAULT_LEEWAY_SECONDS
+    )
+    internal__allow_future_iat: Annotated[bool, Field(exclude=True, repr=False)] = (
+        DEFAULT_ALLOW_FUTURE_IAT
+    )
 
     @property
     def now(self) -> datetime:
@@ -295,12 +304,12 @@ class JWTClaims(JWTClaimsModel):
         self.internal__leeway = leeway_seconds
 
     def allow_future_iat(self) -> None:
-        """Disable the check that 'iat' claim is not in the future."""
-        self.internal__allow_future_iat = False
+        """Allow 'iat' claim to be in the future (disable the check)."""
+        self.internal__allow_future_iat = True
 
     def disallow_future_iat(self) -> None:
-        """Enable the check that 'iat' claim is not in the future."""
-        self.internal__allow_future_iat = True
+        """Disallow 'iat' claim to be in the future (enable the check)."""
+        self.internal__allow_future_iat = False
 
     @model_validator(mode="after")
     def validate_time_integrity(self) -> Self:
@@ -312,7 +321,7 @@ class JWTClaims(JWTClaimsModel):
                 )
 
         # check iat <= now, modulo leeway
-        if self.iat is not None and self.internal__allow_future_iat:
+        if self.iat is not None and not self.internal__allow_future_iat:
             if delta_datetime_timestamp(self.iat, self.now) > self.internal__leeway:
                 raise ValueError("'iat' claim must not be in the future")
 
@@ -427,28 +436,91 @@ def make_key(algorithm: Algorithm | Literal["none"], key: str | bytes) -> BaseKe
     return key_type.import_key(key)
 
 
-class JWTValidationModelConfig(BaseModel):
+class JWTValidationCfg(BaseModel):
     enabled: bool = True
 
-    # validation
-    default_validation_model: type[BaseModel] = JWTBaseModel
-    force_validation_on_pydantic_model: bool = True
+    """The pydantic model to use for data validation."""
+    validation_model: type[JWTBaseModel] = JWTBaseModel
 
-    # data storage
-    default_data_model: type[BaseModel] = JWTBaseModel
+    """Auto-validate pydantic model instances at encoding time."""
+    auto_validate_pydantic_model: bool = True
+
+    """The default pydantic model to use for data storage when data is a dict."""
+    data_model: type[JWTBaseModel] = Field(
+        default_factory=lambda data: data["validation_model"]
+    )
+
+    # ------------- JWTBaseModel internal config -------------
+    """Spoofed 'now' datetime."""
+    now: datetime | None = None
+
+    """Timestamp format for JWTDatetime fields."""
+    jwtdatetime_force_int: bool = DEFAULT_JWTDATETIME_FORCE_INT
+
+    # ------------- JWTClaims internal config -------------
+    """Leeway for time-based validations, in seconds."""
+    leeway: float = DEFAULT_LEEWAY_SECONDS
+
+    """Allow 'iat' claim to be in the future."""
+    allow_future_iat: bool = DEFAULT_ALLOW_FUTURE_IAT
+
+    def _internal_params_matrix(self) -> list[tuple[str, type[JWTBaseModel]]]:
+        return [
+            ("now", JWTBaseModel),
+            ("jwtdatetime_force_int", JWTBaseModel),
+            ("leeway", JWTClaims),
+            ("allow_future_iat", JWTClaims),
+        ]
+
+    def _get_internal_cfg(self) -> dict[str, Any]:
+        """Get internal config values as a dict for injection into validation."""
+        internal_config = {}
+        for param, model_type in self._internal_params_matrix():
+            if issubclass(self.validation_model, model_type):
+                internal_config[f"internal__{param}"] = getattr(self, param)
+        return internal_config
+
+    def _inject_internal_cfg_into_model(self, model: JWTBaseModel) -> None:
+        """Inject config's internal values into a model instance."""
+        for param, model_type in self._internal_params_matrix():
+            if isinstance(model, model_type):
+                setattr(model, f"internal__{param}", getattr(self, param))
+
+    def _set_internal_cfg_from_model(self, model: JWTBaseModel) -> None:
+        """Extract internal values from a model instance into this config."""
+        for param, model_type in self._internal_params_matrix():
+            if isinstance(model, model_type):
+                setattr(self, param, getattr(model, f"internal__{param}"))
+
+    def run(self, data: JWTBaseModel | dict[str, Any]) -> dict[str, Any]:
+        if self.enabled is False:
+            return data.to_dict() if isinstance(data, JWTBaseModel) else data
+
+        # case pydantic model
+        if isinstance(data, JWTBaseModel):
+            data_dict = data.to_dict()
+            temp = self.validation_model.model_construct(**data_dict)
+            self._inject_internal_cfg_into_model(temp)
+            temp.revalidate()
+            return data_dict
+
+        # case dict
+        if isinstance(data, dict):
+            data_with_config = data | self._get_internal_cfg()
+            self.validation_model.model_validate(data_with_config)
+            return data
+
+        raise TypeError("Wrong type during data preparation and validation")
 
 
-JWTDisabledValidationConfig = JWTValidationModelConfig(enabled=False)
-
-JWTClaimsDefaultValidationConfig = JWTValidationModelConfig(
-    default_validation_model=JWTBaseModel,
-    force_validation_on_pydantic_model=True,
-    default_data_model=JWTBaseModel,
+JWTClaimsDefaultValidationCfg = JWTValidationCfg(
+    validation_model=JWTBaseModel,
 )
-JWTHeadersDefaultValidationConfig = JWTValidationModelConfig(
-    default_validation_model=JOSEHeader,
-    force_validation_on_pydantic_model=True,
-    default_data_model=JOSEHeader,
+JWTClaimsStrictValidationCfg = JWTValidationCfg(
+    validation_model=JWTClaims,
+)
+JWTHeadersDefaultValidationCfg = JWTValidationCfg(
+    validation_model=JOSEHeader,
 )
 
 
@@ -459,80 +531,61 @@ class Validation(Enum):
     DISABLE = "disable"
 
 
-def get_effective_data_model(
+def get_data_model(
     data: JWTBaseModel | dict[str, Any],
-    validation_model: type[BaseModel] | JWTValidationModelConfig | None,
-) -> type[BaseModel]:
-    """Determine the effective pydantic model to use for internal data storage."""
+    validation: type[JWTBaseModel] | JWTValidationCfg | Validation | None,
+    default_validation: JWTValidationCfg,
+    fallback_model: type[JWTBaseModel],
+) -> type[JWTBaseModel]:
+    if validation is Validation.DEFAULT and isinstance(data, dict):
+        return default_validation.data_model
+    elif isinstance(validation, JWTValidationCfg):
+        return validation.data_model
+    elif (
+        isclass(validation)
+        and issubclass(validation, JWTBaseModel)
+        and isinstance(data, dict)
+    ):
+        return validation
+    elif isinstance(data, JWTBaseModel):
+        return type(data)
+    return fallback_model
 
-    # 1. case validation is disabled (use generic)
-    if validation_model is None:
-        return JWTBaseModel
 
-    # 2. case when data is not a pydantic model (a dict)
-    if not isinstance(data, BaseModel):
-        # 2.1 validation model was specified (use it)
-        if not isinstance(validation_model, JWTValidationModelConfig):
-            return validation_model
-        # 2.2 no validation model was specified (use default data model)
-        return validation_model.default_data_model
-
-    # 3. case when data is already a pydantic model (use it)
-    return type(data)
-
-
-def get_effective_data_validation_model(
-    data: JWTBaseModel | dict[str, Any],
-    validation_model: type[BaseModel] | JWTValidationModelConfig | None,
-) -> type[BaseModel] | None:
-    """Determine the effective pydantic model to use for internal data validation."""
-
-    # 1. case validation is disabled
-    if validation_model is None:
-        return None
-
-    # 2. case validation model was specified (use it)
-    if not isinstance(validation_model, JWTValidationModelConfig):
-        return validation_model
-
-    # 3. case validation model was not specified (is a JWTValidationModelConfig)
-    # 3.1 case data is not a pydantic model (a dict)
-    if not isinstance(data, BaseModel):
-        return validation_model.default_validation_model
-    # 3.2 case data is already a pydantic model
-    else:
-        # 3.2.1 override default behavior to use data pydantic model itself
-        if validation_model.force_validation_on_pydantic_model:
-            return type(data)
-        # 3.2.2 use default behavior
-        else:
-            return validation_model.default_validation_model
+def get_validation_config(
+    validation: type[JWTBaseModel] | JWTValidationCfg | Validation | None,
+    default_validation: JWTValidationCfg,
+) -> JWTValidationCfg | type[JWTBaseModel]:
+    if validation is Validation.DISABLE or validation is None:
+        return JWTValidationCfg(enabled=False)
+    elif validation is Validation.DEFAULT:
+        return default_validation.model_copy(deep=True)  # make a copy, mutable object!!
+    elif isinstance(validation, JWTValidationCfg):
+        return validation.model_copy(deep=True)
+    elif isclass(validation) and issubclass(validation, JWTBaseModel):
+        return validation
+    raise TypeError("Wrong validation object type")
 
 
 def prepare_and_validate_data(
     data: JWTBaseModel | dict[str, Any],
-    validation_model: type[BaseModel] | None,
-    type_err_msg: str | None = None,
+    validation: JWTValidationCfg | type[JWTBaseModel],
 ) -> dict[str, Any]:
     """Prepare data as dict and perform pydantic validation if required."""
 
-    # --> case data is a dict
-    if isinstance(data, dict):
-        data_dict = data.copy()
-        if validation_model is not None:
-            validation_model.model_validate(data_dict)
-        return data_dict
+    # case validation is a naive Pydantic model
+    # --> make the JWTValidationCfg instance
+    if isclass(validation) and issubclass(validation, JWTBaseModel):
+        validation = JWTValidationCfg(enabled=True, validation_model=validation)
+        # pass internal config when data is a pydantic model
+        if isinstance(data, JWTBaseModel):
+            validation._set_internal_cfg_from_model(data)
 
-    # --> case data is a pydantic model
-    elif isinstance(data, JWTBaseModel):
-        data_dict = data.to_dict()
-        if validation_model is not None:
-            validation_model.model_validate(data)
-        return data_dict
+    # case validation is already a JWTValidationCfg instance
+    # --> (maybe) force validation on pydantic data model
+    elif isinstance(validation, JWTValidationCfg) and isinstance(data, JWTBaseModel):
+        if validation.auto_validate_pydantic_model is True:
+            validation.validation_model = type(data)
 
-    else:
-        raise TypeError(
-            "Wrong type during data preparation and validation"
-            if type_err_msg is None
-            else f": {type_err_msg}"
-        )
+    assert isinstance(validation, JWTValidationCfg)
+    return validation.run(data)
