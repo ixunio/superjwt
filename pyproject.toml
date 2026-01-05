@@ -104,11 +104,6 @@ ignore = [
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = [
-    "F401",    # Allow unused imports in __init__.py
-]
-
 [tool.ruff.lint.flake8-type-checking]
 # Add quotes around type annotations, if doing so would allow
 # an import to be moved into a type-checking block.
