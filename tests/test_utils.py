@@ -1,13 +1,23 @@
 import binascii
+from datetime import datetime
 
 import pytest
 from superjwt.utils import (
     as_bytes,
+    delta_datetime_timestamp,
     is_pem_format,
     is_ssh_key,
     urlsafe_b64decode,
     urlsafe_b64encode,
 )
+
+
+try:
+    from datetime import UTC
+except ImportError:
+    from datetime import timezone
+
+    UTC = timezone.utc
 
 
 def test_rfc4648_vectors():
@@ -117,3 +127,35 @@ def test_is_ssh_key():
 
     # Invalid SSH key
     assert is_ssh_key(b"not-ssh-key") is False
+
+
+def test_delta_datetime_timestamp():
+    """Test delta_datetime_timestamp with various input types."""
+    # Test with datetime objects
+    dt1 = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    dt2 = datetime(2026, 1, 1, 12, 0, 10, tzinfo=UTC)
+    assert delta_datetime_timestamp(dt2, dt1) == 10.0
+    assert delta_datetime_timestamp(dt1, dt2) == -10.0
+
+    # Test with timestamps (floats)
+    ts1 = 1000.0
+    ts2 = 1010.5
+    assert delta_datetime_timestamp(ts2, ts1) == 10.5
+    assert delta_datetime_timestamp(ts1, ts2) == -10.5
+
+    # Test with timestamps (ints)
+    ts1_int = 1000
+    ts2_int = 1010
+    assert delta_datetime_timestamp(ts2_int, ts1_int) == 10.0
+    assert delta_datetime_timestamp(ts1_int, ts2_int) == -10.0
+
+    # Test with mixed types (datetime and timestamp)
+    dt = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    ts = dt.timestamp() + 5.5
+    assert delta_datetime_timestamp(ts, dt) == 5.5
+    assert delta_datetime_timestamp(dt, ts) == -5.5
+
+    # Test zero difference
+    dt_same = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    assert delta_datetime_timestamp(dt1, dt_same) == 0.0
+    assert delta_datetime_timestamp(1000.0, 1000) == 0.0
