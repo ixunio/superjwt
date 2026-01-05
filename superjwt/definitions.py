@@ -158,7 +158,7 @@ class JOSEHeader(JWTBaseModel):
     _strict_crit_check: bool = False
 
     alg: Annotated[
-        Alg | Literal["none"] | str,
+        str,
         Field(description="algorithm - the algorithm used to sign the JWT"),
     ]
 
@@ -182,22 +182,22 @@ class JOSEHeader(JWTBaseModel):
     ] = None
 
     @classmethod
-    def make_default(cls, algorithm: Alg | str) -> Self:
-        return cls(alg=algorithm, typ="JWT")
+    def make_default(cls, algorithm: Alg | str, **kwargs: Any) -> Self:
+        return cls(alg=algorithm, **kwargs)
 
     @field_validator("alg")
     @classmethod
-    def validate_alg(cls, value: Alg | str) -> Alg | str:
-        """Validate that the algorithm is a valid algorithm name."""
+    def validate_alg(cls, value: Alg | str) -> str:
+        """Validate that the algorithm is a valid algorithm name and normalize to string."""
         # Get the string value (works for both Algorithm enum and str)
-        algo_str = value.value if isinstance(value, Alg) else value
+        alg_str = value.value if isinstance(value, Alg) else value
 
         # Check if it's a valid algorithm (including "none")
         valid_algorithms = set(member.value for member in Alg) | {"none"}
-        if algo_str not in valid_algorithms:
-            raise ValueError(f"'{algo_str}' is not a valid algorithm")
+        if alg_str not in valid_algorithms:
+            raise ValueError(f"'{alg_str}' is not a valid algorithm")
 
-        return value
+        return alg_str
 
     @field_validator("crit")
     @classmethod

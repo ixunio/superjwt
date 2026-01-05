@@ -75,7 +75,7 @@ class JWS:
 
         # prepare headers data and perform validation
         if headers is None:
-            headers = JOSEHeader.make_default(cast("Alg", self.algorithm.name))
+            headers = JOSEHeader.make_default(self.algorithm.name)
         try:
             headers_dict = prepare_and_validate_data(
                 data=headers,
