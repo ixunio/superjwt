@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### :sparkles: New
+
+- Choose timestamp serialization format (`int` or `float`) ([#53])
+    - Configure `JWTDatetime` default behavior (default `int`)
+    - Use `JWTDatetimeInt` to serialize as `int` any field
+    - Use `JWTDatetimeFloat` to serialize as `float` any field
+- Time spoofing for validation and testing purposes ([#51])
+- Time integrity validation update ([#55])
+    - add leeway support for `'iat'`, `'exp'`, and `'nbf'` comparison against *now*
+    - new check that `'iat'` is not in the future. Can be disabled via config.
+- `JWTValidationModelCfg` now support internal config params ([#56])
+
+### :gear: Changes
+
+- `.with_issued_at()` and `.with_expiration()` now preserve time delta with `'iat'` ([#49])
+
 ## v0.4.1 (2026-01-03)
 
 ### :bug: Fixes
@@ -13,7 +31,7 @@
 - `Validation` flag can be passed to choose between two modes: ([#39])
     - Validation.DEFAULT (default when nothing is specified)
     - Validation.DISABLE
-- Default validation behavior for claims and headers can now be customized with `JWTValidationModelConfig` ([#38])
+- Default validation behavior for claims and headers can now be customized with `JWTValidationModelCfg` ([#38])
 - `JWT` can receive a `max_token_bytes` parameter to control the allowed max token size ([#40])
 - `JWTClaims` now raises `TokenNotYetValidError` if `'nbf'` > `'iat'` (or present time) ([#41])
 
@@ -83,6 +101,11 @@
 :tada: superjwt repository initialization
 
 
+[#56]: /../../issues/56
+[#55]: /../../issues/55
+[#53]: /../../issues/53
+[#51]: /../../issues/51
+[#49]: /../../issues/49
 [#47]: /../../issues/47
 [#42]: /../../issues/42
 [#41]: /../../issues/41
