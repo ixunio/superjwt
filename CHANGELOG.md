@@ -12,7 +12,8 @@
 - Time integrity validation update ([#55])
     - add leeway support for `'iat'`, `'exp'`, and `'nbf'` comparison against *now*
     - new check that `'iat'` is not in the future. Can be disabled via config.
-- `JWTValidationModelCfg` now support internal config params ([#56])
+- `JWTValidationModelCfg` support for internal config params (leeway, timestamp format, ...etc) ([#56])
+- Select algorithm from `Alg` str Enum ([#57])
 
 ### :gear: Changes
 
@@ -101,23 +102,24 @@
 :tada: superjwt repository initialization
 
 
-[#56]: /../../issues/56
-[#55]: /../../issues/55
-[#53]: /../../issues/53
-[#51]: /../../issues/51
-[#49]: /../../issues/49
-[#47]: /../../issues/47
-[#42]: /../../issues/42
-[#41]: /../../issues/41
-[#40]: /../../issues/40
-[#39]: /../../issues/39
-[#38]: /../../issues/38
-[#34]: /../../issues/34
-[#31]: /../../issues/31
-[#24]: /../../issues/24
-[#17]: /../../issues/17
-[#15]: /../../issues/15
-[#14]: /../../issues/14
-[#13]: /../../issues/13
-[#7]: /../../issues/7
-[#6]: /../../issues/6
+[#57]: https://github.com/ixunio/superjwt/issues/57
+[#56]: https://github.com/ixunio/superjwt/issues/56
+[#55]: https://github.com/ixunio/superjwt/issues/55
+[#53]: https://github.com/ixunio/superjwt/issues/53
+[#51]: https://github.com/ixunio/superjwt/issues/51
+[#49]: https://github.com/ixunio/superjwt/issues/49
+[#47]: https://github.com/ixunio/superjwt/issues/47
+[#42]: https://github.com/ixunio/superjwt/issues/42
+[#41]: https://github.com/ixunio/superjwt/issues/41
+[#40]: https://github.com/ixunio/superjwt/issues/40
+[#39]: https://github.com/ixunio/superjwt/issues/39
+[#38]: https://github.com/ixunio/superjwt/issues/38
+[#34]: https://github.com/ixunio/superjwt/issues/34
+[#31]: https://github.com/ixunio/superjwt/issues/31
+[#24]: https://github.com/ixunio/superjwt/issues/24
+[#17]: https://github.com/ixunio/superjwt/issues/17
+[#15]: https://github.com/ixunio/superjwt/issues/15
+[#14]: https://github.com/ixunio/superjwt/issues/14
+[#13]: https://github.com/ixunio/superjwt/issues/13
+[#7]: https://github.com/ixunio/superjwt/issues/7
+[#6]: https://github.com/ixunio/superjwt/issues/6
