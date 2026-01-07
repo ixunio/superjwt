@@ -1,0 +1,108 @@
+site_name: SuperJWT
+site_url: https://ixunio.github.io/superjwt/
+repo_name: ixunio/superjwt
+repo_url: https://github.com/ixunio/superjwt
+theme:
+  name: material
+  logo: assets/logo-icon-superjwt.png
+  favicon: assets/logo-icon-superjwt.png
+  font:
+    text: Roboto
+    code: Consolas
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    # - navigation.sections
+    - navigation.expand
+    # - navigation.path
+    # - navigation.tracking
+    - search.highlight
+    - search.suggest
+    # - toc.integrate
+    # - content.tabs.link
+    - content.code.annotate
+    - content.code.copy
+    - content.code.fold
+    - content.tooltips
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  # - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path:
+        - docs
+        - CHANGELOG.md
+  - pymdownx.blocks.admonition
+  - pymdownx.blocks.details
+  - pymdownx.blocks.tab:
+      alternate_style: true
+  - pymdownx.blocks.html
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.striphtml # This is required for emoji support
+  - toc:
+      permalink: true
+      toc_depth: 4
+
+extra:
+  version:
+    provider: mike
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+    - search
+    - mermaid2
+
+nav:
+  - Get Started:
+    - 🙋 Documentation:
+      - Welcome: index.md
+      - User Guide: user-guide.md
+      - Algorithms & Keys: algorithms.md
+      - Error Handling: error-handling.md
+      - Best Practices: best-practices.md
+    - 🔏 What is JWT?:
+      - Basics: jwt/basics.md
+      - JWT Content: jwt/content.md
+      - Signing Algorithms: jwt/signing-algorithms.md
+  - Integrations:
+    - FastAPI Basic Example: integrations/fastapi.md
+    - Flask Basic Example: integrations/flask.md
+    - OAuth2.0 Basic Example: integrations/oauth2.md
+  - Dev & Changelog:
+    - 📝 Changelog: development/changelog.md
+    - 🔢 About Versions: development/versions.md
+    # - 🤝 Contributing: development/contributing.md
+    # - 🚀 Release Process: development/release-process.md
