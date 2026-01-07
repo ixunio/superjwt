@@ -12,7 +12,7 @@
 - Time integrity validation update ([#55])
     - add leeway support for `'iat'`, `'exp'`, and `'nbf'` comparison against *now*
     - new check that `'iat'` is not in the future. Can be disabled via config.
-- `JWTValidationModelCfg` support for internal config params (leeway, timestamp format, ...etc) ([#56])
+- Validation can be configured via `JWTValidationConfig` and supports internal params (leeway, timestamp format, ...etc) ([#56]) ([#61])
 - Select algorithm from `Alg` str Enum ([#57])
 
 ### :gear: Changes
@@ -102,6 +102,7 @@
 :tada: superjwt repository initialization
 
 
+[#61]: https://github.com/ixunio/superjwt/issues/61
 [#57]: https://github.com/ixunio/superjwt/issues/57
 [#56]: https://github.com/ixunio/superjwt/issues/56
 [#55]: https://github.com/ixunio/superjwt/issues/55
