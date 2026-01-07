@@ -1,4 +1,4 @@
-"""Tests for custom JWTValidationCfg usage in JWT operations."""
+"""Tests for custom JWTValidation usage in JWT operations."""
 
 from datetime import datetime, timedelta
 
@@ -8,7 +8,7 @@ from superjwt.definitions import (
     JOSEHeader,
     JWTBaseModel,
     JWTClaims,
-    JWTValidationCfg,
+    JWTValidation,
     Validation,
 )
 from superjwt.exceptions import ClaimsValidationError, TokenExpiredError
@@ -42,13 +42,23 @@ class CustomHeader(JOSEHeader):
 # ============================================================================
 
 
+def test_no_validation_model_set(secret_key):
+    """Test that JWTValidation raises error if no validation model is set."""
+    cfg = JWTValidation()
+    jwt = JWT()
+    with pytest.raises(ValueError, match="Validation model is not set in JWTValidation"):
+        jwt.encode(
+            {}, secret_key, Alg.HS256, claims_validation=cfg
+        )  # Should work with default config
+
+
 def test_jwt_custom_validation_config_with_dict_data():
     """Test JWT encoding/decoding with custom validation config using dict data."""
     jwt = JWT()
     secret_key = "test-secret-key-32-bytes-long!!"
 
     # Create custom validation config
-    custom_validation = JWTValidationCfg(
+    custom_validation = JWTValidation(
         validation_model=JWTClaims,
         enabled=True,
         jwtdatetime_force_int=False,  # Use float timestamps
@@ -77,14 +87,11 @@ def test_jwt_custom_validation_config_with_pydantic_model():
     jwt = JWT()
     secret_key = "test-secret-key-32-bytes-long!!"
 
-    # Create custom validation config with auto_validate disabled
-    custom_validation = JWTValidationCfg(
+    custom_validation = JWTValidation(
         validation_model=JWTClaims,
-        auto_validate_pydantic_model=False,  # Don't auto-use the data's type
         enabled=True,
     )
 
-    # Create CustomClaims instance
     claims = CustomClaims.model_construct(
         sub="user123",
         user_id="uid123",
@@ -92,11 +99,10 @@ def test_jwt_custom_validation_config_with_pydantic_model():
         exp=datetime.now(UTC) + timedelta(hours=1),
     )
 
-    # Should validate against JWTClaims (not CustomClaims) because auto_validate is False
+    # Should validate against JWTClaims (not CustomClaims)
     token = jwt.encode(claims, secret_key, Alg.HS256, claims_validation=custom_validation)
     assert token.compact is not None
 
-    # Verify decoding works
     decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
     assert decoded.payload["sub"] == "user123"
     assert decoded.payload["user_id"] == "uid123"
@@ -108,7 +114,7 @@ def test_jwt_validation_config_disabled():
     secret_key = "test-secret-key-32-bytes-long!!"
 
     # Create validation config with validation disabled
-    no_validation = JWTValidationCfg(enabled=False)
+    no_validation = JWTValidation(enabled=False)
 
     # Create invalid claims (invalid type for sub)
     invalid_claims = {"sub": 12345, "aud": ["audience1"]}  # sub should be string
@@ -145,7 +151,7 @@ def test_jwt_validation_config_with_custom_now():
     )
 
     # Create validation config with spoofed 'now' set to past
-    spoofed_validation = JWTValidationCfg(
+    spoofed_validation = JWTValidation(
         validation_model=JWTClaims,
         now=past_time + timedelta(minutes=30),  # Within the validity period
     )
@@ -157,7 +163,7 @@ def test_jwt_validation_config_with_custom_now():
     assert decoded.payload["sub"] == "user123"
 
     # Without spoofed time, should fail with strict validation (JWTClaims)
-    strict_validation = JWTValidationCfg(validation_model=JWTClaims)
+    strict_validation = JWTValidation(validation_model=JWTClaims)
     with pytest.raises(TokenExpiredError):
         jwt.decode(
             token.compact, secret_key, Alg.HS256, claims_validation=strict_validation
@@ -183,7 +189,7 @@ def test_jwt_validation_config_with_custom_leeway():
     )
 
     # Default leeway (5 seconds) with JWTClaims validation should fail
-    default_leeway_validation = JWTValidationCfg(
+    default_leeway_validation = JWTValidation(
         validation_model=JWTClaims,
         leeway=5.0,  # Default leeway - should NOT cover 8s expiration
     )
@@ -196,7 +202,7 @@ def test_jwt_validation_config_with_custom_leeway():
         )
 
     # Custom validation with larger leeway should succeed
-    large_leeway_validation = JWTValidationCfg(
+    large_leeway_validation = JWTValidation(
         validation_model=JWTClaims,
         leeway=10.0,  # 10 seconds leeway - should cover 8s expiration
     )
@@ -222,7 +228,7 @@ def test_jwt_validation_config_allow_future_iat():
     }
 
     # With allow_future_iat=True, encoding should succeed
-    encode_validation = JWTValidationCfg(
+    encode_validation = JWTValidation(
         validation_model=JWTClaims,
         allow_future_iat=True,  # Allow future iat
     )
@@ -235,7 +241,7 @@ def test_jwt_validation_config_allow_future_iat():
     assert decoded.payload["sub"] == "user123"
 
     # Default validation (allow_future_iat=False) should fail
-    strict_validation = JWTValidationCfg(
+    strict_validation = JWTValidation(
         validation_model=JWTClaims,
         allow_future_iat=False,  # Disallow future iat (default)
     )
@@ -260,7 +266,7 @@ def test_jwt_validation_config_combine_multiple_params():
     }
 
     # Encode with custom validation config (validation disabled to allow expired claims)
-    encode_validation = JWTValidationCfg(
+    encode_validation = JWTValidation(
         validation_model=JWTClaims,
         jwtdatetime_force_int=False,  # Use float timestamps
         enabled=False,  # Disable validation to allow creating expired token
@@ -278,7 +284,7 @@ def test_jwt_validation_config_combine_multiple_params():
     assert isinstance(decoded.payload["exp"], float)
 
     # Decode with custom validation (spoofed time + large leeway)
-    decode_validation = JWTValidationCfg(
+    decode_validation = JWTValidation(
         validation_model=JWTClaims,
         now=past_time + timedelta(minutes=15),  # Spoof to within validity
         leeway=20.0,  # Large leeway
@@ -302,7 +308,7 @@ def test_jwt_custom_headers_validation_config_with_dict():
     secret_key = "test-secret-key-32-bytes-long!!"
 
     # Create custom validation config for headers
-    custom_headers_validation = JWTValidationCfg(
+    custom_headers_validation = JWTValidation(
         validation_model=JOSEHeader,
         enabled=True,
     )
@@ -335,13 +341,10 @@ def test_jwt_custom_headers_validation_config_with_pydantic():
     jwt = JWT()
     secret_key = "test-secret-key-32-bytes-long!!"
 
-    # Create custom validation config with auto_validate disabled
-    custom_validation = JWTValidationCfg(
+    custom_validation = JWTValidation(
         validation_model=JOSEHeader,
-        auto_validate_pydantic_model=False,
     )
 
-    # Create CustomHeader instance
     headers = CustomHeader(alg="HS256", custom_field="test-value", version=2)
     claims = {"sub": "user123"}
 
@@ -368,7 +371,7 @@ def test_jwt_headers_validation_config_disabled():
     secret_key = "test-secret-key-32-bytes-long!!"
 
     # Create validation config with validation disabled
-    no_validation = JWTValidationCfg(enabled=False)
+    no_validation = JWTValidation(enabled=False)
 
     # Create headers with non-standard fields
     custom_headers = {"alg": "HS256", "typ": "JWT", "custom": "value"}
@@ -402,7 +405,7 @@ def test_jwt_encode_decode_different_validation_configs():
     secret_key = "test-secret-key-32-bytes-long!!"
 
     # Encode with relaxed validation (float timestamps)
-    encode_config = JWTValidationCfg(
+    encode_config = JWTValidation(
         validation_model=JWTClaims,
         jwtdatetime_force_int=False,
         leeway=5.0,
@@ -417,7 +420,7 @@ def test_jwt_encode_decode_different_validation_configs():
     token = jwt.encode(claims, secret_key, Alg.HS256, claims_validation=encode_config)
 
     # Decode with strict validation (int timestamps, smaller leeway)
-    decode_config = JWTValidationCfg(
+    decode_config = JWTValidation(
         validation_model=JWTClaims,
         jwtdatetime_force_int=True,
         leeway=2.0,
@@ -433,7 +436,7 @@ def test_jwt_encode_decode_different_validation_configs():
 def test_jwt_validation_config_does_not_mutate_default():
     """Test that using custom validation config doesn't mutate JWT default config."""
     # Create JWT with specific default validation
-    default_config = JWTValidationCfg(
+    default_config = JWTValidation(
         validation_model=JWTBaseModel,
         jwtdatetime_force_int=True,
         leeway=5.0,
@@ -442,7 +445,7 @@ def test_jwt_validation_config_does_not_mutate_default():
     secret_key = "test-secret-key-32-bytes-long!!"
 
     # Use different validation config for encoding
-    custom_config = JWTValidationCfg(
+    custom_config = JWTValidation(
         validation_model=JWTClaims,
         jwtdatetime_force_int=False,
         leeway=10.0,
@@ -482,14 +485,11 @@ def test_jwt_validation_config_overrides_model_internal_values():
 
     # Set model's internal values to allow future iat
     claims.allow_future_iat()
-    claims.set_leeway(15.0)  # Large leeway
 
     # Create validation config that should OVERRIDE model's settings
-    strict_validation = JWTValidationCfg(
+    strict_validation = JWTValidation(
         validation_model=JWTClaims,
         allow_future_iat=False,  # Override: disallow future iat
-        leeway=5.0,  # Override: smaller leeway
-        auto_validate_pydantic_model=True,
     )
 
     # Encoding should fail because config's allow_future_iat=False overrides model's True
@@ -497,11 +497,9 @@ def test_jwt_validation_config_overrides_model_internal_values():
         jwt.encode(claims, secret_key, Alg.HS256, claims_validation=strict_validation)
 
     # Now test with permissive config that allows future iat
-    permissive_validation = JWTValidationCfg(
+    permissive_validation = JWTValidation(
         validation_model=JWTClaims,
         allow_future_iat=True,  # Allow future iat
-        leeway=20.0,
-        auto_validate_pydantic_model=True,
     )
 
     # This should succeed because config overrides model
@@ -509,3 +507,181 @@ def test_jwt_validation_config_overrides_model_internal_values():
         claims, secret_key, Alg.HS256, claims_validation=permissive_validation
     )
     assert token.compact is not None
+
+
+def test_validation_config_inherits_none_values_from_model():
+    """Test that validation config inherits values from model only when config values are None."""
+    jwt = JWT()
+    secret_key = "test-secret-key-32-bytes-long!!"
+
+    # Create a JWTClaims instance with custom internal values
+    past_time = datetime.now(UTC) - timedelta(hours=1)
+    claims = JWTClaims.model_construct(
+        sub="user123",
+        iat=past_time,
+        exp=past_time + timedelta(hours=1),
+    )
+
+    # Set model's internal values
+    claims.set_leeway(20.0)
+    claims.allow_future_iat()
+    claims.force_jwtdatetime_to_float()
+    custom_now = past_time + timedelta(minutes=30)
+    claims.spoof_time(custom_now)
+
+    # Create validation config with ALL values as None (should inherit from model)
+    inherit_validation = JWTValidation(
+        validation_model=JWTClaims,
+        leeway=None,  # Should inherit 20.0 from model
+        allow_future_iat=None,  # Should inherit True from model
+        jwtdatetime_force_int=None,  # Should inherit False from model
+        now=None,  # Should inherit custom_now from model
+    )
+
+    # Encoding should succeed using model's inherited values
+    token = jwt.encode(
+        claims, secret_key, Alg.HS256, claims_validation=inherit_validation
+    )
+    assert token.compact is not None
+
+    # Verify that config inherited model's values by checking the config after apply_internal_cfg
+    validation_copy = inherit_validation.model_copy(deep=True)
+    validation_copy.apply_internal_cfg(claims)
+
+    assert validation_copy.leeway == 20.0
+    assert validation_copy.allow_future_iat is True
+    assert validation_copy.jwtdatetime_force_int is False
+    assert validation_copy.now == custom_now
+
+
+def test_validation_config_does_not_override_set_values():
+    """Test that validation config does NOT override its own set values with model values."""
+    # Create a JWTClaims instance with one set of internal values
+    past_time = datetime.now(UTC) - timedelta(hours=1)
+    claims = JWTClaims.model_construct(
+        sub="user123",
+        iat=past_time,
+        exp=past_time + timedelta(hours=1),
+    )
+
+    # Set model's internal values
+    claims.set_leeway(100.0)  # Very large leeway
+    claims.allow_future_iat()  # Allow future
+    claims.force_jwtdatetime_to_float()  # Float timestamps
+    model_now = past_time + timedelta(minutes=15)
+    claims.spoof_time(model_now)
+
+    # Create validation config with DIFFERENT set values (should NOT be overridden)
+    override_validation = JWTValidation(
+        validation_model=JWTClaims,
+        leeway=4.0,  # Should NOT be overridden by model's 100.0
+        allow_future_iat=False,  # Should NOT be overridden by model's True
+        jwtdatetime_force_int=True,  # Should NOT be overridden by model's False
+        now=past_time + timedelta(minutes=30),  # Should NOT be overridden by model's now
+    )
+
+    # Apply internal config to see what happens
+    validation_copy = override_validation.model_copy(deep=True)
+    validation_copy.apply_internal_cfg(claims)
+
+    # Verify that config's values were NOT overridden by model's values
+    assert validation_copy.leeway == 4.0  # NOT 100.0
+    assert validation_copy.allow_future_iat is False  # NOT True
+    assert validation_copy.jwtdatetime_force_int is True  # NOT False
+    assert validation_copy.now == past_time + timedelta(minutes=30)  # NOT model_now
+
+
+def test_validation_config_mixed_none_and_set_values():
+    """Test that validation config correctly handles mix of None and set values."""
+    # Create a JWTClaims instance with custom internal values
+    past_time = datetime.now(UTC) - timedelta(hours=1)
+    claims = JWTClaims.model_construct(
+        sub="user123",
+        iat=past_time,
+        exp=past_time + timedelta(hours=1),
+    )
+
+    # Set model's internal values
+    claims.set_leeway(50.0)
+    claims.allow_future_iat()
+    claims.force_jwtdatetime_to_float()
+    model_now = past_time + timedelta(minutes=20)
+    claims.spoof_time(model_now)
+
+    # Create validation config with MIXED values (some None, some set)
+    mixed_validation = JWTValidation(
+        validation_model=JWTClaims,
+        leeway=10.0,  # SET - should NOT be overridden
+        allow_future_iat=None,  # NONE - should inherit True from model
+        jwtdatetime_force_int=True,  # SET - should NOT be overridden
+        now=None,  # NONE - should inherit model_now from model
+    )
+
+    # Apply internal config
+    validation_copy = mixed_validation.model_copy(deep=True)
+    validation_copy.apply_internal_cfg(claims)
+
+    # Verify mixed behavior
+    assert validation_copy.leeway == 10.0  # Used config's value (NOT model's 50.0)
+    assert validation_copy.allow_future_iat is True  # Inherited from model
+    assert (
+        validation_copy.jwtdatetime_force_int is True
+    )  # Used config's value (NOT model's False)
+    assert validation_copy.now == model_now  # Inherited from model
+
+
+def test_validation_config_none_values_use_defaults_when_no_model():
+    """Test that validation config uses default values when values are None and no model is provided."""
+    from superjwt.definitions import (
+        DEFAULT_ALLOW_FUTURE_IAT,
+        DEFAULT_JWTDATETIME_FORCE_INT,
+        DEFAULT_LEEWAY_SECONDS,
+    )
+
+    # Create validation config with all None values
+    config = JWTValidation(
+        validation_model=JWTClaims,
+        leeway=None,
+        allow_future_iat=None,
+        jwtdatetime_force_int=None,
+        now=None,
+    )
+
+    # Apply internal config WITHOUT a model (should use defaults)
+    config.apply_internal_cfg(model=None)
+
+    # Verify default values were applied
+    assert config.leeway == DEFAULT_LEEWAY_SECONDS  # 5.0
+    assert config.allow_future_iat == DEFAULT_ALLOW_FUTURE_IAT  # False
+    assert config.jwtdatetime_force_int == DEFAULT_JWTDATETIME_FORCE_INT  # True
+    assert config.now is None  # Default for 'now' is None
+
+
+def test_validation_config_partial_inheritance_from_incompatible_model():
+    """Test that validation config only inherits values for compatible model types."""
+    # Create a JWTBaseModel instance (NOT JWTClaims)
+    base_claims = JWTBaseModel()
+    base_claims.force_jwtdatetime_to_float()
+    custom_now = datetime.now(UTC) - timedelta(hours=1)
+    base_claims.spoof_time(custom_now)
+
+    # Create validation config targeting JWTClaims with all None values
+    config = JWTValidation(
+        validation_model=JWTClaims,
+        leeway=None,
+        allow_future_iat=None,
+        jwtdatetime_force_int=None,
+        now=None,
+    )
+
+    # Apply internal config from JWTBaseModel
+    config.apply_internal_cfg(base_claims)
+
+    # JWTBaseModel parameters should be inherited
+    assert config.jwtdatetime_force_int is False  # Inherited from base_claims
+    assert config.now == custom_now  # Inherited from base_claims
+
+    # JWTClaims-specific parameters remain None (base_claims doesn't have them
+    # and model is not None, so defaults are not applied)
+    assert config.leeway is None  # Stays None (not default, not from model)
+    assert config.allow_future_iat is None  # Stays None (not default, not from model)

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, cast
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -9,14 +9,12 @@ from superjwt.definitions import (
     JOSEHeader,
     JWSToken,
     JWTBaseModel,
-    JWTClaimsDefaultValidationCfg,
-    JWTHeadersDefaultValidationCfg,
-    JWTValidationCfg,
+    JWTClaimsDefaultValidation,
+    JWTHeadersDefaultValidation,
+    JWTValidation,
     Validation,
-    get_data_model,
     get_validation_config,
     make_key,
-    prepare_and_validate_data,
 )
 from superjwt.exceptions import (
     ClaimsValidationError,
@@ -33,8 +31,8 @@ class JWT:
     def __init__(
         self,
         max_token_bytes: int = MAX_TOKEN_BYTES,
-        default_claims_validation: JWTValidationCfg = JWTClaimsDefaultValidationCfg,
-        default_headers_validation: JWTValidationCfg = JWTHeadersDefaultValidationCfg,
+        default_claims_validation: JWTValidation = JWTClaimsDefaultValidation,
+        default_headers_validation: JWTValidation = JWTHeadersDefaultValidation,
     ) -> None:
         self.jws: JWS
 
@@ -50,11 +48,11 @@ class JWT:
         *,
         headers: JOSEHeader | dict[str, Any] | None = None,
         claims_validation: type[JWTBaseModel]
-        | JWTValidationCfg
+        | JWTValidation
         | Validation
         | None = Validation.DEFAULT,
         headers_validation: type[JOSEHeader]
-        | JWTValidationCfg
+        | JWTValidation
         | Validation
         | None = Validation.DEFAULT,
     ) -> JWSToken:
@@ -67,12 +65,12 @@ class JWT:
                 Will default to 'HS256' (HMAC with SHA-256).
             headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
                 in the JWT. Will use default JWS headers if not provided.
-            claims_validation (type[JWTBaseModel] | JWTValidationCfg | Validation | None, opt.):
-                Validation configuration for claims. Can be a pydantic model class, a JWTValidationCfg
+            claims_validation (type[JWTBaseModel] | JWTValidation | Validation | None, opt.):
+                Validation configuration for claims. Can be a pydantic model class, a JWTValidation
                 instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
-                or None (disables validation).
-            headers_validation (type[JOSEHeader] | JWTValidationCfg | Validation | None, opt.):
-                Validation configuration for headers. Can be a pydantic model class, a JWTValidationCfg
+                or None (no validation).
+            headers_validation (type[JOSEHeader] | JWTValidation | Validation | None, opt.):
+                Validation configuration for headers. Can be a pydantic model class, a JWTValidation
                 instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
                 or None (no validation).
 
@@ -89,11 +87,10 @@ class JWT:
         # prepare claims data and perform validation
         if claims is None:
             claims = JWTBaseModel()
+        claims_validation = self.get_claims_validation(claims, claims_validation)
+
         try:
-            claims_dict = prepare_and_validate_data(
-                data=claims,
-                validation=self.get_claims_validation_config(claims_validation),
-            )
+            claims_dict = claims_validation.run(claims)
         except ValidationError as e:
             raise ClaimsValidationError(validation_errors=e.errors()) from e
 
@@ -110,11 +107,8 @@ class JWT:
         )
 
         # set claims model data
-        self.jws.token.verified.model.claims = cast(
-            "JWTBaseModel",
-            self.get_claims_data_model(claims, claims_validation).model_construct(
-                **claims_dict
-            ),
+        self.jws.token.verified.model.claims = (
+            claims_validation.data_model.model_construct(**claims_dict)
         )
 
         return self.jws.token.verified
@@ -140,11 +134,11 @@ class JWT:
         *,
         with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
         claims_validation: type[JWTBaseModel]
-        | JWTValidationCfg
+        | JWTValidation
         | Validation
         | None = Validation.DEFAULT,
         headers_validation: type[JOSEHeader]
-        | JWTValidationCfg
+        | JWTValidation
         | Validation
         | None = Validation.DEFAULT,
     ) -> JWSToken:
@@ -156,12 +150,12 @@ class JWT:
             algorithm (Algorithm): The algorithm to use for verifying the JWT.
             with_detached_payload (JWTBaseModel | dict[str, Any] | None, opt.):
                 Detached payload to use for signature verification, if any.
-            claims_validation (type[JWTBaseModel] | JWTValidationCfg | Validation | None, opt.):
-                Validation configuration for claims. Can be a pydantic model class, a JWTValidationCfg
+            claims_validation (type[JWTBaseModel] | JWTValidation | Validation | None, opt.):
+                Validation configuration for claims. Can be a pydantic model class, a JWTValidation
                 instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
-                or None (disables validation).
-            headers_validation (type[JOSEHeader] | JWTValidationCfg | Validation | None, opt.):
-                Validation configuration for headers. Can be a pydantic model class, a JWTValidationCfg
+                or None (no validation).
+            headers_validation (type[JOSEHeader] | JWTValidation | Validation | None, opt.):
+                Validation configuration for headers. Can be a pydantic model class, a JWTValidation
                 instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
                 or None (no validation).
 
@@ -182,13 +176,13 @@ class JWT:
         # CASE 1: detached payload mode
         if with_detached_payload is not None:
             self.jws.enable_detached_payload()
+            claims_validation = self.get_claims_validation(
+                with_detached_payload, claims_validation
+            )
 
             # prepare detached claims data and perform validation
             try:
-                claims_dict = prepare_and_validate_data(
-                    data=with_detached_payload,
-                    validation=self.get_claims_validation_config(claims_validation),
-                )
+                claims_dict = claims_validation.run(with_detached_payload)
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
 
@@ -208,22 +202,18 @@ class JWT:
                 key,
                 headers_validation=headers_validation,
             )
+            claims = self.jws.token.verified.payload
+            claims_validation = self.get_claims_validation(claims, claims_validation)
 
             # validate claims
             try:
-                claims_dict = prepare_and_validate_data(
-                    data=self.jws.token.verified.payload,
-                    validation=self.get_claims_validation_config(claims_validation),
-                )
+                claims_dict = claims_validation.run(claims)
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
 
         # set claims model data
-        self.jws.token.verified.model.claims = cast(
-            "JWTBaseModel",
-            self.get_claims_data_model(claims_dict, claims_validation).model_construct(
-                **claims_dict
-            ),
+        self.jws.token.verified.model.claims = (
+            claims_validation.data_model.model_construct(**claims_dict)
         )
 
         return self.jws.token.verified
@@ -257,23 +247,14 @@ class JWT:
 
         return self.jws.token.unsafe
 
-    def get_claims_data_model(
+    def get_claims_validation(
         self,
         data: JWTBaseModel | dict[str, Any],
-        validation: type[JWTBaseModel]
-        | JWTValidationCfg
-        | Validation
-        | None = Validation.DEFAULT,
-    ) -> type[JWTBaseModel]:
-        return get_data_model(
-            data, validation, self.default_claims_validation, JWTBaseModel
+        validation: type[JWTBaseModel] | JWTValidation | Validation | None,
+    ) -> JWTValidation:
+        return get_validation_config(
+            data,
+            validation,
+            self.default_claims_validation,
+            fallback_data_model=JWTBaseModel,
         )
-
-    def get_claims_validation_config(
-        self,
-        validation: type[JWTBaseModel]
-        | JWTValidationCfg
-        | Validation
-        | None = Validation.DEFAULT,
-    ) -> JWTValidationCfg | type[JWTBaseModel]:
-        return get_validation_config(validation, self.default_claims_validation)

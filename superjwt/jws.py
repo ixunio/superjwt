@@ -10,13 +10,11 @@ from superjwt.definitions import (
     JOSEHeader,
     JWSToken,
     JWSTokenLifeCycle,
-    JWTHeadersDefaultValidationCfg,
-    JWTValidationCfg,
+    JWTHeadersDefaultValidation,
+    JWTValidation,
     Validation,
-    get_data_model,
     get_jws_algorithm,
     get_validation_config,
-    prepare_and_validate_data,
 )
 from superjwt.exceptions import (
     AlgorithmMismatchError,
@@ -37,7 +35,7 @@ class JWS:
         self,
         algorithm: Alg | Literal["none"] | str,
         max_token_bytes: int = MAX_TOKEN_BYTES,
-        default_headers_validation: JWTValidationCfg = JWTHeadersDefaultValidationCfg,
+        default_headers_validation: JWTValidation = JWTHeadersDefaultValidation,
     ):
         self.token: JWSTokenLifeCycle = JWSTokenLifeCycle()
         self.algorithm: BaseJWSAlgorithm[BaseKey] = get_jws_algorithm(algorithm)
@@ -66,7 +64,7 @@ class JWS:
         key: BaseKey,
         *,
         headers_validation: type[JOSEHeader]
-        | JWTValidationCfg
+        | JWTValidation
         | Validation
         | None = Validation.DEFAULT,
     ) -> JWSToken:
@@ -76,20 +74,17 @@ class JWS:
         # prepare headers data and perform validation
         if headers is None:
             headers = JOSEHeader.make_default(self.algorithm.name)
+        headers_validation = self.get_headers_validation(headers, headers_validation)
+
         try:
-            headers_dict = prepare_and_validate_data(
-                data=headers,
-                validation=self.get_headers_validation_config(headers_validation),
-            )
+            headers_dict = headers_validation.run(headers)
         except ValidationError as e:
             raise HeadersValidationError(validation_errors=e.errors()) from e
 
         # set headers data
         self.token.verified.model.headers = cast(
             "JOSEHeader",
-            self.get_headers_data_model(headers, headers_validation).model_construct(
-                **headers_dict
-            ),
+            headers_validation.data_model.model_construct(**headers_dict),
         )
         self.token.verified.headers = headers_dict
         self.token.verified.encoded_headers = urlsafe_b64encode(
@@ -123,7 +118,7 @@ class JWS:
         *,
         with_detached_payload: dict[str, Any] | None = None,
         headers_validation: type[JOSEHeader]
-        | JWTValidationCfg
+        | JWTValidation
         | Validation
         | None = Validation.DEFAULT,
     ) -> JWSToken:
@@ -134,6 +129,9 @@ class JWS:
         self.decode_parts(compact, with_detached_payload)
 
         # validate headers and algorithm
+        headers_validation = self.get_headers_validation(
+            self.token.unsafe.headers, headers_validation
+        )
         self.validate_headers_and_algorithm(headers_validation)
 
         # verify signature
@@ -234,29 +232,18 @@ class JWS:
                 "Signature is not encoded as a valid Base64url"
             ) from e
 
-    def validate_headers_and_algorithm(
-        self,
-        validation_model: type[JOSEHeader]
-        | JWTValidationCfg
-        | Validation
-        | None = Validation.DEFAULT,
-    ) -> None:
-        headers_dict = self.token.unsafe.headers
-
+    def validate_headers_and_algorithm(self, headers_validation: JWTValidation) -> None:
         # validate headers
         try:
-            prepare_and_validate_data(
-                data=headers_dict,
-                validation=self.get_headers_validation_config(validation_model),
-            )
+            headers_validation.run(self.token.unsafe.headers)
         except ValidationError as e:
             raise HeadersValidationError(validation_errors=e.errors()) from e
 
         # set headers model data
         headers_dict = self.token.unsafe.headers
-        self.token.unsafe.model.headers = headers_validated = self.get_headers_data_model(
-            headers_dict, validation_model
-        ).model_construct(**headers_dict)
+        self.token.unsafe.model.headers = headers_validated = cast(
+            "JOSEHeader", headers_validation.data_model.model_construct(**headers_dict)
+        )
 
         # check algorithm match
         pass_through = self.algorithm.name == "none" and self._allow_none_algorithm
@@ -283,27 +270,14 @@ class JWS:
 
         return True
 
-    def get_headers_data_model(
+    def get_headers_validation(
         self,
         data: JOSEHeader | dict[str, Any],
-        validation: type[JOSEHeader]
-        | JWTValidationCfg
-        | Validation
-        | None = Validation.DEFAULT,
-    ) -> type[JOSEHeader]:
-        return cast(
-            "type[JOSEHeader]",
-            get_data_model(data, validation, self.default_headers_validation, JOSEHeader),
-        )
-
-    def get_headers_validation_config(
-        self,
-        validation: type[JOSEHeader]
-        | JWTValidationCfg
-        | Validation
-        | None = Validation.DEFAULT,
-    ) -> JWTValidationCfg | type[JOSEHeader]:
-        return cast(
-            "JWTValidationCfg | type[JOSEHeader]",
-            get_validation_config(validation, self.default_headers_validation),
+        validation: type[JOSEHeader] | JWTValidation | Validation | None,
+    ) -> JWTValidation:
+        return get_validation_config(
+            data,
+            validation,
+            self.default_headers_validation,
+            fallback_data_model=JOSEHeader,
         )

@@ -10,7 +10,7 @@ from superjwt.definitions import (
     JWTDatetime,
     JWTDatetimeFloat,
     JWTDatetimeInt,
-    JWTValidationCfg,
+    JWTValidation,
     Validation,
 )
 from superjwt.jwt import JWT
@@ -21,10 +21,14 @@ __all__ = [
     "JWT",
     "Alg",
     "JOSEHeader",
+    "JWSToken",
+    "JWTBaseModel",
     "JWTClaims",
     "JWTDatetime",
     "JWTDatetimeFloat",
     "JWTDatetimeInt",
+    "JWTValidation",
+    "Validation",
     "__version__",
     "decode",
     "encode",
@@ -40,11 +44,11 @@ def encode(
     headers: JOSEHeader | dict[str, Any] | None = None,
     detach_payload: bool = False,
     claims_validation: type[JWTBaseModel]
-    | JWTValidationCfg
+    | JWTValidation
     | Validation
     | None = Validation.DEFAULT,
     headers_validation: type[JOSEHeader]
-    | JWTValidationCfg
+    | JWTValidation
     | Validation
     | None = Validation.DEFAULT,
 ) -> bytes:
@@ -57,12 +61,12 @@ def encode(
         headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
             in the JWT. Will use default JWS headers if not provided.
         detach_payload (bool, opt.): whether to produce a JWT token with detached payload.
-        claims_validation (type[JWTBaseModel] | JWTValidationCfg | Validation | None, opt.):
-            Validation configuration for claims. Can be a pydantic model class, a JWTValidationCfg
+        claims_validation (type[JWTBaseModel] | JWTValidation | Validation | None, opt.):
+            Validation configuration for claims. Can be a pydantic model class, a JWTValidation
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
-            or None (disables validation).
-        headers_validation (type[JOSEHeader] | JWTValidationCfg | Validation | None, opt.):
-            Validation configuration for headers. Can be a pydantic model class, a JWTValidationCfg
+            or None (no validation).
+        headers_validation (type[JOSEHeader] | JWTValidation | Validation | None, opt.):
+            Validation configuration for headers. Can be a pydantic model class, a JWTValidation
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
             or None (no validation).
 
@@ -93,11 +97,11 @@ def decode(
     *,
     with_detached_payload: JWTClaims | dict[str, Any] | None = None,
     claims_validation: type[JWTBaseModel]
-    | JWTValidationCfg
+    | JWTValidation
     | Validation
     | None = Validation.DEFAULT,
     headers_validation: type[JOSEHeader]
-    | JWTValidationCfg
+    | JWTValidation
     | Validation
     | None = Validation.DEFAULT,
 ) -> dict[str, Any]:
@@ -109,12 +113,12 @@ def decode(
         algorithm (Algorithm): The algorithm to use for verifying the JWT.
         with_detached_payload (JWTClaims | dict[str, Any] | None, opt.):
             Detached payload to use for signature verification, if any.
-        claims_validation (type[JWTBaseModel] | JWTValidationCfg | Validation | None, opt.):
-            Validation configuration for claims. Can be a pydantic model class, a JWTValidationCfg
+        claims_validation (type[JWTBaseModel] | JWTValidation | Validation | None, opt.):
+            Validation configuration for claims. Can be a pydantic model class, a JWTValidation
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
-            or None (disables validation).
-        headers_validation (type[JOSEHeader] | JWTValidationCfg | Validation | None, opt.):
-            Validation configuration for headers. Can be a pydantic model class, a JWTValidationCfg
+            or None (no validation).
+        headers_validation (type[JOSEHeader] | JWTValidation | Validation | None, opt.):
+            Validation configuration for headers. Can be a pydantic model class, a JWTValidation
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
             or None (no validation).
 
