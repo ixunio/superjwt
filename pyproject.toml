@@ -58,7 +58,8 @@ dev = [
     {include-group = "test"},
 ]
 docs = [
-
+    "mkdocs-material",
+    "mkdocs-mermaid2-plugin",
 ]
 lint = [
     "ruff",
