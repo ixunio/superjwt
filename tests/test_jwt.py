@@ -22,7 +22,7 @@ from superjwt.exceptions import (
     InvalidHeadersError,
     InvalidPayloadError,
     InvalidTokenError,
-    SignatureVerificationFailedError,
+    SignatureVerificationError,
     SizeExceededError,
     SuperJWTError,
     TokenExpiredError,
@@ -182,7 +182,7 @@ def test_decode_invalid_signature(jwt: JWT, claims: JWTCustomClaims, secret_key:
     wrong_key = "wrongkey_but_long_enough"
     compact = jwt.encode(claims, secret_key, Alg.HS256).compact
 
-    with pytest.raises(SignatureVerificationFailedError):
+    with pytest.raises(SignatureVerificationError):
         jwt.decode(compact, wrong_key, Alg.HS256)
 
 
@@ -427,7 +427,7 @@ def test_unsafe_inspect(jwt: JWT, claims_fixed_dt, secret_key: str):
     assert decoded_claims["sub"] == claims_fixed_dt.sub
 
     # check the JWT was tampered with
-    with pytest.raises(SignatureVerificationFailedError):
+    with pytest.raises(SignatureVerificationError):
         jwt.decode(forged_compact, secret_key, Alg.HS256)
 
     # decode with no signature verification

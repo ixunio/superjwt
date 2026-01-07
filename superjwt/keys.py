@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 from typing_extensions import Self
 
-from superjwt.exceptions import InvalidKeyError, SecurityWarning
+from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning
 from superjwt.utils import as_bytes, is_pem_format, is_ssh_key
 
 
@@ -52,5 +52,7 @@ class OctKey(SymmetricKey):
             )
         if len(private_key) < 14:
             # https://csrc.nist.gov/publications/detail/sp/800-131a/rev-2/final
-            warnings.warn("Key size should be >= 112 bits", SecurityWarning, stacklevel=3)
+            warnings.warn(
+                "Key size should be >= 112 bits", KeyLengthSecurityWarning, stacklevel=3
+            )
         self.private_key = private_key

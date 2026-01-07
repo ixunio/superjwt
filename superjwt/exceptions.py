@@ -5,6 +5,10 @@ class SecurityWarning(UserWarning):
     """Base class for warnings of security issues."""
 
 
+class KeyLengthSecurityWarning(SecurityWarning):
+    """Base class for warnings of security issues."""
+
+
 class SuperJWTError(Exception):
     """Base class for all SuperJWT related errors."""
 
@@ -26,7 +30,7 @@ class InvalidTokenError(SuperJWTError):
         super().__init__(self.error)
 
 
-class SignatureVerificationFailedError(InvalidTokenError):
+class SignatureVerificationError(InvalidTokenError):
     """Raised when signature verification fails despite token
     being valid in its format. The token may have been tampered with."""
 

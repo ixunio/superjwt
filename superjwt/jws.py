@@ -22,7 +22,7 @@ from superjwt.exceptions import (
     InvalidHeadersError,
     InvalidPayloadError,
     InvalidTokenError,
-    SignatureVerificationFailedError,
+    SignatureVerificationError,
     SizeExceededError,
     SuperJWTError,
 )
@@ -262,7 +262,7 @@ class JWS:
             self.token.unsafe.signature,
             key,
         ):
-            raise SignatureVerificationFailedError()
+            raise SignatureVerificationError()
 
         if not isinstance(self.algorithm, NoneAlgorithm):
             self.token.verified = self.token.unsafe.model_copy()
