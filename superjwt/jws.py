@@ -13,7 +13,6 @@ from superjwt.definitions import (
     JWTHeadersDefaultValidation,
     JWTValidation,
     Validation,
-    get_jws_algorithm,
     get_validation_config,
 )
 from superjwt.exceptions import (
@@ -39,7 +38,7 @@ class JWS:
         default_headers_validation: JWTValidation = JWTHeadersDefaultValidation,
     ):
         self.token: JWSTokenLifeCycle = JWSTokenLifeCycle()
-        self.algorithm: BaseJWSAlgorithm[BaseKey] = get_jws_algorithm(algorithm)
+        self.algorithm: BaseJWSAlgorithm[BaseKey] = Alg.get_algorithm(algorithm)
 
         self.has_detached_payload: bool = False
 

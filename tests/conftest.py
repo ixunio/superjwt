@@ -7,6 +7,7 @@ from pydantic import Field
 from superjwt.definitions import Alg, JWTClaims, JWTDatetime
 from superjwt.jws import JWS
 from superjwt.jwt import JWT
+from superjwt.utils import check_cryptography_available
 
 
 try:
@@ -16,6 +17,15 @@ except ImportError:
     from datetime import timezone
 
     UTC = timezone.utc
+
+
+# Check if cryptography is available for RSA tests
+CRYPTOGRAPHY_AVAILABLE = check_cryptography_available(raise_error=False)
+
+# Mark to skip tests that require cryptography
+requires_cryptography = pytest.mark.skipif(
+    not CRYPTOGRAPHY_AVAILABLE, reason="cryptography library not installed"
+)
 
 
 class JWTCustomClaims(JWTClaims):

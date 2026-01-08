@@ -12,9 +12,9 @@ from superjwt.definitions import (
     JWTClaimsDefaultValidation,
     JWTHeadersDefaultValidation,
     JWTValidation,
+    Key,
     Validation,
     get_validation_config,
-    make_key,
 )
 from superjwt.exceptions import (
     ClaimsValidationError,
@@ -96,7 +96,7 @@ class JWT:
 
         # prepare key
         if not isinstance(key, BaseKey):
-            key = make_key(algorithm, key)
+            key = Key.make_signing_key(algorithm, key)
 
         # encode as JWS
         self.jws.encode(
@@ -171,7 +171,7 @@ class JWT:
 
         # prepare key
         if not isinstance(key, BaseKey):
-            key = make_key(algorithm, key)
+            key = Key.make_verifying_key(algorithm, key)
 
         # CASE 1: detached payload mode
         if with_detached_payload is not None:

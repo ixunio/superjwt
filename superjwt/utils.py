@@ -32,6 +32,21 @@ def urlsafe_b64encode(s: bytes) -> bytes:
     return base64.urlsafe_b64encode(s).rstrip(b"=")
 
 
+def check_cryptography_available(raise_error: bool = True) -> bool:
+    """Check if cryptography library is available, raise helpful error if not."""
+    try:
+        import cryptography  # noqa: F401
+
+        return True
+    except ImportError as e:  # pragma: no cover
+        if raise_error:
+            raise ImportError(
+                "Asymmetric key algorithms require the 'cryptography' library. "
+                "Install it with: pip install superjwt[asymmetric]"
+            ) from e
+        return False
+
+
 # Based on https://github.com/hynek/pem/blob/7ad94db26b0bc21d10953f5dbad3acfdfacf57aa/src/pem/_core.py#L224-L252
 _PEMS = {
     b"CERTIFICATE",

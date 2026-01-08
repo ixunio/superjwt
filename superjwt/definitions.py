@@ -30,13 +30,13 @@ from superjwt.exceptions import (
     TokenExpiredError,
     TokenNotYetValidError,
 )
-from superjwt.keys import BaseKey, NoneKey, OctKey
+from superjwt.keys import BaseKey
 from superjwt.utils import delta_datetime_timestamp
 
 
 try:
     from datetime import UTC
-except ImportError:
+except ImportError:  # pragma: no cover
     # Python 3.10 compatibility
     from datetime import timezone
 
@@ -73,8 +73,8 @@ class Alg(str, Enum):
             )
         return instance
 
-    @classmethod
-    def get_instance_by_name(cls, name: str) -> BaseJWSAlgorithm:
+    @staticmethod
+    def get_instance_by_name(name: str) -> BaseJWSAlgorithm:
         if name not in ALG_INSTANCES:
             raise InvalidAlgorithmError(
                 f"Algorithm '{name}' is not a valid JWS algorithm"
@@ -85,6 +85,13 @@ class Alg(str, Enum):
                 f"JWS Algorithm '{name}' is not yet implemented"
             )
         return instance
+
+    @classmethod
+    def get_algorithm(cls, algorithm: Self | Literal["none"] | str) -> BaseJWSAlgorithm:
+        if isinstance(algorithm, cls):
+            return algorithm.get_instance()
+        else:
+            return cls.get_instance_by_name(algorithm)
 
 
 ALG_INSTANCES: dict[str, BaseJWSAlgorithm | None] = {
@@ -107,12 +114,36 @@ ALG_INSTANCES: dict[str, BaseJWSAlgorithm | None] = {
 }
 
 
-class Key(Enum):
-    NoneKey = NoneKey()
-    OctKey = OctKey()
-    RSAKey = None  # Placeholder
-    ECKey = None  # Placeholder
-    OKPKey = None  # Placeholder
+class Key(str, Enum):
+    """JWT Key types with associated implementation instances."""
+
+    OctKey = "OctKey"
+    RSAKey = "RSAKey"
+    ECKey = "ECKey"
+    OKPKey = "OKPKey"
+
+    @staticmethod
+    def make_key(
+        algorithm: Alg | Literal["none"] | str,
+        private_key: str | bytes | None,
+        public_key: str | bytes | None,
+    ) -> BaseKey:
+        key_type: type[BaseKey] = Alg.get_algorithm(algorithm).key_type
+        return key_type.import_key(private_key, public_key)
+
+    @staticmethod
+    def make_signing_key(
+        algorithm: Alg | Literal["none"] | str, key: str | bytes
+    ) -> BaseKey:
+        key_type: type[BaseKey] = Alg.get_algorithm(algorithm).key_type
+        return key_type.import_signing_key(key)
+
+    @staticmethod
+    def make_verifying_key(
+        algorithm: Alg | Literal["none"] | str, key: str | bytes
+    ) -> BaseKey:
+        key_type: type[BaseKey] = Alg.get_algorithm(algorithm).key_type
+        return key_type.import_verifying_key(key)
 
 
 class HttpsUrl(HttpUrl):
@@ -455,20 +486,6 @@ class JWSToken(BaseModel):
 class JWSTokenLifeCycle(BaseModel):
     unsafe: JWSToken = JWSToken()
     verified: JWSToken = JWSToken()
-
-
-def get_jws_algorithm(algorithm: Alg | Literal["none"] | str) -> BaseJWSAlgorithm:
-    # Convert to algorithm instance
-    if isinstance(algorithm, Alg):
-        return algorithm.get_instance()
-    else:
-        # Handle string input (including "none")
-        return Alg.get_instance_by_name(algorithm)
-
-
-def make_key(algorithm: Alg | Literal["none"] | str, key: str | bytes) -> BaseKey:
-    key_type = get_jws_algorithm(algorithm).key_type
-    return key_type.import_key(key)
 
 
 class JWTValidation(BaseModel):

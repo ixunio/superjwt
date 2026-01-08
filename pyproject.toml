@@ -42,6 +42,11 @@ keywords = [
     "pydantic",
 ]
 
+[project.optional-dependencies]
+asymmetric = [
+    "cryptography>=43.0.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/ixunio/superjwt"
 Repository = "https://github.com/ixunio/superjwt.git"

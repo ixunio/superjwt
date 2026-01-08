@@ -2,13 +2,15 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
-from superjwt.definitions import Alg, JWTClaims
+from superjwt.definitions import Alg, JWTClaims, Key
 from superjwt.exceptions import (
     AlgorithmNotSupportedError,
     InvalidAlgorithmError,
+    InvalidKeyError,
     TokenExpiredError,
     TokenNotYetValidError,
 )
+from superjwt.keys import NoneKey, OctKey
 
 from .conftest import JWTCustomClaims, check_claims_instance
 
@@ -621,3 +623,56 @@ class TestAlgEnum:
         instance = Alg.get_instance_by_name("HS256")
         assert instance is not None
         assert instance.__class__.__name__ == "HS256Algorithm"
+
+
+class TestKeyEnum:
+    """Test suite for the Key enum static methods."""
+
+    def test_make_key_with_symmetric_algorithm(self):
+        """Test Key.make_key() with symmetric algorithm (HMAC)."""
+        key = Key.make_key("HS256", private_key=b"secret", public_key=None)
+        assert isinstance(key, OctKey)
+        assert key.private_key == b"secret"
+        assert key.public_key == b""
+
+    def test_make_key_with_none_algorithm(self):
+        """Test Key.make_key() with 'none' algorithm."""
+        key = Key.make_key("none", private_key=None, public_key=None)
+        assert isinstance(key, NoneKey)
+        assert key.private_key == b""
+        assert key.public_key == b""
+
+    def test_make_signing_key_with_symmetric_algorithm(self):
+        """Test Key.make_signing_key() with symmetric algorithm (HMAC)."""
+        key = Key.make_signing_key("HS256", b"secret")
+        assert isinstance(key, OctKey)
+        assert key.private_key == b"secret"
+        assert key.public_key == b""
+
+    def test_make_signing_key_with_none_algorithm(self):
+        """Test Key.make_signing_key() with 'none' algorithm."""
+        key = Key.make_signing_key("none", b"")
+        assert isinstance(key, NoneKey)
+        assert key.private_key == b""
+        assert key.public_key == b""
+
+    def test_make_verifying_key_with_symmetric_algorithm(self):
+        """Test Key.make_verifying_key() with symmetric algorithm (HMAC)."""
+        key = Key.make_verifying_key("HS256", b"secret")
+        assert isinstance(key, OctKey)
+        assert key.private_key == b"secret"
+        assert key.public_key == b""
+
+    def test_make_verifying_key_with_none_algorithm(self):
+        """Test Key.make_verifying_key() with 'none' algorithm."""
+        key = Key.make_verifying_key("none", b"")
+        assert isinstance(key, NoneKey)
+        assert key.private_key == b""
+        assert key.public_key == b""
+
+    def test_make_key_with_symmetric_algorithm_and_public_key_raises_error(self):
+        """Test Key.make_key() with symmetric algorithm and public_key raises InvalidKeyError."""
+        with pytest.raises(
+            InvalidKeyError, match=r"Symmetric key should not have a public key component"
+        ):
+            Key.make_key("HS256", private_key=b"secret", public_key=b"invalid")
