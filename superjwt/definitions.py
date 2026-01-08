@@ -22,6 +22,9 @@ from superjwt.algorithms import (
     HS384Algorithm,
     HS512Algorithm,
     NoneAlgorithm,
+    RS256Algorithm,
+    RS384Algorithm,
+    RS512Algorithm,
 )
 from superjwt.exceptions import (
     AlgorithmNotSupportedError,
@@ -62,6 +65,7 @@ class Alg(str, Enum):
     ES256K = "ES256K"
     ES384 = "ES384"
     ES512 = "ES512"
+    EdDSA = "EdDSA"
     Ed25519 = "Ed25519"
     Ed448 = "Ed448"
 
@@ -99,9 +103,9 @@ ALG_INSTANCES: dict[str, BaseJWSAlgorithm | None] = {
     "HS256": HS256Algorithm(),
     "HS384": HS384Algorithm(),
     "HS512": HS512Algorithm(),
-    "RS256": None,  # Placeholder
-    "RS384": None,  # Placeholder
-    "RS512": None,  # Placeholder
+    "RS256": RS256Algorithm(),
+    "RS384": RS384Algorithm(),
+    "RS512": RS512Algorithm(),
     "PS256": None,  # Placeholder
     "PS384": None,  # Placeholder
     "PS512": None,  # Placeholder
@@ -109,6 +113,7 @@ ALG_INSTANCES: dict[str, BaseJWSAlgorithm | None] = {
     "ES256K": None,  # Placeholder
     "ES384": None,  # Placeholder
     "ES512": None,  # Placeholder
+    "EdDSA": None,  # Deprecated and not supported
     "Ed25519": None,  # Placeholder
     "Ed448": None,  # Placeholder
 }

@@ -4,7 +4,14 @@ from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Generic, TypeVar
 
 from superjwt.exceptions import SuperJWTError
-from superjwt.keys import BaseKey, NoneKey, OctKey
+from superjwt.keys import BaseKey, NoneKey, OctKey, RSAKey
+from superjwt.utils import check_cryptography_available
+
+
+if check_cryptography_available(raise_error=False):
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import padding
 
 
 KeyType = TypeVar("KeyType", bound=BaseKey)
@@ -84,3 +91,58 @@ class HS512Algorithm(HMACWithSHAAlgorithm):
 
     def __init__(self):
         super().__init__(hash_algorithm=hashlib.sha512)
+
+
+class RSAAlgorithm(BaseJWSAlgorithm[RSAKey]):
+    """Base class for RSA using SHA algorithms (RSASSA-PKCS1-v1_5)"""
+
+    key_type = RSAKey
+
+    def __init__(self, hash_algorithm: Any):
+        check_cryptography_available()
+        self.hash_algorithm = hash_algorithm
+
+        self.padding = padding.PKCS1v15()
+
+    def check_key(self, key: RSAKey) -> None:
+        if not isinstance(key, RSAKey):
+            raise SuperJWTError("Key must be an RSAKey for RSA algorithms")
+
+    def sign(self, data: bytes, key: RSAKey) -> bytes:
+        """Sign data using RSA private key."""
+        private_key = key.get_private_key()
+        return private_key.sign(data, self.padding, self.hash_algorithm)
+
+    def verify(self, data: bytes, signature: bytes, key: RSAKey) -> bool:
+        """Verify signature using RSA public key."""
+
+        public_key = key.get_public_key()
+        try:
+            public_key.verify(signature, data, self.padding, self.hash_algorithm)
+            return True
+        except InvalidSignature:
+            return False
+
+
+class RS256Algorithm(RSAAlgorithm):
+    name = "RS256"
+    description = "RSASSA-PKCS1-v1_5 using SHA-256"
+
+    def __init__(self):
+        super().__init__(hash_algorithm=hashes.SHA256())
+
+
+class RS384Algorithm(RSAAlgorithm):
+    name = "RS384"
+    description = "RSASSA-PKCS1-v1_5 using SHA-384"
+
+    def __init__(self):
+        super().__init__(hash_algorithm=hashes.SHA384())
+
+
+class RS512Algorithm(RSAAlgorithm):
+    name = "RS512"
+    description = "RSASSA-PKCS1-v1_5 using SHA-512"
+
+    def __init__(self):
+        super().__init__(hash_algorithm=hashes.SHA512())

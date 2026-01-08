@@ -591,11 +591,11 @@ class TestAlgEnum:
 
     def test_get_instance_not_implemented(self):
         """Test that get_instance() raises AlgorithmNotSupportedError for unimplemented algorithms."""
-        # RS256 is defined but not yet implemented (ALG_INSTANCES[RS256] = None)
+        # EdDSA is defined but not yet implemented (ALG_INSTANCES[RS256] = None)
         with pytest.raises(
-            AlgorithmNotSupportedError, match=r"RS256.*not yet implemented"
+            AlgorithmNotSupportedError, match=r"EdDSA.*not yet implemented"
         ):
-            Alg.RS256.get_instance()
+            Alg.EdDSA.get_instance()
 
     def test_get_instance_by_name_invalid_algorithm(self):
         """Test that get_instance_by_name() raises InvalidAlgorithmError for invalid algorithm names."""
@@ -606,11 +606,11 @@ class TestAlgEnum:
 
     def test_get_instance_by_name_not_implemented(self):
         """Test that get_instance_by_name() raises AlgorithmNotSupportedError for unimplemented algorithms."""
-        # PS256 is defined but not yet implemented (ALG_INSTANCES[PS256] = None)
+        # EdDSA is defined but not yet implemented (ALG_INSTANCES[PS256] = None)
         with pytest.raises(
-            AlgorithmNotSupportedError, match=r"PS256.*not yet implemented"
+            AlgorithmNotSupportedError, match=r"EdDSA.*not yet implemented"
         ):
-            Alg.get_instance_by_name("PS256")
+            Alg.get_instance_by_name("EdDSA")
 
     def test_get_instance_success(self):
         """Test that get_instance() successfully returns an algorithm instance for implemented algorithms."""
