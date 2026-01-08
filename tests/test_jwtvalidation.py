@@ -213,6 +213,18 @@ def test_jwtvalidation_model_copy():
     assert original.allow_future_iat is True
 
 
+def test_jwtvalidation_forbids_extra_fields():
+    """Test JWTValidation rejects extra fields due to extra='forbid' config."""
+    import pydantic
+
+    # Should raise ValidationError when trying to set an invalid field
+    with pytest.raises(pydantic.ValidationError, match="Extra inputs are not permitted"):
+        JWTValidation(
+            validation_model=JWTClaims,
+            invalid_field="some_value",  # type: ignore
+        )
+
+
 def test_jwtvalidation_run_with_no_validation_model():
     """Test JWTValidation.run() raises error when validation_model is None."""
     validation = JWTValidation(

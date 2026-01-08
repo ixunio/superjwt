@@ -474,6 +474,8 @@ def make_key(algorithm: Alg | Literal["none"] | str, key: str | bytes) -> BaseKe
 class JWTValidation(BaseModel):
     """JWT data validation object."""
 
+    model_config = {"extra": "forbid"}
+
     # ------------- General validation config -------------
     """Enable or disable data validation."""
     enabled: bool = True
