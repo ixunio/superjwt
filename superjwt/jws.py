@@ -19,6 +19,7 @@ from superjwt.definitions import (
 from superjwt.exceptions import (
     AlgorithmMismatchError,
     HeadersValidationError,
+    InvalidAlgorithmError,
     InvalidHeadersError,
     InvalidPayloadError,
     InvalidTokenError,
@@ -98,6 +99,8 @@ class JWS:
         )
 
         # set signature data
+        if isinstance(self.algorithm, NoneAlgorithm) and not self._allow_none_algorithm:
+            raise InvalidAlgorithmError("None algorithm is not allowed")
         signature = self.algorithm.sign(self.token.verified.signing_input, key)
         self.token.verified.signature = signature
         self.token.verified.encoded_signature = urlsafe_b64encode(signature)
@@ -254,7 +257,7 @@ class JWS:
 
     def verify_signature(self, key: BaseKey) -> bool:
         if isinstance(self.algorithm, NoneAlgorithm) and not self._allow_none_algorithm:
-            raise SuperJWTError("None algorithm is not allowed")
+            raise InvalidAlgorithmError("None algorithm is not allowed")
         self.algorithm.check_key(key)
 
         if not self.algorithm.verify(

@@ -3,6 +3,7 @@ from superjwt.definitions import JOSEHeader, Validation
 from superjwt.exceptions import (
     AlgorithmMismatchError,
     HeadersValidationError,
+    InvalidAlgorithmError,
     InvalidHeadersError,
     SuperJWTError,
 )
@@ -80,8 +81,8 @@ def test_wrong_header_algorithm(
     jws_HS256.reset()
 
 
-def test_none_algorithm_not_allowed(claims_fixed_dt: JWTCustomClaims):
-    """Test that 'none' algorithm raises error when not explicitly allowed."""
+def test_none_algorithm_not_allowed_decode():
+    """Test that decoding with 'none' algorithm raises error when not explicitly allowed."""
 
     none_token = (
         "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0"
@@ -94,7 +95,8 @@ def test_none_algorithm_not_allowed(claims_fixed_dt: JWTCustomClaims):
     jws_none = JWS(algorithm="none")
     none_key = NoneKey()
 
-    with pytest.raises(SuperJWTError, match="None algorithm is not allowed"):
+    # Test decode with none algorithm not allowed
+    with pytest.raises(InvalidAlgorithmError, match="None algorithm is not allowed"):
         jws_none.decode(compact=none_token, key=none_key)
 
     jws_none._allow_none_algorithm = True
@@ -102,3 +104,28 @@ def test_none_algorithm_not_allowed(claims_fixed_dt: JWTCustomClaims):
     jws_none.decode(compact=none_token, key=none_key)  # Should not raise
     assert jws_none.token.unsafe.headers == {"alg": "none", "typ": "JWT"}
     assert jws_none.token.unsafe.payload == {"iss": "myapp", "sub": "someone"}
+
+
+def test_none_algorithm_not_allowed_encode(claims_fixed_dt: JWTCustomClaims):
+    """Test that encoding with 'none' algorithm raises error when not explicitly allowed."""
+    jws_none = JWS(algorithm="none")
+    none_key = NoneKey()
+
+    # Test encode with none algorithm not allowed
+    with pytest.raises(InvalidAlgorithmError, match="None algorithm is not allowed"):
+        jws_none.encode(
+            headers=JOSEHeader(alg="none"),
+            payload=claims_fixed_dt.to_dict(),
+            key=none_key,
+        )
+
+    # Test that it works when allowed
+    jws_none._allow_none_algorithm = True
+    jws_none.reset()
+    token = jws_none.encode(
+        headers=JOSEHeader(alg="none"),
+        payload=claims_fixed_dt.to_dict(),
+        key=none_key,
+    )
+    assert token.headers == {"alg": "none", "typ": "JWT"}
+    assert token.payload == claims_fixed_dt.to_dict()

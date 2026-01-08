@@ -37,7 +37,7 @@ class NoneAlgorithm(BaseJWSAlgorithm[NoneKey]):
             raise SuperJWTError("Key must be a NoneKey for 'none' algorithm")
 
     def sign(self, _: bytes, __: NoneKey) -> bytes:
-        return b""
+        return b"no-signature"
 
     def verify(self, _: bytes, __: bytes, ___: NoneKey) -> bool:
         return True
