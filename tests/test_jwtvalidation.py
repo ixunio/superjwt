@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 
 import pytest
+from pydantic import Field
 from superjwt.definitions import (
     Alg,
     JOSEHeader,
@@ -37,9 +38,256 @@ class CustomHeader(JOSEHeader):
     version: int = 1
 
 
+class ModelA(JWTClaims):
+    """First pydantic model for testing - requires field_a."""
+
+    field_a: str = Field(default=...)  # Required field
+
+
+class ModelB(JWTClaims):
+    """Second pydantic model for testing - requires field_b."""
+
+    field_b: str = Field(default=...)  # Required field
+
+
 # ============================================================================
 # JWT Claims Validation Config Tests
 # ============================================================================
+
+
+def test_jwtvalidation_all_combinations(secret_key):
+    """Test all 8 combinations of data type, forward_pydantic_model, and validation_model.
+
+    Outcomes:
+    | Case | Data Type | Forward | Validation Model | Expected Validation Against |
+    |------|-----------|---------|------------------|----------------------------|
+    | 1    | Pydantic  | True    | None            | Data's type (forwarded)    |
+    | 2    | Pydantic  | True    | Set             | Explicit model (NOT forwarded) |
+    | 3    | Pydantic  | False   | None            | ERROR: No model            |
+    | 4    | Pydantic  | False   | Set             | Explicit model             |
+    | 5    | Dict      | True    | None            | ERROR: No model            |
+    | 6    | Dict      | True    | Set             | Explicit model             |
+    | 7    | Dict      | False   | None            | ERROR: No model            |
+    | 8    | Dict      | False   | Set             | Explicit model             |
+    """
+
+    jwt = JWT()
+    now = datetime.now(UTC)
+
+    # ========================================================================
+    # Case 1: data=pydantic (ModelA), forward=True, validation_model=None
+    # ========================================================================
+    # Expected: Should validate against ModelA (forwarded from data)
+    # Result: field_a is required, should pass when present, fail when absent
+
+    validation_1 = JWTValidation(
+        validation_model=None,
+        forward_pydantic_model=True,
+    )
+
+    data_1_valid = ModelA(field_a="value_a", iat=now, exp=now + timedelta(hours=1))
+    # Should succeed - validates against ModelA which has field_a
+    token_1 = jwt.encode(
+        data_1_valid, secret_key, Alg.HS256, claims_validation=validation_1
+    )
+    assert token_1.model.claims is not None
+
+    data_1_invalid = ModelA.model_construct(
+        # field_a missing (required by ModelA)
+        iat=now,
+        exp=now + timedelta(hours=1),
+    )
+    # Should fail - field_a is required by ModelA
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(data_1_invalid, secret_key, Alg.HS256, claims_validation=validation_1)
+
+    # ========================================================================
+    # Case 2: data=pydantic (ModelA), forward=True, validation_model=ModelB
+    # ========================================================================
+    # Expected: Should validate against ModelB (explicitly set, overrides forward)
+    # Note: In the fixed implementation, explicit validation_model should NOT be
+    # overridden even when forward=True
+
+    validation_2 = JWTValidation(
+        validation_model=ModelB,
+        forward_pydantic_model=True,
+    )
+
+    data_2_with_field_b = ModelA.model_construct(
+        field_a="value_a",
+        field_b="value_b",  # ModelB requires this
+        iat=now,
+        exp=now + timedelta(hours=1),
+    )
+    # Should succeed - validates against ModelB which has field_b
+    token_2 = jwt.encode(
+        data_2_with_field_b, secret_key, Alg.HS256, claims_validation=validation_2
+    )
+    assert token_2.model.claims is not None
+
+    data_2_without_field_b = ModelA(
+        field_a="value_a",
+        # field_b missing (required by ModelB)
+        iat=now,
+        exp=now + timedelta(hours=1),
+    )
+    # Should fail - field_b is required by ModelB
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(
+            data_2_without_field_b, secret_key, Alg.HS256, claims_validation=validation_2
+        )
+
+    # ========================================================================
+    # Case 3: data=pydantic (ModelA), forward=False, validation_model=None
+    # ========================================================================
+    # Expected: Should fail because validation_model is None and not forwarded
+    # This is an invalid configuration
+
+    validation_3 = JWTValidation(
+        validation_model=None,
+        forward_pydantic_model=False,
+    )
+
+    data_3 = ModelA(field_a="value_a", iat=now, exp=now + timedelta(hours=1))
+    # Should fail - no validation model to use
+    with pytest.raises(ValueError, match="Validation model is not set"):
+        jwt.encode(data_3, secret_key, Alg.HS256, claims_validation=validation_3)
+
+    # ========================================================================
+    # Case 4: data=pydantic (ModelA), forward=False, validation_model=ModelB
+    # ========================================================================
+    # Expected: Should validate against ModelB (explicitly set, forward disabled)
+
+    validation_4 = JWTValidation(
+        validation_model=ModelB,
+        forward_pydantic_model=False,
+    )
+
+    data_4_with_field_b = ModelA.model_construct(
+        field_a="value_a",
+        field_b="value_b",  # ModelB requires this
+        iat=now,
+        exp=now + timedelta(hours=1),
+    )
+    # Should succeed - validates against ModelB which has field_b
+    token_4 = jwt.encode(
+        data_4_with_field_b, secret_key, Alg.HS256, claims_validation=validation_4
+    )
+    assert token_4.model.claims is not None
+
+    data_4_without_field_b = ModelA(
+        field_a="value_a",
+        # field_b missing (required by ModelB)
+        iat=now,
+        exp=now + timedelta(hours=1),
+    )
+    # Should fail - field_b is required by ModelB
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(
+            data_4_without_field_b, secret_key, Alg.HS256, claims_validation=validation_4
+        )
+
+    # ========================================================================
+    # Case 5: data=dict, forward=True, validation_model=None
+    # ========================================================================
+    # Expected: Should fail because validation_model is None and dict has no type to forward
+
+    validation_5 = JWTValidation(
+        validation_model=None,
+        forward_pydantic_model=True,
+    )
+
+    data_5 = {
+        "field_a": "value_a",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=1)).timestamp()),
+    }
+    # Should fail - no validation model to use (can't forward from dict)
+    with pytest.raises(ValueError, match="Validation model is not set"):
+        jwt.encode(data_5, secret_key, Alg.HS256, claims_validation=validation_5)
+
+    # ========================================================================
+    # Case 6: data=dict, forward=True, validation_model=ModelA
+    # ========================================================================
+    # Expected: Should validate against ModelA (explicitly set)
+
+    validation_6 = JWTValidation(
+        validation_model=ModelA,
+        forward_pydantic_model=True,
+    )
+
+    data_6_with_field_a = {
+        "field_a": "value_a",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=1)).timestamp()),
+    }
+    # Should succeed - validates against ModelA which has field_a
+    token_6 = jwt.encode(
+        data_6_with_field_a, secret_key, Alg.HS256, claims_validation=validation_6
+    )
+    assert token_6.model.claims is not None
+
+    data_6_without_field_a = {
+        # field_a missing (required by ModelA)
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=1)).timestamp()),
+    }
+    # Should fail - field_a is required by ModelA
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(
+            data_6_without_field_a, secret_key, Alg.HS256, claims_validation=validation_6
+        )
+
+    # ========================================================================
+    # Case 7: data=dict, forward=False, validation_model=None
+    # ========================================================================
+    # Expected: Should fail because validation_model is None
+
+    validation_7 = JWTValidation(
+        validation_model=None,
+        forward_pydantic_model=False,
+    )
+
+    data_7 = {
+        "field_a": "value_a",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=1)).timestamp()),
+    }
+    # Should fail - no validation model to use
+    with pytest.raises(ValueError, match="Validation model is not set"):
+        jwt.encode(data_7, secret_key, Alg.HS256, claims_validation=validation_7)
+
+    # ========================================================================
+    # Case 8: data=dict, forward=False, validation_model=ModelB
+    # ========================================================================
+    # Expected: Should validate against ModelB (explicitly set)
+
+    validation_8 = JWTValidation(
+        validation_model=ModelB,
+        forward_pydantic_model=False,
+    )
+
+    data_8_with_field_b = {
+        "field_b": "value_b",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=1)).timestamp()),
+    }
+    # Should succeed - validates against ModelB which has field_b
+    token_8 = jwt.encode(
+        data_8_with_field_b, secret_key, Alg.HS256, claims_validation=validation_8
+    )
+    assert token_8.model.claims is not None
+
+    data_8_without_field_b = {
+        # field_b missing (required by ModelB)
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=1)).timestamp()),
+    }
+    # Should fail - field_b is required by ModelB
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(
+            data_8_without_field_b, secret_key, Alg.HS256, claims_validation=validation_8
+        )
 
 
 def test_no_validation_model_set(secret_key):
@@ -106,6 +354,37 @@ def test_jwt_custom_validation_config_with_pydantic_model():
     decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
     assert decoded.payload["sub"] == "user123"
     assert decoded.payload["user_id"] == "uid123"
+
+
+def test_jwt_custom_validation_config_with_no_validation_model():
+    """Test JWT encoding/decoding with custom validation config using pydantic model."""
+    jwt = JWT()
+    secret_key = "test-secret-key-32-bytes-long!!"
+
+    custom_validation = JWTValidation(
+        validation_model=None,
+    )
+
+    claims = CustomClaims.model_construct(
+        sub="user123",
+        user_id=123,
+        iat=datetime.now(UTC),
+        exp=datetime.now(UTC) + timedelta(hours=1),
+    )
+
+    # Should validate against CustomClaims since no model is set in config
+    # and forward_pydantic_model is True by default
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(claims, secret_key, Alg.HS256, claims_validation=custom_validation)
+
+    custom_validation = JWTValidation(
+        validation_model=None,
+        forward_pydantic_model=False,
+    )
+
+    # no validation model set and forwarding disabled - should fails
+    with pytest.raises(ValueError, match="Validation model is not set in JWTValidation"):
+        jwt.encode(claims, secret_key, Alg.HS256, claims_validation=custom_validation)
 
 
 def test_jwt_validation_config_disabled():
@@ -685,3 +964,153 @@ def test_validation_config_partial_inheritance_from_incompatible_model():
     # and model is not None, so defaults are not applied)
     assert config.leeway is None  # Stays None (not default, not from model)
     assert config.allow_future_iat is None  # Stays None (not default, not from model)
+
+
+def test_default_vs_custom_validation():
+    """Test the difference between Validation.DEFAULT and custom validation configs.
+
+    Key differences:
+    1. Validation.DEFAULT uses JWT's default_claims_validation
+    2. Custom validation uses explicitly provided configuration
+    3. DEFAULT with pydantic data forwards the model type when forward_pydantic_model=True
+    """
+    secret_key = "test-secret-key-32-bytes-long!!"
+    now = datetime.now(UTC)
+
+    # ========================================================================
+    # Setup: Create JWT with custom default validation
+    # ========================================================================
+    custom_default_validation = JWTValidation(
+        validation_model=JWTBaseModel,  # Very permissive
+        forward_pydantic_model=True,  # Will forward pydantic model types
+        leeway=10.0,  # Large leeway
+        jwtdatetime_force_int=True,  # Use int timestamps
+    )
+
+    jwt = JWT(default_claims_validation=custom_default_validation)
+
+    # ========================================================================
+    # Test 1: Validation.DEFAULT forwards pydantic model type
+    # ========================================================================
+
+    # Create claims with ModelA that's missing required field_a
+    invalid_claims_a = ModelA.model_construct(
+        iat=now,
+        exp=now + timedelta(hours=1),
+        # field_a is missing - ModelA requires it
+    )
+
+    # With Validation.DEFAULT: Should validate against ModelA (forwarded) and fail
+    with pytest.raises(ClaimsValidationError):
+        jwt.encode(
+            invalid_claims_a, secret_key, Alg.HS256, claims_validation=Validation.DEFAULT
+        )
+
+    # ========================================================================
+    # Test 2: Custom validation uses explicit model, NOT forwarded type
+    # ========================================================================
+
+    # Use custom validation that explicitly sets validation_model=JWTBaseModel
+    explicit_validation = JWTValidation(
+        validation_model=JWTBaseModel,  # Explicit - won't be overridden
+        forward_pydantic_model=True,  # This doesn't matter for explicit model
+    )
+
+    # Same invalid data, but with explicit validation against JWTBaseModel
+    # Should succeed because JWTBaseModel is permissive (doesn't require field_a)
+    token = jwt.encode(
+        invalid_claims_a, secret_key, Alg.HS256, claims_validation=explicit_validation
+    )
+    assert token.compact is not None
+
+    # ========================================================================
+    # Test 3: Validation.DEFAULT uses JWT's default config values
+    # ========================================================================
+
+    # Create claims with slightly expired timestamp (within 10s leeway)
+    expired_claims = {
+        "sub": "user123",
+        "iat": (now - timedelta(seconds=15)).timestamp(),
+        "exp": (now - timedelta(seconds=7)).timestamp(),  # Expired 7 seconds ago
+    }
+
+    # Encode with validation disabled to create the token
+    token_expired = jwt.encode(
+        expired_claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    )
+
+    # Decode with Validation.DEFAULT: Should succeed because default leeway is 10.0s
+    decoded = jwt.decode(
+        token_expired.compact, secret_key, Alg.HS256, claims_validation=Validation.DEFAULT
+    )
+    assert decoded.payload["sub"] == "user123"
+
+    # ========================================================================
+    # Test 4: Custom validation uses its own config values
+    # ========================================================================
+
+    # Use custom validation with smaller leeway
+    strict_validation = JWTValidation(
+        validation_model=JWTClaims,
+        leeway=5.0,  # Smaller leeway - won't cover 7s expiration
+    )
+
+    # Decode with custom validation: Should fail because leeway is only 5s
+    with pytest.raises(TokenExpiredError):
+        jwt.decode(
+            token_expired.compact,
+            secret_key,
+            Alg.HS256,
+            claims_validation=strict_validation,
+        )
+
+    # ========================================================================
+    # Test 5: Validation.DEFAULT with pydantic data uses default config
+    # ========================================================================
+
+    # Use pydantic model with default validation
+    claims_with_extra = JWTClaims(
+        sub="user123",
+        iat=now,
+        exp=now + timedelta(hours=1),
+    )
+
+    # Should succeed - DEFAULT uses JWTBaseModel which is permissive
+    token_default = jwt.encode(
+        claims_with_extra, secret_key, Alg.HS256, claims_validation=Validation.DEFAULT
+    )
+    assert token_default.compact is not None
+
+    # ========================================================================
+    # Test 6: Demonstrate complete control with custom validation
+    # ========================================================================
+
+    # Create a custom JWTValidation that requires strict JWTClaims
+    strict_custom_validation = JWTValidation(
+        validation_model=JWTClaims,  # Strict model
+        leeway=2.0,  # Tight leeway
+        allow_future_iat=False,  # No future iat
+    )
+
+    # Valid claims should work
+    valid_claims = JWTClaims(
+        sub="user789",
+        iat=now,
+        exp=now + timedelta(hours=1),
+    )
+
+    token_custom = jwt.encode(
+        valid_claims, secret_key, Alg.HS256, claims_validation=strict_custom_validation
+    )
+    assert token_custom.compact is not None
+
+    # ========================================================================
+    # Summary: Key Differences
+    # ========================================================================
+    # 1. Validation.DEFAULT forwards pydantic model types → validates against ModelA
+    # 2. Custom validation with explicit model → validates against explicit model only
+    # 3. Validation.DEFAULT uses JWT's default leeway (10.0s) → accepts expired token
+    # 4. Custom validation uses its own leeway (5.0s) → rejects expired token
+    # 5. Validation.DEFAULT with dict uses default validation_model (JWTBaseModel)
+    # 6. Validation.DEFAULT uses default timestamp format (int)
+    # 7. Custom validation can override timestamp format (float)

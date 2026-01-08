@@ -85,7 +85,7 @@ def secret_key_random() -> str:
 
 @pytest.fixture
 def secret_key() -> str:
-    return "5297323b3f8f10e11f884e8079416f858010af256e5cc9dd67994743fcc3417d"
+    return "test-secret-key-32-bytes-long!!"
 
 
 @pytest.fixture

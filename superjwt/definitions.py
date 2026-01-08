@@ -518,7 +518,9 @@ class JWTValidation(BaseModel):
             if self.validation_model is not None and issubclass(
                 self.validation_model, model_type
             ):
-                internal_config[f"internal__{param}"] = getattr(self, param)
+                value = getattr(self, param)
+                if value is not None:
+                    internal_config[f"internal__{param}"] = value
         return internal_config
 
     def apply_internal_cfg(self, model: JWTBaseModel | None = None) -> None:
@@ -605,7 +607,8 @@ def get_validation_config(
 ) -> JWTValidation:
     data_model = get_data_model(data, validation, default_validation, fallback_data_model)
 
-    # 1. case DISABLE
+    ##############################
+    # case validation is DISABLED
     if (
         validation is Validation.DISABLE
         or validation is None
@@ -613,40 +616,49 @@ def get_validation_config(
     ):
         return JWTValidation(enabled=False, data_model=data_model)
 
-    # 2. case DEFAULT (nothing was specified)
+    ##############################
+    # case validation is ENABLED
+
+    # 1. case DEFAULT/AUTOMATIC behavior
     if validation is Validation.DEFAULT:
         # make a copy, mutable object!!
         validation_cfg = default_validation.model_copy(deep=True)
-        validation_cfg.data_model = data_model
         if isinstance(data, JWTBaseModel):
-            # forward internal cfg from data model and overwrite when unset
-            validation_cfg.apply_internal_cfg(data)
-            # (maybe) set validation model to data model
             if validation_cfg.forward_pydantic_model is True:
-                validation_cfg.validation_model = type(data)
-        else:
-            # set default values for unset internal config
-            validation_cfg.apply_internal_cfg()
-        return validation_cfg
+                # ALWAYS forward data model to validation model in DEFAULT case
+                # --> the validation model was a mere fallback for dict data
+                validation_cfg.validation_model = None  # we will forward the model below
 
-    # 3. case CUSTOM
-    # 3.1 case JWTValidation instance
-    if isinstance(validation, JWTValidation):
-        # make a copy, mutable object!!
-        validation_cfg = validation.model_copy(deep=True)
+    # 2. case CUSTOM
+    elif isinstance(validation, JWTValidation) or (
+        isclass(validation) and issubclass(validation, JWTBaseModel)
+    ):
+        # 2.1 case JWTValidation instance
+        if isinstance(validation, JWTValidation):
+            # make a copy, mutable object!!
+            validation_cfg = validation.model_copy(deep=True)
 
-    # 3.2 case Pydantic model
-    elif isclass(validation) and issubclass(validation, JWTBaseModel):
-        validation_cfg = JWTValidation(validation_model=validation)
+        # 2.2 case Pydantic model
+        if isclass(validation) and issubclass(validation, JWTBaseModel):
+            validation_cfg = JWTValidation(validation_model=validation)
 
     else:
         raise TypeError("Wrong validation object type")
 
+    # finalize internal config
     if isinstance(data, JWTBaseModel):
-        # forward internal cfg from data model and overwrite when unset
-        validation_cfg.apply_internal_cfg(data)
+        if validation_cfg.validation_model is None:
+            if validation_cfg.forward_pydantic_model is True:
+                # forward data model type to validation model
+                validation_cfg.validation_model = type(data)
+                # forward internal config from data model
+                validation_cfg.apply_internal_cfg(data)
+            else:
+                # do not forward data internal config
+                validation_cfg.apply_internal_cfg()
     else:
         # set default values for unset internal config
+        # --> data is a dict and carries no config
         validation_cfg.apply_internal_cfg()
 
     # add data model
