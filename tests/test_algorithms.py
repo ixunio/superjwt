@@ -15,8 +15,44 @@ if CRYPTOGRAPHY_AVAILABLE:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
-    from superjwt.algorithms import RS256Algorithm, RS384Algorithm, RS512Algorithm
+    from superjwt.algorithms import (
+        PS256Algorithm,
+        PS384Algorithm,
+        PS512Algorithm,
+        RS256Algorithm,
+        RS384Algorithm,
+        RS512Algorithm,
+    )
     from superjwt.keys import RSAKey
+
+
+@pytest.fixture
+def rsa_key_pair():
+    """Generate RSA key pair for testing (module-level fixture for all RSA tests)."""
+    if not CRYPTOGRAPHY_AVAILABLE:
+        pytest.skip("cryptography not available")
+
+    private_key_obj = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
+
+    private_pem = private_key_obj.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    public_pem = private_key_obj.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+    return {
+        "private_pem": private_pem,
+        "public_pem": public_pem,
+        "private_key": RSAKey.import_signing_key(private_pem),
+        "public_key": RSAKey.import_verifying_key(public_pem),
+    }
 
 
 class TestNoneAlgorithm:
@@ -142,31 +178,6 @@ class TestHMACAlgorithms:
 @requires_cryptography
 class TestRSAAlgorithms:
     """Test suite for RSA algorithms (RS256, RS384, RS512)."""
-
-    @pytest.fixture
-    def rsa_key_pair(self):
-        """Generate RSA key pair for testing."""
-        private_key_obj = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-
-        private_pem = private_key_obj.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-
-        public_pem = private_key_obj.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-
-        return {
-            "private_pem": private_pem,
-            "public_pem": public_pem,
-            "private_key": RSAKey.import_signing_key(private_pem),
-            "public_key": RSAKey.import_verifying_key(public_pem),
-        }
 
     @pytest.fixture
     def wrong_key_pair(self):
@@ -393,6 +404,193 @@ class TestRSAAlgorithms:
         assert rs256.verify(test_data, sig512, rsa_key_pair["public_key"]) is False
 
 
+@requires_cryptography
+class TestRSAPSSAlgorithms:
+    """Tests for RSASSA-PSS algorithms (PS256, PS384, PS512)."""
+
+    def test_ps256_sign_and_verify(self, rsa_key_pair):
+        """Test PS256 algorithm can sign and verify."""
+        algo = PS256Algorithm()
+        private_key = rsa_key_pair["private_key"]
+        public_key = rsa_key_pair["public_key"]
+
+        data = b"test data"
+        signature = algo.sign(data, private_key)
+
+        assert algo.verify(data, signature, public_key)
+
+    def test_ps384_sign_and_verify(self, rsa_key_pair):
+        """Test PS384 algorithm can sign and verify."""
+        algo = PS384Algorithm()
+        private_key = rsa_key_pair["private_key"]
+        public_key = rsa_key_pair["public_key"]
+
+        data = b"test data"
+        signature = algo.sign(data, private_key)
+
+        assert algo.verify(data, signature, public_key)
+
+    def test_ps512_sign_and_verify(self, rsa_key_pair):
+        """Test PS512 algorithm can sign and verify."""
+        algo = PS512Algorithm()
+        private_key = rsa_key_pair["private_key"]
+        public_key = rsa_key_pair["public_key"]
+
+        data = b"test data"
+        signature = algo.sign(data, private_key)
+
+        assert algo.verify(data, signature, public_key)
+
+    def test_ps256_invalid_signature(self, rsa_key_pair):
+        """Test PS256 algorithm rejects invalid signature."""
+        algo = PS256Algorithm()
+        private_key = rsa_key_pair["private_key"]
+        public_key = rsa_key_pair["public_key"]
+
+        data = b"test data"
+        signature = algo.sign(data, private_key)
+
+        # Tamper with signature
+        bad_signature = signature[:-10] + b"0" * 10
+
+        assert not algo.verify(data, bad_signature, public_key)
+
+    def test_ps384_invalid_signature(self, rsa_key_pair):
+        """Test PS384 algorithm rejects invalid signature."""
+        algo = PS384Algorithm()
+        private_key = rsa_key_pair["private_key"]
+        public_key = rsa_key_pair["public_key"]
+
+        data = b"test data"
+        signature = algo.sign(data, private_key)
+
+        # Tamper with signature
+        bad_signature = signature[:-10] + b"0" * 10
+
+        assert not algo.verify(data, bad_signature, public_key)
+
+    def test_ps512_invalid_signature(self, rsa_key_pair):
+        """Test PS512 algorithm rejects invalid signature."""
+        algo = PS512Algorithm()
+        private_key = rsa_key_pair["private_key"]
+        public_key = rsa_key_pair["public_key"]
+
+        data = b"test data"
+        signature = algo.sign(data, private_key)
+
+        # Tamper with signature
+        bad_signature = signature[:-10] + b"0" * 10
+
+        assert not algo.verify(data, bad_signature, public_key)
+
+    def test_ps256_tampered_data(self, rsa_key_pair):
+        """Test PS256 algorithm rejects tampered data."""
+        algo = PS256Algorithm()
+        private_key = rsa_key_pair["private_key"]
+        public_key = rsa_key_pair["public_key"]
+
+        data = b"test data"
+        signature = algo.sign(data, private_key)
+
+        tampered_data = b"tampered data"
+
+        assert not algo.verify(tampered_data, signature, public_key)
+
+    def test_ps_algorithms_produce_different_signatures(self, rsa_key_pair):
+        """Test that different PS algorithms produce different signatures."""
+        private_key = rsa_key_pair["private_key"]
+        public_key = rsa_key_pair["public_key"]
+        data = b"test data"
+
+        algo256 = PS256Algorithm()
+        algo384 = PS384Algorithm()
+        algo512 = PS512Algorithm()
+
+        sig256 = algo256.sign(data, private_key)
+        sig384 = algo384.sign(data, private_key)
+        sig512 = algo512.sign(data, private_key)
+
+        # All signatures should be different due to different hash functions
+        assert sig256 != sig384
+        assert sig256 != sig512
+        assert sig384 != sig512
+
+        # But each should verify correctly with its own algorithm
+        assert algo256.verify(data, sig256, public_key)
+        assert algo384.verify(data, sig384, public_key)
+        assert algo512.verify(data, sig512, public_key)
+
+        # And fail to verify with wrong algorithms
+        assert not algo256.verify(data, sig384, public_key)
+        assert not algo256.verify(data, sig512, public_key)
+
+    def test_ps_algorithms_check_key_validates_type(self):
+        """Test that PS algorithms validate key types."""
+        algo = PS256Algorithm()
+
+        none_key = NoneKey()
+        with pytest.raises(SuperJWTError, match="Key must be an RSAKey"):
+            algo.check_key(none_key)  # type: ignore
+
+        oct_key = OctKey.import_key(b"test-secret")
+        with pytest.raises(SuperJWTError, match="Key must be an RSAKey"):
+            algo.check_key(oct_key)  # type: ignore
+
+    def test_ps_algorithm_names(self):
+        """Test that PS algorithms have correct names."""
+        assert PS256Algorithm.name == "PS256"
+        assert PS384Algorithm.name == "PS384"
+        assert PS512Algorithm.name == "PS512"
+
+    def test_ps_algorithm_descriptions(self):
+        """Test that PS algorithms have correct descriptions."""
+        assert "RSASSA-PSS" in PS256Algorithm.description
+        assert "SHA-256" in PS256Algorithm.description
+        assert "MGF1" in PS256Algorithm.description
+
+        assert "RSASSA-PSS" in PS384Algorithm.description
+        assert "SHA-384" in PS384Algorithm.description
+        assert "MGF1" in PS384Algorithm.description
+
+        assert "RSASSA-PSS" in PS512Algorithm.description
+        assert "SHA-512" in PS512Algorithm.description
+        assert "MGF1" in PS512Algorithm.description
+
+    def test_ps256_verify_with_private_key(self, rsa_key_pair):
+        """Test PS256 can verify with private key (which contains public key)."""
+        algo = PS256Algorithm()
+        private_key = rsa_key_pair["private_key"]
+
+        data = b"test data"
+        signature = algo.sign(data, private_key)
+
+        # Should be able to verify with private key too
+        assert algo.verify(data, signature, private_key)
+
+    def test_pss_padding_randomization(self, rsa_key_pair):
+        """Test that PSS padding produces different signatures each time."""
+        algo = PS256Algorithm()
+        private_key = rsa_key_pair["private_key"]
+        public_key = rsa_key_pair["public_key"]
+
+        data = b"test data"
+
+        # Generate multiple signatures of the same data
+        sig1 = algo.sign(data, private_key)
+        sig2 = algo.sign(data, private_key)
+        sig3 = algo.sign(data, private_key)
+
+        # PSS padding includes randomness, so signatures should be different
+        assert sig1 != sig2
+        assert sig1 != sig3
+        assert sig2 != sig3
+
+        # But all should verify correctly
+        assert algo.verify(data, sig1, public_key)
+        assert algo.verify(data, sig2, public_key)
+        assert algo.verify(data, sig3, public_key)
+
+
 class TestAlgorithmKeyTypes:
     """Test that algorithms have correct key types defined."""
 
@@ -408,3 +606,10 @@ class TestAlgorithmKeyTypes:
         assert RS256Algorithm.key_type is RSAKey
         assert RS384Algorithm.key_type is RSAKey
         assert RS512Algorithm.key_type is RSAKey
+
+    @requires_cryptography
+    def test_rsa_pss_algorithms_key_type(self):
+        """Test that RSA-PSS algorithms specify RSAKey as key type."""
+        assert PS256Algorithm.key_type is RSAKey
+        assert PS384Algorithm.key_type is RSAKey
+        assert PS512Algorithm.key_type is RSAKey

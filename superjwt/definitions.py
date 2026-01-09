@@ -22,6 +22,9 @@ from superjwt.algorithms import (
     HS384Algorithm,
     HS512Algorithm,
     NoneAlgorithm,
+    PS256Algorithm,
+    PS384Algorithm,
+    PS512Algorithm,
     RS256Algorithm,
     RS384Algorithm,
     RS512Algorithm,
@@ -106,9 +109,9 @@ ALG_INSTANCES: dict[str, BaseJWSAlgorithm | None] = {
     "RS256": RS256Algorithm(),
     "RS384": RS384Algorithm(),
     "RS512": RS512Algorithm(),
-    "PS256": None,  # Placeholder
-    "PS384": None,  # Placeholder
-    "PS512": None,  # Placeholder
+    "PS256": PS256Algorithm(),
+    "PS384": PS384Algorithm(),
+    "PS512": PS512Algorithm(),
     "ES256": None,  # Placeholder
     "ES256K": None,  # Placeholder
     "ES384": None,  # Placeholder

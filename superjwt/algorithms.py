@@ -146,3 +146,41 @@ class RS512Algorithm(RSAAlgorithm):
 
     def __init__(self):
         super().__init__(hash_algorithm=hashes.SHA512())
+
+
+class RSAPSSAlgorithm(RSAAlgorithm):
+    """Base class for RSA using SHA algorithms with PSS padding (RSASSA-PSS)"""
+
+    def __init__(self, hash_algorithm: Any):
+        check_cryptography_available()
+        self.hash_algorithm = hash_algorithm
+
+        # Use PSS padding with MGF1 instead of PKCS1v15
+        self.padding = padding.PSS(
+            mgf=padding.MGF1(hash_algorithm),
+            salt_length=hash_algorithm.digest_size,
+        )
+
+
+class PS256Algorithm(RSAPSSAlgorithm):
+    name = "PS256"
+    description = "RSASSA-PSS using SHA-256 and MGF1 with SHA-256"
+
+    def __init__(self):
+        super().__init__(hash_algorithm=hashes.SHA256())
+
+
+class PS384Algorithm(RSAPSSAlgorithm):
+    name = "PS384"
+    description = "RSASSA-PSS using SHA-384 and MGF1 with SHA-384"
+
+    def __init__(self):
+        super().__init__(hash_algorithm=hashes.SHA384())
+
+
+class PS512Algorithm(RSAPSSAlgorithm):
+    name = "PS512"
+    description = "RSASSA-PSS using SHA-512 and MGF1 with SHA-512"
+
+    def __init__(self):
+        super().__init__(hash_algorithm=hashes.SHA512())

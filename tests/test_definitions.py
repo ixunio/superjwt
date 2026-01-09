@@ -12,7 +12,19 @@ from superjwt.exceptions import (
 )
 from superjwt.keys import NoneKey, OctKey
 
-from .conftest import JWTCustomClaims, check_claims_instance
+from .conftest import (
+    CRYPTOGRAPHY_AVAILABLE,
+    JWTCustomClaims,
+    check_claims_instance,
+    requires_cryptography,
+)
+
+
+if CRYPTOGRAPHY_AVAILABLE:
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from superjwt.keys import RSAKey
 
 
 try:
@@ -676,3 +688,193 @@ class TestKeyEnum:
             InvalidKeyError, match=r"Symmetric key should not have a public key component"
         ):
             Key.make_key("HS256", private_key=b"secret", public_key=b"invalid")
+
+    @requires_cryptography
+    def test_make_key_with_rsa_algorithm(self):
+        """Test Key.make_key() with RSA algorithm (RS256)."""
+        # Generate RSA key pair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        public_key = private_key.public_key()
+
+        # Serialize keys to PEM format
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        public_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        # Test with RS256
+        key = Key.make_key("RS256", private_key=private_pem, public_key=public_pem)
+        assert isinstance(key, RSAKey)
+        assert key.private_key == private_pem
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_key_with_ps256_algorithm(self):
+        """Test Key.make_key() with PS256 algorithm."""
+        # Generate RSA key pair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        public_key = private_key.public_key()
+
+        # Serialize keys to PEM format
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        public_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        # Test with PS256
+        key = Key.make_key("PS256", private_key=private_pem, public_key=public_pem)
+        assert isinstance(key, RSAKey)
+        assert key.private_key == private_pem
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_key_with_ps384_algorithm(self):
+        """Test Key.make_key() with PS384 algorithm."""
+        # Generate RSA key pair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        public_key = private_key.public_key()
+
+        # Serialize keys to PEM format
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        public_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        # Test with PS384
+        key = Key.make_key("PS384", private_key=private_pem, public_key=public_pem)
+        assert isinstance(key, RSAKey)
+        assert key.private_key == private_pem
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_key_with_ps512_algorithm(self):
+        """Test Key.make_key() with PS512 algorithm."""
+        # Generate RSA key pair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        public_key = private_key.public_key()
+
+        # Serialize keys to PEM format
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        public_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        # Test with PS512
+        key = Key.make_key("PS512", private_key=private_pem, public_key=public_pem)
+        assert isinstance(key, RSAKey)
+        assert key.private_key == private_pem
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_signing_key_with_rsa_algorithm(self):
+        """Test Key.make_signing_key() with RSA algorithm (RS256)."""
+        # Generate RSA key pair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+
+        # Serialize private key to PEM format
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+        # Test with RS256
+        key = Key.make_signing_key("RS256", private_pem)
+        assert isinstance(key, RSAKey)
+        assert key.private_key == private_pem
+        assert key.public_key != b""  # Public key derived from private
+
+    @requires_cryptography
+    def test_make_signing_key_with_ps_algorithms(self):
+        """Test Key.make_signing_key() with PS algorithms."""
+        # Generate RSA key pair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+
+        # Serialize private key to PEM format
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+        # Test with PS256, PS384, PS512
+        for alg in ["PS256", "PS384", "PS512"]:
+            key = Key.make_signing_key(alg, private_pem)
+            assert isinstance(key, RSAKey)
+            assert key.private_key == private_pem
+            assert key.public_key != b""  # Public key derived from private
+
+    @requires_cryptography
+    def test_make_verifying_key_with_rsa_algorithm(self):
+        """Test Key.make_verifying_key() with RSA algorithm (RS256)."""
+        # Generate RSA key pair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        public_key = private_key.public_key()
+
+        # Serialize public key to PEM format
+        public_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        # Test with RS256
+        key = Key.make_verifying_key("RS256", public_pem)
+        assert isinstance(key, RSAKey)
+        assert key.private_key == b""
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_verifying_key_with_ps_algorithms(self):
+        """Test Key.make_verifying_key() with PS algorithms."""
+        # Generate RSA key pair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        public_key = private_key.public_key()
+
+        # Serialize public key to PEM format
+        public_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        # Test with PS256, PS384, PS512
+        for alg in ["PS256", "PS384", "PS512"]:
+            key = Key.make_verifying_key(alg, public_pem)
+            assert isinstance(key, RSAKey)
+            assert key.private_key == b""
+            assert key.public_key == public_pem
