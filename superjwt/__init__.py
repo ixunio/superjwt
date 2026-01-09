@@ -14,12 +14,14 @@ from superjwt.definitions import (
     Validation,
 )
 from superjwt.jwt import JWT
-from superjwt.keys import BaseKey
+from superjwt.keys import BaseKey, ECKey, OctKey, OKPKey, RSAKey
 
 
 __all__ = [
     "JWT",
     "Alg",
+    "BaseKey",
+    "ECKey",
     "JOSEHeader",
     "JWSToken",
     "JWTBaseModel",
@@ -28,6 +30,9 @@ __all__ = [
     "JWTDatetimeFloat",
     "JWTDatetimeInt",
     "JWTValidation",
+    "OKPKey",
+    "OctKey",
+    "RSAKey",
     "Validation",
     "__version__",
     "decode",

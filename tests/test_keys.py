@@ -11,8 +11,18 @@ from .conftest import CRYPTOGRAPHY_AVAILABLE, requires_cryptography
 if CRYPTOGRAPHY_AVAILABLE:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import ec, rsa
-    from superjwt.keys import RSAKey
+    from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+    from superjwt.keys import ECKey, OKPKey, RSAKey
+
+
+@requires_cryptography
+class TestCheckCryptographyAvailable:
+    """Test the check_cryptography_available function."""
+
+    def test_check_cryptography_available_when_installed(self):
+        """Test that check passes when cryptography is installed."""
+        # Should not raise an error
+        check_cryptography_available()
 
 
 class TestNoneKey:
@@ -28,13 +38,6 @@ class TestNoneKey:
         """Test importing a NoneKey."""
         key = NoneKey.import_key(b"anything")
         assert isinstance(key, NoneKey)
-        assert key.private_key == b""
-        assert key.public_key == b""
-
-    def test_none_key_prepare_does_nothing(self):
-        """Test that prepare_key does nothing for NoneKey."""
-        key = NoneKey()
-        key.prepare_key(b"some data")
         assert key.private_key == b""
         assert key.public_key == b""
 
@@ -203,9 +206,11 @@ class TestRSAKey:
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
 
-    def test_rsa_key_name_attribute(self):
-        """Test that RSAKey has correct name attribute."""
+    def test_rsa_key_class_attributes(self):
+        """Test that RSAKey has correct ClassVar attributes."""
         assert RSAKey.name == "RSA"
+        assert RSAKey.private_key_types == (rsa.RSAPrivateKey,)
+        assert RSAKey.public_key_types == (rsa.RSAPublicKey,)
 
     def test_rsa_key_import_private_key_pkcs1(self, rsa_private_key_pkcs1):
         """Test importing RSA private key in PKCS#1 format."""
@@ -247,13 +252,13 @@ class TestRSAKey:
     def test_rsa_key_get_private_key(self, rsa_private_key_pkcs1):
         """Test getting the private key object for signing."""
         key = RSAKey.import_key(rsa_private_key_pkcs1)
-        private_key_obj = key.get_private_key()
+        private_key_obj = key._get_private_key()
         assert isinstance(private_key_obj, rsa.RSAPrivateKey)
 
     def test_rsa_key_get_public_key(self, rsa_private_key_pkcs1):
         """Test getting the public key object for verification."""
         key = RSAKey.import_key(rsa_private_key_pkcs1)
-        public_key_obj = key.get_public_key()
+        public_key_obj = key._get_public_key()
         assert isinstance(public_key_obj, rsa.RSAPublicKey)
 
     def test_rsa_key_get_private_key_from_public_only_raises_error(
@@ -266,7 +271,7 @@ class TestRSAKey:
         with pytest.raises(
             InvalidKeyError, match="does not have a private component for signing"
         ):
-            key.get_private_key()
+            key._get_private_key()
 
     def test_rsa_key_get_public_key_without_keys_raises_error(self):
         """Test that calling get_public_key() on an uninitialized key raises error."""
@@ -274,7 +279,7 @@ class TestRSAKey:
         with pytest.raises(
             InvalidKeyError, match="does not have a public component for verification"
         ):
-            key.get_public_key()
+            key._get_public_key()
 
     def test_rsa_key_invalid_pem_format_raises_error(self):
         """Test that invalid PEM format raises error for private key."""
@@ -457,20 +462,652 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(ValueError, match="Secret key must not be empty"):
             RSAKey.import_key(None, b"")
 
-    def test_rsa_key_prepare_key_with_no_keys_raises_error(self):
-        """Test that calling prepare_key directly with no keys raises InvalidKeyError."""
+    def test_rsa_key_public_keys_match_returns_true(self, rsa_private_key_pkcs1):
+        """Test that public_keys_match returns True when keys match."""
+        # Load the private key to extract its public key
+        private_key_obj = serialization.load_pem_private_key(
+            rsa_private_key_pkcs1, password=None, backend=default_backend()
+        )
+        public_key_obj = private_key_obj.public_key()
+
+        # Create RSAKey instance and test
         key = RSAKey()
-        with pytest.raises(
-            InvalidKeyError, match=r"No public key or private key available"
-        ):
-            key.prepare_key(None, None)
+        assert isinstance(public_key_obj, rsa.RSAPublicKey)
+        assert key.public_keys_match(public_key_obj, public_key_obj) is True
+
+    def test_rsa_key_public_keys_match_returns_false(self, rsa_private_key_pkcs1):
+        """Test that public_keys_match returns False when keys don't match."""
+        # Load the first private key
+        private_key_obj = serialization.load_pem_private_key(
+            rsa_private_key_pkcs1, password=None, backend=default_backend()
+        )
+        public_key_obj1 = private_key_obj.public_key()
+
+        # Generate a different key pair
+        different_private = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        public_key_obj2 = different_private.public_key()
+
+        # Test with mismatched keys
+        key = RSAKey()
+        assert isinstance(public_key_obj1, rsa.RSAPublicKey)
+        assert isinstance(public_key_obj2, rsa.RSAPublicKey)
+        assert key.public_keys_match(public_key_obj1, public_key_obj2) is False
 
 
 @requires_cryptography
-class TestCheckCryptographyAvailable:
-    """Test the check_cryptography_available function."""
+class TestECKey:
+    """Test ECKey (Elliptic Curve key) class."""
 
-    def test_check_cryptography_available_when_installed(self):
-        """Test that check passes when cryptography is installed."""
-        # Should not raise an error
-        check_cryptography_available()
+    @pytest.fixture
+    def ec_private_key_p256(self):
+        """Generate a test EC private key with P-256 curve."""
+        private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+        return private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+    @pytest.fixture
+    def ec_private_key_p384(self):
+        """Generate a test EC private key with P-384 curve."""
+        private_key = ec.generate_private_key(ec.SECP384R1(), default_backend())
+        return private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+    @pytest.fixture
+    def ec_private_key_p521(self):
+        """Generate a test EC private key with P-521 curve."""
+        private_key = ec.generate_private_key(ec.SECP521R1(), default_backend())
+        return private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+    @pytest.fixture
+    def ec_public_key_p256(self, ec_private_key_p256):
+        """Extract public key from EC private key with P-256."""
+        private_key = serialization.load_pem_private_key(
+            ec_private_key_p256, password=None, backend=default_backend()
+        )
+        return private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+    def test_ec_key_class_attributes(self):
+        """Test that ECKey has correct ClassVar attributes."""
+        assert ECKey.name == "EC"
+        assert ECKey.private_key_types == (ec.EllipticCurvePrivateKey,)
+        assert ECKey.public_key_types == (ec.EllipticCurvePublicKey,)
+
+    def test_ec_key_import_private_key_p256(self, ec_private_key_p256):
+        """Test importing EC private key with P-256 curve."""
+        key = ECKey.import_key(ec_private_key_p256)
+        assert isinstance(key, ECKey)
+        assert key.private_key == ec_private_key_p256
+        assert key.public_key != b""
+        assert b"BEGIN PUBLIC KEY" in key.public_key
+        assert key._private_key_obj is not None
+        assert key._public_key_obj is not None
+
+    def test_ec_key_import_private_key_p384(self, ec_private_key_p384):
+        """Test importing EC private key with P-384 curve."""
+        key = ECKey.import_key(ec_private_key_p384)
+        assert isinstance(key, ECKey)
+        assert key.private_key == ec_private_key_p384
+        assert key.public_key != b""
+        assert key._private_key_obj is not None
+
+    def test_ec_key_import_private_key_p521(self, ec_private_key_p521):
+        """Test importing EC private key with P-521 curve."""
+        key = ECKey.import_key(ec_private_key_p521)
+        assert isinstance(key, ECKey)
+        assert key.private_key == ec_private_key_p521
+        assert key.public_key != b""
+        assert key._private_key_obj is not None
+
+    def test_ec_key_import_public_key(self, ec_public_key_p256):
+        """Test importing EC public key."""
+        key = ECKey.import_key(public_key=ec_public_key_p256)
+        assert isinstance(key, ECKey)
+        assert key.private_key == b""
+        assert key.public_key == ec_public_key_p256
+        assert key._private_key_obj is None
+        assert key._public_key_obj is not None
+
+    def test_ec_key_get_private_key(self, ec_private_key_p256):
+        """Test getting the private key object for signing."""
+        key = ECKey.import_key(ec_private_key_p256)
+        private_key_obj = key._get_private_key()
+        assert isinstance(private_key_obj, ec.EllipticCurvePrivateKey)
+
+    def test_ec_key_get_public_key(self, ec_private_key_p256):
+        """Test getting the public key object for verification."""
+        key = ECKey.import_key(ec_private_key_p256)
+        public_key_obj = key._get_public_key()
+        assert isinstance(public_key_obj, ec.EllipticCurvePublicKey)
+
+    def test_ec_key_get_private_key_from_public_only_raises_error(
+        self, ec_public_key_p256
+    ):
+        """Test that getting private key from public-only key raises error."""
+        key = ECKey.import_key(public_key=ec_public_key_p256)
+        with pytest.raises(
+            InvalidKeyError, match="does not have a private component for signing"
+        ):
+            key._get_private_key()
+
+    def test_ec_key_get_public_key_without_keys_raises_error(self):
+        """Test that calling get_public_key() on an uninitialized key raises error."""
+        key = ECKey()
+        with pytest.raises(
+            InvalidKeyError, match="does not have a public component for verification"
+        ):
+            key._get_public_key()
+
+    def test_ec_key_invalid_pem_format_raises_error(self):
+        """Test that invalid PEM format raises error for private key."""
+        with pytest.raises(
+            InvalidKeyError, match=r"EC private key must be in PEM format"
+        ):
+            ECKey.import_key(b"not a pem key")
+
+    def test_ec_key_invalid_pem_format_public_key_raises_error(self):
+        """Test that invalid PEM format raises error for public key."""
+        with pytest.raises(InvalidKeyError, match=r"EC public key must be in PEM format"):
+            ECKey.import_key(public_key=b"not a pem public key")
+
+    def test_ec_key_invalid_key_data_raises_error(self):
+        """Test that invalid key data raises error."""
+        invalid_pem = b"""-----BEGIN PRIVATE KEY-----
+invalid base64 data!!!
+-----END PRIVATE KEY-----"""
+        with pytest.raises(InvalidKeyError, match=r"Unable to parse EC (private )?key"):
+            ECKey.import_key(invalid_pem)
+
+    def test_ec_key_public_key_extracted_from_private(self, ec_private_key_p256):
+        """Test that public key is correctly extracted from private key."""
+        # Import private key
+        key = ECKey.import_key(ec_private_key_p256)
+
+        # Load the original private key to compare
+        original_private = serialization.load_pem_private_key(
+            ec_private_key_p256, password=None, backend=default_backend()
+        )
+        original_public = original_private.public_key()
+
+        # Verify the public key matches
+        key_public = serialization.load_pem_public_key(
+            key.public_key, backend=default_backend()
+        )
+
+        # Compare public numbers (ensure they're EC keys)
+        assert isinstance(key_public, ec.EllipticCurvePublicKey)
+        assert isinstance(original_public, ec.EllipticCurvePublicKey)
+        assert key_public.public_numbers() == original_public.public_numbers()
+
+    def test_ec_key_empty_string_raises_error(self):
+        """Test that empty string raises ValueError."""
+        with pytest.raises(ValueError, match="Secret key must not be empty"):
+            ECKey.import_key("")
+
+    def test_ec_key_none_raises_error(self):
+        """Test that None raises ValueError."""
+        with pytest.raises(ValueError, match="Secret key must not be empty"):
+            ECKey.import_key(None)  # type: ignore
+
+    def test_ec_key_both_keys_valid_match(self, ec_private_key_p256, ec_public_key_p256):
+        """Test that providing both private and public key works when they match."""
+        # Import with both keys - should work since public key matches private key
+        key = ECKey.import_key(ec_private_key_p256, ec_public_key_p256)
+        assert isinstance(key, ECKey)
+        assert key.private_key == ec_private_key_p256
+        assert key.public_key == ec_public_key_p256
+        assert key._private_key_obj is not None
+        assert key._public_key_obj is not None
+
+    def test_ec_key_both_keys_mismatched_raises_error(self, ec_private_key_p256):
+        """Test that providing mismatched private and public keys raises an error."""
+        # Generate a different key pair
+        different_private = ec.generate_private_key(ec.SECP256R1(), default_backend())
+        different_public_pem = different_private.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        # Try to import with mismatched keys
+        with pytest.raises(
+            InvalidKeyError,
+            match="Provided public key does not match the public key derived from the private key",
+        ):
+            ECKey.import_key(ec_private_key_p256, different_public_pem)
+
+    def test_ec_key_import_signing_key(self, ec_private_key_p256):
+        """Test importing ECKey via import_signing_key with private key."""
+        key = ECKey.import_signing_key(ec_private_key_p256)
+        assert isinstance(key, ECKey)
+        assert key.private_key == ec_private_key_p256
+        assert key.public_key != b""
+        assert key._private_key_obj is not None
+        assert key._public_key_obj is not None
+
+    def test_ec_key_import_verifying_key(self, ec_public_key_p256):
+        """Test importing ECKey via import_verifying_key with public key."""
+        key = ECKey.import_verifying_key(ec_public_key_p256)
+        assert isinstance(key, ECKey)
+        assert key.private_key == b""
+        assert key.public_key == ec_public_key_p256
+        assert key._private_key_obj is None
+        assert key._public_key_obj is not None
+
+    def test_ec_key_invalid_private_key_data_raises_error(self):
+        """Test that corrupted private key data raises InvalidKeyError."""
+        invalid_private_key = b"""-----BEGIN PRIVATE KEY-----
+CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
+-----END PRIVATE KEY-----"""
+        with pytest.raises(InvalidKeyError, match=r"Unable to parse EC private key"):
+            ECKey.import_key(invalid_private_key)
+
+    def test_ec_key_non_ec_private_key_raises_error(self):
+        """Test that providing a non-EC private key (e.g., RSA key) raises InvalidKeyError."""
+        # Generate an RSA private key instead of EC
+        rsa_private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        rsa_private_key_pem = rsa_private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        with pytest.raises(InvalidKeyError, match=r"Key must be an EC private key"):
+            ECKey.import_key(rsa_private_key_pem)
+
+    def test_ec_key_invalid_public_key_data_raises_error(self):
+        """Test that corrupted public key data raises InvalidKeyError."""
+        invalid_public_key = b"""-----BEGIN PUBLIC KEY-----
+CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
+-----END PUBLIC KEY-----"""
+        with pytest.raises(InvalidKeyError, match=r"Unable to parse EC public key"):
+            ECKey.import_key(public_key=invalid_public_key)
+
+    def test_ec_key_non_ec_public_key_raises_error(self):
+        """Test that providing a non-EC public key (e.g., RSA key) raises InvalidKeyError."""
+        # Generate an RSA public key instead of EC
+        rsa_private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        rsa_public_key = rsa_private_key.public_key()
+        rsa_public_key_pem = rsa_public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        with pytest.raises(InvalidKeyError, match=r"Key must be an EC public key"):
+            ECKey.import_key(public_key=rsa_public_key_pem)
+
+    def test_ec_key_small_curve_warning_private(self):
+        """Test that small EC curve private key triggers security warning."""
+        # Generate a key with P-192 (weak curve)
+        small_private_key = ec.generate_private_key(ec.SECP192R1(), default_backend())
+        small_private_pem = small_private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+        with pytest.warns(
+            KeyLengthSecurityWarning,
+            match=r"EC curve.*has weak security",
+        ):
+            ECKey.import_key(small_private_pem)
+
+    def test_ec_key_small_curve_warning_public(self):
+        """Test that small EC curve public key triggers security warning."""
+        # Generate a key with P-224 (weak curve)
+        small_private_key = ec.generate_private_key(ec.SECP224R1(), default_backend())
+        small_public_pem = small_private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        with pytest.warns(
+            KeyLengthSecurityWarning,
+            match=r"EC curve.*has weak security",
+        ):
+            ECKey.import_key(public_key=small_public_pem)
+
+    def test_ec_key_empty_public_key_raises_error(self):
+        """Test that empty public_key parameter raises ValueError."""
+        with pytest.raises(ValueError, match="Secret key must not be empty"):
+            ECKey.import_key(None, b"")
+
+    def test_ec_key_public_keys_match_returns_true(self, ec_private_key_p256):
+        """Test that public_keys_match returns True when keys match."""
+        # Load the private key to extract its public key
+        private_key_obj = serialization.load_pem_private_key(
+            ec_private_key_p256, password=None, backend=default_backend()
+        )
+        public_key_obj = private_key_obj.public_key()
+
+        # Create ECKey instance and test
+        key = ECKey()
+        assert isinstance(public_key_obj, ec.EllipticCurvePublicKey)
+        assert key.public_keys_match(public_key_obj, public_key_obj) is True
+
+    def test_ec_key_public_keys_match_returns_false(self, ec_private_key_p256):
+        """Test that public_keys_match returns False when keys don't match."""
+        # Load the first private key
+        private_key_obj = serialization.load_pem_private_key(
+            ec_private_key_p256, password=None, backend=default_backend()
+        )
+        public_key_obj1 = private_key_obj.public_key()
+
+        # Generate a different key pair
+        different_private = ec.generate_private_key(ec.SECP256R1(), default_backend())
+        public_key_obj2 = different_private.public_key()
+
+        # Test with mismatched keys
+        key = ECKey()
+        assert isinstance(public_key_obj1, ec.EllipticCurvePublicKey)
+        assert isinstance(public_key_obj2, ec.EllipticCurvePublicKey)
+        assert key.public_keys_match(public_key_obj1, public_key_obj2) is False
+
+
+@requires_cryptography
+class TestOKPKey:
+    """Test OKPKey (Octet Key Pair for EdDSA) class."""
+
+    @pytest.fixture
+    def okp_private_key_ed25519(self):
+        """Generate a test Ed25519 private key."""
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        return private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+    @pytest.fixture
+    def okp_private_key_ed448(self):
+        """Generate a test Ed448 private key."""
+        private_key = ed448.Ed448PrivateKey.generate()
+        return private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+    @pytest.fixture
+    def okp_public_key_ed25519(self, okp_private_key_ed25519):
+        """Extract public key from Ed25519 private key."""
+        private_key = serialization.load_pem_private_key(
+            okp_private_key_ed25519, password=None, backend=default_backend()
+        )
+        return private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+    def test_okp_key_class_attributes(self):
+        """Test that OKPKey has correct ClassVar attributes."""
+        assert OKPKey.name == "OKP"
+        assert OKPKey.private_key_types == (
+            ed25519.Ed25519PrivateKey,
+            ed448.Ed448PrivateKey,
+        )
+        assert OKPKey.public_key_types == (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)
+
+    def test_okp_key_import_private_key_ed25519(self, okp_private_key_ed25519):
+        """Test importing Ed25519 private key."""
+        key = OKPKey.import_key(okp_private_key_ed25519)
+        assert isinstance(key, OKPKey)
+        assert key.private_key == okp_private_key_ed25519
+        assert key.public_key != b""
+        assert b"BEGIN PUBLIC KEY" in key.public_key
+        assert key._private_key_obj is not None
+        assert key._public_key_obj is not None
+
+    def test_okp_key_import_private_key_ed448(self, okp_private_key_ed448):
+        """Test importing Ed448 private key."""
+        key = OKPKey.import_key(okp_private_key_ed448)
+        assert isinstance(key, OKPKey)
+        assert key.private_key == okp_private_key_ed448
+        assert key.public_key != b""
+        assert key._private_key_obj is not None
+        assert isinstance(key._private_key_obj, ed448.Ed448PrivateKey)
+
+    def test_okp_key_import_public_key(self, okp_public_key_ed25519):
+        """Test importing Ed25519 public key."""
+        key = OKPKey.import_key(public_key=okp_public_key_ed25519)
+        assert isinstance(key, OKPKey)
+        assert key.private_key == b""
+        assert key.public_key == okp_public_key_ed25519
+        assert key._private_key_obj is None
+        assert key._public_key_obj is not None
+
+    def test_okp_key_get_private_key(self, okp_private_key_ed25519):
+        """Test getting the private key object for signing."""
+        key = OKPKey.import_key(okp_private_key_ed25519)
+        private_key_obj = key._get_private_key()
+        assert isinstance(private_key_obj, ed25519.Ed25519PrivateKey)
+
+    def test_okp_key_get_public_key(self, okp_private_key_ed25519):
+        """Test getting the public key object for verification."""
+        key = OKPKey.import_key(okp_private_key_ed25519)
+        public_key_obj = key._get_public_key()
+        assert isinstance(public_key_obj, ed25519.Ed25519PublicKey)
+
+    def test_okp_key_get_private_key_from_public_only_raises_error(
+        self, okp_public_key_ed25519
+    ):
+        """Test that getting private key from public-only key raises error."""
+        key = OKPKey.import_key(public_key=okp_public_key_ed25519)
+        with pytest.raises(
+            InvalidKeyError, match="does not have a private component for signing"
+        ):
+            key._get_private_key()
+
+    def test_okp_key_get_public_key_without_keys_raises_error(self):
+        """Test that calling get_public_key() on an uninitialized key raises error."""
+        key = OKPKey()
+        with pytest.raises(
+            InvalidKeyError, match="does not have a public component for verification"
+        ):
+            key._get_public_key()
+
+    def test_okp_key_invalid_pem_format_raises_error(self):
+        """Test that invalid PEM format raises error for private key."""
+        with pytest.raises(
+            InvalidKeyError, match=r"OKP private key must be in PEM format"
+        ):
+            OKPKey.import_key(b"not a pem key")
+
+    def test_okp_key_invalid_pem_format_public_key_raises_error(self):
+        """Test that invalid PEM format raises error for public key."""
+        with pytest.raises(
+            InvalidKeyError, match=r"OKP public key must be in PEM format"
+        ):
+            OKPKey.import_key(public_key=b"not a pem public key")
+
+    def test_okp_key_invalid_key_data_raises_error(self):
+        """Test that invalid key data raises error."""
+        invalid_pem = b"""-----BEGIN PRIVATE KEY-----
+invalid base64 data!!!
+-----END PRIVATE KEY-----"""
+        with pytest.raises(InvalidKeyError, match=r"Unable to parse OKP (private )?key"):
+            OKPKey.import_key(invalid_pem)
+
+    def test_okp_key_public_key_extracted_from_private(self, okp_private_key_ed25519):
+        """Test that public key is correctly extracted from private key."""
+        # Import private key
+        key = OKPKey.import_key(okp_private_key_ed25519)
+
+        # Load the original private key to compare
+        original_private = serialization.load_pem_private_key(
+            okp_private_key_ed25519, password=None, backend=default_backend()
+        )
+        original_public = original_private.public_key()
+
+        # Verify the public key matches
+        key_public = serialization.load_pem_public_key(
+            key.public_key, backend=default_backend()
+        )
+
+        # Compare raw bytes (ensure they're EdDSA keys)
+        assert isinstance(key_public, ed25519.Ed25519PublicKey)
+        assert isinstance(original_public, ed25519.Ed25519PublicKey)
+        assert key_public.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        ) == original_public.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+
+    def test_okp_key_empty_string_raises_error(self):
+        """Test that empty string raises ValueError."""
+        with pytest.raises(ValueError, match="Secret key must not be empty"):
+            OKPKey.import_key("")
+
+    def test_okp_key_none_raises_error(self):
+        """Test that None raises ValueError."""
+        with pytest.raises(ValueError, match="Secret key must not be empty"):
+            OKPKey.import_key(None)  # type: ignore
+
+    def test_okp_key_both_keys_valid_match(
+        self, okp_private_key_ed25519, okp_public_key_ed25519
+    ):
+        """Test that providing both private and public key works when they match."""
+        # Import with both keys - should work since public key matches private key
+        key = OKPKey.import_key(okp_private_key_ed25519, okp_public_key_ed25519)
+        assert isinstance(key, OKPKey)
+        assert key.private_key == okp_private_key_ed25519
+        assert key.public_key == okp_public_key_ed25519
+        assert key._private_key_obj is not None
+        assert key._public_key_obj is not None
+
+    def test_okp_key_both_keys_mismatched_raises_error(self, okp_private_key_ed25519):
+        """Test that providing mismatched private and public keys raises an error."""
+        # Generate a different key pair
+        different_private = ed25519.Ed25519PrivateKey.generate()
+        different_public_pem = different_private.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        # Try to import with mismatched keys
+        with pytest.raises(
+            InvalidKeyError,
+            match="Provided public key does not match the public key derived from the private key",
+        ):
+            OKPKey.import_key(okp_private_key_ed25519, different_public_pem)
+
+    def test_okp_key_import_signing_key(self, okp_private_key_ed25519):
+        """Test importing OKPKey via import_signing_key with private key."""
+        key = OKPKey.import_signing_key(okp_private_key_ed25519)
+        assert isinstance(key, OKPKey)
+        assert key.private_key == okp_private_key_ed25519
+        assert key.public_key != b""
+        assert key._private_key_obj is not None
+        assert key._public_key_obj is not None
+
+    def test_okp_key_import_verifying_key(self, okp_public_key_ed25519):
+        """Test importing OKPKey via import_verifying_key with public key."""
+        key = OKPKey.import_verifying_key(okp_public_key_ed25519)
+        assert isinstance(key, OKPKey)
+        assert key.private_key == b""
+        assert key.public_key == okp_public_key_ed25519
+        assert key._private_key_obj is None
+        assert key._public_key_obj is not None
+
+    def test_okp_key_invalid_private_key_data_raises_error(self):
+        """Test that corrupted private key data raises InvalidKeyError."""
+        invalid_private_key = b"""-----BEGIN PRIVATE KEY-----
+CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
+-----END PRIVATE KEY-----"""
+        with pytest.raises(InvalidKeyError, match=r"Unable to parse OKP private key"):
+            OKPKey.import_key(invalid_private_key)
+
+    def test_okp_key_non_okp_private_key_raises_error(self):
+        """Test that providing a non-EdDSA private key (e.g., RSA key) raises InvalidKeyError."""
+        # Generate an RSA private key instead of EdDSA
+        rsa_private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        rsa_private_key_pem = rsa_private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        with pytest.raises(InvalidKeyError, match=r"Key must be an OKP private key"):
+            OKPKey.import_key(rsa_private_key_pem)
+
+    def test_okp_key_invalid_public_key_data_raises_error(self):
+        """Test that corrupted public key data raises InvalidKeyError."""
+        invalid_public_key = b"""-----BEGIN PUBLIC KEY-----
+CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
+-----END PUBLIC KEY-----"""
+        with pytest.raises(InvalidKeyError, match=r"Unable to parse OKP public key"):
+            OKPKey.import_key(public_key=invalid_public_key)
+
+    def test_okp_key_non_okp_public_key_raises_error(self):
+        """Test that providing a non-EdDSA public key (e.g., RSA key) raises InvalidKeyError."""
+        # Generate an RSA public key instead of EdDSA
+        rsa_private_key = rsa.generate_private_key(
+            public_exponent=65537, key_size=2048, backend=default_backend()
+        )
+        rsa_public_key = rsa_private_key.public_key()
+        rsa_public_key_pem = rsa_public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        with pytest.raises(InvalidKeyError, match=r"Key must be an OKP public key"):
+            OKPKey.import_key(public_key=rsa_public_key_pem)
+
+    def test_okp_key_empty_public_key_raises_error(self):
+        """Test that empty public_key parameter raises ValueError."""
+        with pytest.raises(ValueError, match="Secret key must not be empty"):
+            OKPKey.import_key(None, b"")
+
+    def test_okp_key_public_keys_match_returns_true(self, okp_private_key_ed25519):
+        """Test that public_keys_match returns True when keys match."""
+        # Load the private key to extract its public key
+        private_key_obj = serialization.load_pem_private_key(
+            okp_private_key_ed25519, password=None, backend=default_backend()
+        )
+        public_key_obj = private_key_obj.public_key()
+
+        # Create OKPKey instance and test
+        key = OKPKey()
+        assert isinstance(
+            public_key_obj, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)
+        )
+        assert key.public_keys_match(public_key_obj, public_key_obj) is True
+
+    def test_okp_key_public_keys_match_returns_false(self, okp_private_key_ed25519):
+        """Test that public_keys_match returns False when keys don't match."""
+        # Load the first private key
+        private_key_obj = serialization.load_pem_private_key(
+            okp_private_key_ed25519, password=None, backend=default_backend()
+        )
+        public_key_obj1 = private_key_obj.public_key()
+
+        # Generate a different key pair
+        different_private = ed25519.Ed25519PrivateKey.generate()
+        public_key_obj2 = different_private.public_key()
+
+        # Test with mismatched keys
+        key = OKPKey()
+        assert isinstance(
+            public_key_obj1, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)
+        )
+        assert isinstance(
+            public_key_obj2, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)
+        )
+        assert key.public_keys_match(public_key_obj1, public_key_obj2) is False

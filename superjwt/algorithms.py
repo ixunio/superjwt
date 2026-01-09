@@ -110,13 +110,13 @@ class RSAAlgorithm(BaseJWSAlgorithm[RSAKey]):
 
     def sign(self, data: bytes, key: RSAKey) -> bytes:
         """Sign data using RSA private key."""
-        private_key = key.get_private_key()
+        private_key = key._get_private_key()
         return private_key.sign(data, self.padding, self.hash_algorithm)
 
     def verify(self, data: bytes, signature: bytes, key: RSAKey) -> bool:
         """Verify signature using RSA public key."""
 
-        public_key = key.get_public_key()
+        public_key = key._get_public_key()
         try:
             public_key.verify(signature, data, self.padding, self.hash_algorithm)
             return True
