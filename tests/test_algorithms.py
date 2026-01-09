@@ -1,27 +1,30 @@
 import pytest
 from superjwt.algorithms import (
+    Ed448Algorithm,
+    Ed25519Algorithm,
+    ES256Algorithm,
+    ES256KAlgorithm,
+    ES384Algorithm,
+    ES512Algorithm,
     HS256Algorithm,
     HS384Algorithm,
     HS512Algorithm,
     NoneAlgorithm,
+    PS256Algorithm,
+    PS384Algorithm,
+    PS512Algorithm,
+    RS256Algorithm,
+    RS384Algorithm,
+    RS512Algorithm,
 )
-from superjwt.exceptions import SuperJWTError
-from superjwt.keys import NoneKey, OctKey
+from superjwt.exceptions import InvalidKeyError, SuperJWTError
+from superjwt.keys import ECKey, NoneKey, OctKey, OKPKey, RSAKey
 
 from .conftest import CRYPTOGRAPHY_AVAILABLE, requires_cryptography
 
 
 if CRYPTOGRAPHY_AVAILABLE:
     from cryptography.hazmat.primitives import serialization
-    from superjwt.algorithms import (
-        PS256Algorithm,
-        PS384Algorithm,
-        PS512Algorithm,
-        RS256Algorithm,
-        RS384Algorithm,
-        RS512Algorithm,
-    )
-    from superjwt.keys import RSAKey
 
 
 # Use session-scoped fixture from conftest.py - alias it for compatibility
@@ -29,6 +32,45 @@ if CRYPTOGRAPHY_AVAILABLE:
 def rsa_key_pair(rsa_2048_key_pair):
     """Alias for session-scoped RSA key pair fixture."""
     return rsa_2048_key_pair
+
+
+class TestSymmetricAlgorithmKeyTypes:
+    """Test that algorithms have correct key types defined."""
+
+    def test_hmac_algorithms_key_type(self):
+        """Test that HMAC algorithms specify OctKey as key type."""
+        assert HS256Algorithm.key_type is OctKey
+        assert HS384Algorithm.key_type is OctKey
+        assert HS512Algorithm.key_type is OctKey
+
+
+@requires_cryptography
+class TestAsymmetricAlgorithmKeyTypes:
+    """Test that asymmetric algorithms have correct key types defined."""
+
+    def test_rsa_algorithms_key_type(self):
+        """Test that RSA algorithms specify RSAKey as key type."""
+        assert RS256Algorithm.key_type is RSAKey
+        assert RS384Algorithm.key_type is RSAKey
+        assert RS512Algorithm.key_type is RSAKey
+
+    def test_rsa_pss_algorithms_key_type(self):
+        """Test that RSA-PSS algorithms specify RSAKey as key type."""
+        assert PS256Algorithm.key_type is RSAKey
+        assert PS384Algorithm.key_type is RSAKey
+        assert PS512Algorithm.key_type is RSAKey
+
+    def test_ecdsa_algorithms_key_type(self):
+        """Test that ECDSA algorithms specify ECKey as key type."""
+        assert ES256Algorithm.key_type is ECKey
+        assert ES256KAlgorithm.key_type is ECKey
+        assert ES384Algorithm.key_type is ECKey
+        assert ES512Algorithm.key_type is ECKey
+
+    def test_eddsa_algorithms_key_type(self):
+        """Test that EdDSA algorithms specify OKPKey as key type."""
+        assert Ed25519Algorithm.key_type is OKPKey
+        assert Ed448Algorithm.key_type is OKPKey
 
 
 class TestNoneAlgorithm:
@@ -540,25 +582,367 @@ class TestRSAPSSAlgorithms:
         assert algo.verify(data, sig3, public_key)
 
 
-class TestAlgorithmKeyTypes:
-    """Test that algorithms have correct key types defined."""
+@requires_cryptography
+class TestECDSAAlgorithms:
+    """Test suite for ECDSA algorithms (ES256, ES256K, ES384, ES512)."""
 
-    def test_hmac_algorithms_key_type(self):
-        """Test that HMAC algorithms specify OctKey as key type."""
-        assert HS256Algorithm.key_type is OctKey
-        assert HS384Algorithm.key_type is OctKey
-        assert HS512Algorithm.key_type is OctKey
+    @pytest.fixture
+    def test_data(self):
+        """Test data to sign."""
+        return b"The quick brown fox jumps over the lazy dog"
 
-    @requires_cryptography
-    def test_rsa_algorithms_key_type(self):
-        """Test that RSA algorithms specify RSAKey as key type."""
-        assert RS256Algorithm.key_type is RSAKey
-        assert RS384Algorithm.key_type is RSAKey
-        assert RS512Algorithm.key_type is RSAKey
+    def test_es256_sign_and_verify(self, ec_p256_key_pair, test_data):
+        """Test ES256 (ECDSA with P-256 and SHA-256) signing and verification."""
+        algorithm = ES256Algorithm()
+        private_key = ec_p256_key_pair.private_key
+        public_key = ec_p256_key_pair.public_key
 
-    @requires_cryptography
-    def test_rsa_pss_algorithms_key_type(self):
-        """Test that RSA-PSS algorithms specify RSAKey as key type."""
-        assert PS256Algorithm.key_type is RSAKey
-        assert PS384Algorithm.key_type is RSAKey
-        assert PS512Algorithm.key_type is RSAKey
+        signature = algorithm.sign(test_data, private_key)
+        assert isinstance(signature, bytes)
+        assert len(signature) > 0
+
+        assert algorithm.verify(test_data, signature, public_key)
+
+    def test_es384_sign_and_verify(self, ec_p384_key_pair, test_data):
+        """Test ES384 (ECDSA with P-384 and SHA-384) signing and verification."""
+        algorithm = ES384Algorithm()
+        private_key = ec_p384_key_pair.private_key
+        public_key = ec_p384_key_pair.public_key
+
+        signature = algorithm.sign(test_data, private_key)
+        assert isinstance(signature, bytes)
+        assert len(signature) > 0
+
+        assert algorithm.verify(test_data, signature, public_key)
+
+    def test_es512_sign_and_verify(self, ec_p521_key_pair, test_data):
+        """Test ES512 (ECDSA with P-521 and SHA-512) signing and verification."""
+        algorithm = ES512Algorithm()
+        private_key = ec_p521_key_pair.private_key
+        public_key = ec_p521_key_pair.public_key
+
+        signature = algorithm.sign(test_data, private_key)
+        assert isinstance(signature, bytes)
+        assert len(signature) > 0
+
+        assert algorithm.verify(test_data, signature, public_key)
+
+    def test_es256k_algorithm_name(self):
+        """Test ES256K algorithm name (secp256k1 curve)."""
+        algorithm = ES256KAlgorithm()
+        assert algorithm.name == "ES256K"
+        assert "secp256k1" in algorithm.description
+
+    def test_ecdsa_verify_with_private_key(self, ec_p256_key_pair, test_data):
+        """Test that ECDSA verification works with private key (contains public key)."""
+        algorithm = ES256Algorithm()
+        private_key = ec_p256_key_pair.private_key
+
+        signature = algorithm.sign(test_data, private_key)
+        # Verify with private key (which contains public key)
+        assert algorithm.verify(test_data, signature, private_key)
+
+    def test_ecdsa_invalid_signature(self, ec_p256_key_pair, test_data):
+        """Test that ECDSA verification fails with invalid signature."""
+        algorithm = ES256Algorithm()
+        public_key = ec_p256_key_pair.public_key
+
+        # Create an invalid signature (wrong length for P-256)
+        invalid_signature = b"invalid_signature_data"
+
+        assert not algorithm.verify(test_data, invalid_signature, public_key)
+
+    def test_ecdsa_wrong_key(self, ec_p256_key_pair, ec_p256_key_pair_alt, test_data):
+        """Test that ECDSA verification fails with wrong key."""
+        algorithm = ES256Algorithm()
+        private_key = ec_p256_key_pair.private_key
+        wrong_public_key = ec_p256_key_pair_alt.public_key
+
+        signature = algorithm.sign(test_data, private_key)
+
+        # Verification should fail with wrong key
+        assert not algorithm.verify(test_data, signature, wrong_public_key)
+
+    def test_ecdsa_tampered_data(self, ec_p256_key_pair, test_data):
+        """Test that ECDSA verification fails with tampered data."""
+        algorithm = ES256Algorithm()
+        private_key = ec_p256_key_pair.private_key
+        public_key = ec_p256_key_pair.public_key
+
+        signature = algorithm.sign(test_data, private_key)
+
+        # Tamper with the data
+        tampered_data = test_data + b"extra"
+
+        # Verification should fail
+        assert not algorithm.verify(tampered_data, signature, public_key)
+
+    def test_ecdsa_sign_requires_private_key(self, ec_p256_key_pair, test_data):
+        """Test that ECDSA signing requires private key."""
+        algorithm = ES256Algorithm()
+        public_key = ec_p256_key_pair.public_key
+
+        with pytest.raises(InvalidKeyError):
+            algorithm.sign(test_data, public_key)
+
+    def test_ecdsa_check_key_validates_type(self, ec_p256_key_pair):
+        """Test that ECDSA check_key validates key type."""
+        algorithm = ES256Algorithm()
+        ec_key = ec_p256_key_pair.private_key
+        oct_key = OctKey.import_key(b"secret")
+
+        # Should not raise for ECKey
+        algorithm.check_key(ec_key)
+
+        # Should raise for wrong key type
+        with pytest.raises(SuperJWTError, match="Key must be an ECKey"):
+            algorithm.check_key(oct_key)  # type: ignore
+
+    def test_ecdsa_algorithm_names(self):
+        """Test that ECDSA algorithms have correct names."""
+        assert ES256Algorithm.name == "ES256"
+        assert ES384Algorithm.name == "ES384"
+        assert ES512Algorithm.name == "ES512"
+
+    def test_ecdsa_different_curves_produce_different_signatures(
+        self, ec_p256_key_pair, ec_p384_key_pair, test_data
+    ):
+        """Test that different curves produce different signature sizes."""
+        es256 = ES256Algorithm()
+        es384 = ES384Algorithm()
+
+        sig256 = es256.sign(test_data, ec_p256_key_pair.private_key)
+        sig384 = es384.sign(test_data, ec_p384_key_pair.private_key)
+
+        # Different curves should produce different signature sizes
+        assert len(sig256) != len(sig384)
+
+    def test_ecdsa_randomization(self, ec_p256_key_pair, test_data):
+        """Test that ECDSA produces different signatures for the same data (due to randomness)."""
+        algorithm = ES256Algorithm()
+        private_key = ec_p256_key_pair.private_key
+        public_key = ec_p256_key_pair.public_key
+
+        # Generate multiple signatures of the same data
+        sig1 = algorithm.sign(test_data, private_key)
+        sig2 = algorithm.sign(test_data, private_key)
+        sig3 = algorithm.sign(test_data, private_key)
+
+        # ECDSA includes randomness, so signatures should be different
+        assert sig1 != sig2
+        assert sig1 != sig3
+        assert sig2 != sig3
+
+        # But all should verify correctly
+        assert algorithm.verify(test_data, sig1, public_key)
+        assert algorithm.verify(test_data, sig2, public_key)
+        assert algorithm.verify(test_data, sig3, public_key)
+
+    def test_ecdsa_curve_mismatch_p256_key_with_es384_algo(
+        self, ec_p256_key_pair, test_data
+    ):
+        """Test that using P-256 key with ES384 algorithm raises curve mismatch error."""
+        es384 = ES384Algorithm()
+
+        # Should raise error due to curve mismatch (P-256 key with ES384 which expects P-384)
+        with pytest.raises(SuperJWTError, match="curve"):
+            es384.sign(test_data, ec_p256_key_pair.private_key)
+
+    def test_ecdsa_curve_mismatch_p384_key_with_es256_algo(
+        self, ec_p384_key_pair, test_data
+    ):
+        """Test that using P-384 key with ES256 algorithm raises curve mismatch error."""
+        es256 = ES256Algorithm()
+
+        # Should raise error due to curve mismatch (P-384 key with ES256 which expects P-256)
+        with pytest.raises(SuperJWTError, match="curve"):
+            es256.sign(test_data, ec_p384_key_pair.private_key)
+
+
+@requires_cryptography
+class TestEdDSAAlgorithms:
+    """Test suite for EdDSA algorithms (Ed25519, Ed448)."""
+
+    @pytest.fixture
+    def test_data(self):
+        """Test data to sign."""
+        return b"The quick brown fox jumps over the lazy dog"
+
+    def test_ed25519_sign_and_verify(self, ed25519_key_pair, test_data):
+        """Test Ed25519 signing and verification."""
+        algorithm = Ed25519Algorithm()
+        private_key = ed25519_key_pair.private_key
+        public_key = ed25519_key_pair.public_key
+
+        signature = algorithm.sign(test_data, private_key)
+        assert isinstance(signature, bytes)
+        assert len(signature) == 64  # Ed25519 signatures are always 64 bytes
+
+        assert algorithm.verify(test_data, signature, public_key)
+
+    def test_ed448_sign_and_verify(self, ed448_key_pair, test_data):
+        """Test Ed448 signing and verification."""
+        algorithm = Ed448Algorithm()
+        private_key = ed448_key_pair.private_key
+        public_key = ed448_key_pair.public_key
+
+        signature = algorithm.sign(test_data, private_key)
+        assert isinstance(signature, bytes)
+        assert len(signature) == 114  # Ed448 signatures are always 114 bytes
+
+        assert algorithm.verify(test_data, signature, public_key)
+
+    def test_eddsa_verify_with_private_key(self, ed25519_key_pair, test_data):
+        """Test that EdDSA verification works with private key (contains public key)."""
+        algorithm = Ed25519Algorithm()
+        private_key = ed25519_key_pair.private_key
+
+        signature = algorithm.sign(test_data, private_key)
+        # Verify with private key (which contains public key)
+        assert algorithm.verify(test_data, signature, private_key)
+
+    def test_eddsa_invalid_signature(self, ed25519_key_pair, test_data):
+        """Test that EdDSA verification fails with invalid signature."""
+        algorithm = Ed25519Algorithm()
+        public_key = ed25519_key_pair.public_key
+
+        # Create an invalid signature (wrong length)
+        invalid_signature = b"invalid_signature_data"
+
+        assert not algorithm.verify(test_data, invalid_signature, public_key)
+
+    def test_eddsa_wrong_key(self, ed25519_key_pair, ed25519_key_pair_alt, test_data):
+        """Test that EdDSA verification fails with wrong key."""
+        algorithm = Ed25519Algorithm()
+        private_key = ed25519_key_pair.private_key
+        wrong_public_key = ed25519_key_pair_alt.public_key
+
+        signature = algorithm.sign(test_data, private_key)
+
+        # Verification should fail with wrong key
+        assert not algorithm.verify(test_data, signature, wrong_public_key)
+
+    def test_eddsa_tampered_data(self, ed25519_key_pair, test_data):
+        """Test that EdDSA verification fails with tampered data."""
+        algorithm = Ed25519Algorithm()
+        private_key = ed25519_key_pair.private_key
+        public_key = ed25519_key_pair.public_key
+
+        signature = algorithm.sign(test_data, private_key)
+
+        # Tamper with the data
+        tampered_data = test_data + b"extra"
+
+        # Verification should fail
+        assert not algorithm.verify(tampered_data, signature, public_key)
+
+    def test_eddsa_sign_requires_private_key(self, ed25519_key_pair, test_data):
+        """Test that EdDSA signing requires private key."""
+        algorithm = Ed25519Algorithm()
+        public_key = ed25519_key_pair.public_key
+
+        with pytest.raises(InvalidKeyError):
+            algorithm.sign(test_data, public_key)
+
+    def test_eddsa_check_key_validates_type(self, ed25519_key_pair):
+        """Test that EdDSA check_key validates key type."""
+        algorithm = Ed25519Algorithm()
+        okp_key = ed25519_key_pair.private_key
+        oct_key = OctKey.import_key(b"secret")
+
+        # Should not raise for OKPKey
+        algorithm.check_key(okp_key)
+
+        # Should raise for wrong key type
+        with pytest.raises(SuperJWTError, match="Key must be an OKPKey"):
+            algorithm.check_key(oct_key)  # type: ignore
+
+    def test_eddsa_algorithm_names(self):
+        """Test that EdDSA algorithms have correct names."""
+        assert Ed25519Algorithm.name == "Ed25519"
+        assert Ed448Algorithm.name == "Ed448"
+
+    def test_eddsa_deterministic_signatures(self, ed25519_key_pair, test_data):
+        """Test that EdDSA produces deterministic signatures (same input = same signature)."""
+        algorithm = Ed25519Algorithm()
+        private_key = ed25519_key_pair.private_key
+
+        # Generate multiple signatures of the same data
+        sig1 = algorithm.sign(test_data, private_key)
+        sig2 = algorithm.sign(test_data, private_key)
+        sig3 = algorithm.sign(test_data, private_key)
+
+        # EdDSA is deterministic, so signatures should be identical
+        assert sig1 == sig2
+        assert sig1 == sig3
+        assert sig2 == sig3
+
+    def test_ed25519_ed448_different_signature_sizes(
+        self, ed25519_key_pair, ed448_key_pair, test_data
+    ):
+        """Test that Ed25519 and Ed448 produce different signature sizes."""
+        ed25519_algo = Ed25519Algorithm()
+        ed448_algo = Ed448Algorithm()
+
+        sig_ed25519 = ed25519_algo.sign(test_data, ed25519_key_pair.private_key)
+        sig_ed448 = ed448_algo.sign(test_data, ed448_key_pair.private_key)
+
+        # Different signature sizes
+        assert len(sig_ed25519) == 64
+        assert len(sig_ed448) == 114
+
+    def test_eddsa_curve_mismatch_ed25519_key_with_ed448_algo(
+        self, ed25519_key_pair, test_data
+    ):
+        """Test that Ed25519 key with Ed448 algorithm raises error."""
+        ed448_algo = Ed448Algorithm()
+        ed25519_key = ed25519_key_pair.private_key
+
+        # Should raise error due to curve mismatch
+        with pytest.raises(SuperJWTError, match=r"Key curve .* does not match"):
+            ed448_algo.sign(test_data, ed25519_key)
+
+    def test_eddsa_curve_mismatch_ed448_key_with_ed25519_algo(
+        self, ed448_key_pair, test_data
+    ):
+        """Test that Ed448 key with Ed25519 algorithm raises error."""
+        ed25519_algo = Ed25519Algorithm()
+        ed448_key = ed448_key_pair.private_key
+
+        # Should raise error due to curve mismatch
+        with pytest.raises(SuperJWTError, match=r"Key curve .* does not match"):
+            ed25519_algo.sign(test_data, ed448_key)
+
+    def test_eddsa_curve_mismatch_public_key_ed25519_with_ed448_algo(
+        self, ed25519_key_pair, test_data
+    ):
+        """Test that Ed25519 public key with Ed448 algorithm raises error during verify."""
+        ed448_algo = Ed448Algorithm()
+
+        # Create a public-only key to test the public key validation path
+        ed25519_public_only = OKPKey.import_verifying_key(ed25519_key_pair.public_pem)
+
+        # Create a valid signature with Ed25519
+        ed25519_algo = Ed25519Algorithm()
+        signature = ed25519_algo.sign(test_data, ed25519_key_pair.private_key)
+
+        # Should raise error when trying to verify with Ed448 algorithm (wrong curve)
+        with pytest.raises(SuperJWTError, match=r"Key curve .* does not match"):
+            ed448_algo.verify(test_data, signature, ed25519_public_only)
+
+    def test_eddsa_curve_mismatch_public_key_ed448_with_ed25519_algo(
+        self, ed448_key_pair, test_data
+    ):
+        """Test that Ed448 public key with Ed25519 algorithm raises error during verify."""
+        ed25519_algo = Ed25519Algorithm()
+
+        # Create a public-only key to test the public key validation path
+        ed448_public_only = OKPKey.import_verifying_key(ed448_key_pair.public_pem)
+
+        # Create a valid signature with Ed448
+        ed448_algo = Ed448Algorithm()
+        signature = ed448_algo.sign(test_data, ed448_key_pair.private_key)
+
+        # Should raise error when trying to verify with Ed25519 algorithm (wrong curve)
+        with pytest.raises(SuperJWTError, match=r"Key curve .* does not match"):
+            ed25519_algo.verify(test_data, signature, ed448_public_only)

@@ -31,7 +31,7 @@ from superjwt.exceptions import (
 from superjwt.jwt import JWT
 from superjwt.utils import urlsafe_b64encode
 
-from tests.conftest import JWTCustomClaims, check_claims_instance
+from tests.conftest import JWTCustomClaims, check_claims_instance, requires_cryptography
 
 
 try:
@@ -184,16 +184,6 @@ def test_decode_invalid_signature(jwt: JWT, claims: JWTCustomClaims, secret_key:
 
     with pytest.raises(SignatureVerificationError):
         jwt.decode(compact, wrong_key, Alg.HS256)
-
-
-def test_hmac_algorithms(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
-    hmac_algorithms = [Alg.HS256, Alg.HS384, Alg.HS512]
-
-    for alg in hmac_algorithms:
-        token = jwt.encode(claims, secret_key, alg).compact
-        decoded_claims = JWTCustomClaims(**jwt.decode(token, secret_key, alg).payload)
-
-        check_claims_instance(claims, decoded_claims, jwtdatetime_force_int=True)
 
 
 def test_encode_decode_claims_validation_disabled(
@@ -1063,3 +1053,110 @@ def test_mixed_datetime_serialization_types(jwt, secret_key):
     # nbf and custom_time behavior unchanged
     assert isinstance(decoded3.payload["nbf"], int)
     assert isinstance(decoded3.payload["custom_time"], float)
+
+
+def test_hmac_algorithms(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
+    hmac_algorithms = [Alg.HS256, Alg.HS384, Alg.HS512]
+
+    for alg in hmac_algorithms:
+        token = jwt.encode(claims, secret_key, alg).compact
+        decoded_claims = JWTCustomClaims(**jwt.decode(token, secret_key, alg).payload)
+
+        check_claims_instance(claims, decoded_claims, jwtdatetime_force_int=True)
+
+
+@requires_cryptography
+def test_rsa_algorithms(jwt: JWT, claims: JWTCustomClaims, rsa_2048_key_pair):
+    """Test RSA PKCS#1 v1.5 algorithms"""
+    rsa_algorithms = [Alg.RS256, Alg.RS384, Alg.RS512]
+
+    for alg in rsa_algorithms:
+        token = jwt.encode(claims, rsa_2048_key_pair.private_key, alg).compact
+        decoded_claims = JWTCustomClaims(
+            **jwt.decode(token, rsa_2048_key_pair.public_key, alg).payload
+        )
+
+        check_claims_instance(claims, decoded_claims, jwtdatetime_force_int=True)
+
+        # Verify with private key (contains public component)
+        decoded_with_private = JWTCustomClaims(
+            **jwt.decode(token, rsa_2048_key_pair.private_key, alg).payload
+        )
+        check_claims_instance(claims, decoded_with_private, jwtdatetime_force_int=True)
+
+
+@requires_cryptography
+def test_rsa_pss_algorithms(jwt: JWT, claims: JWTCustomClaims, rsa_2048_key_pair):
+    """Test RSA-PSS algorithms."""
+    rsa_pss_algorithms = [Alg.PS256, Alg.PS384, Alg.PS512]
+
+    for alg in rsa_pss_algorithms:
+        token = jwt.encode(claims, rsa_2048_key_pair.private_key, alg).compact
+        decoded_claims = JWTCustomClaims(
+            **jwt.decode(token, rsa_2048_key_pair.public_key, alg).payload
+        )
+
+        check_claims_instance(claims, decoded_claims, jwtdatetime_force_int=True)
+
+        # Verify with private key (contains public component)
+        decoded_with_private = JWTCustomClaims(
+            **jwt.decode(token, rsa_2048_key_pair.private_key, alg).payload
+        )
+        check_claims_instance(claims, decoded_with_private, jwtdatetime_force_int=True)
+
+
+@requires_cryptography
+def test_ecdsa_algorithms(
+    jwt: JWT,
+    claims: JWTCustomClaims,
+    ec_p256_key_pair,
+    ec_p384_key_pair,
+    ec_p521_key_pair,
+):
+    """Test ECDSA algorithms."""
+    # Map algorithms to their corresponding key pairs
+    ecdsa_test_cases = [
+        (Alg.ES256, ec_p256_key_pair),
+        (Alg.ES384, ec_p384_key_pair),
+        (Alg.ES512, ec_p521_key_pair),
+    ]
+
+    for alg, key_pair in ecdsa_test_cases:
+        token = jwt.encode(claims, key_pair.private_key, alg).compact
+        decoded_claims = JWTCustomClaims(
+            **jwt.decode(token, key_pair.public_key, alg).payload
+        )
+
+        check_claims_instance(claims, decoded_claims, jwtdatetime_force_int=True)
+
+        # Verify with private key (contains public component)
+        decoded_with_private = JWTCustomClaims(
+            **jwt.decode(token, key_pair.private_key, alg).payload
+        )
+        check_claims_instance(claims, decoded_with_private, jwtdatetime_force_int=True)
+
+
+@requires_cryptography
+def test_eddsa_algorithms(
+    jwt: JWT, claims: JWTCustomClaims, ed25519_key_pair, ed448_key_pair
+):
+    """Test EdDSA algorithms."""
+    # Map algorithms to their corresponding key pairs
+    eddsa_test_cases = [
+        (Alg.Ed25519, ed25519_key_pair),
+        (Alg.Ed448, ed448_key_pair),
+    ]
+
+    for alg, key_pair in eddsa_test_cases:
+        token = jwt.encode(claims, key_pair.private_key, alg).compact
+        decoded_claims = JWTCustomClaims(
+            **jwt.decode(token, key_pair.public_key, alg).payload
+        )
+
+        check_claims_instance(claims, decoded_claims, jwtdatetime_force_int=True)
+
+        # Verify with private key (contains public component)
+        decoded_with_private = JWTCustomClaims(
+            **jwt.decode(token, key_pair.private_key, alg).payload
+        )
+        check_claims_instance(claims, decoded_with_private, jwtdatetime_force_int=True)

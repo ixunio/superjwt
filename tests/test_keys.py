@@ -2,7 +2,7 @@
 
 import pytest
 from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning
-from superjwt.keys import NoneKey, OctKey
+from superjwt.keys import ECKey, NoneKey, OctKey, OKPKey, RSAKey
 from superjwt.utils import check_cryptography_available
 
 from .conftest import CRYPTOGRAPHY_AVAILABLE, requires_cryptography
@@ -12,7 +12,6 @@ if CRYPTOGRAPHY_AVAILABLE:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
-    from superjwt.keys import ECKey, OKPKey, RSAKey
 
 
 @requires_cryptography

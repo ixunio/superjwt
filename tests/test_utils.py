@@ -4,7 +4,9 @@ from datetime import datetime
 import pytest
 from superjwt.utils import (
     as_bytes,
+    decode_integer,
     delta_datetime_timestamp,
+    encode_integer,
     is_pem_format,
     is_ssh_key,
     urlsafe_b64decode,
@@ -159,3 +161,87 @@ def test_delta_datetime_timestamp():
     dt_same = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
     assert delta_datetime_timestamp(dt1, dt_same) == 0.0
     assert delta_datetime_timestamp(1000.0, 1000) == 0.0
+
+
+def test_encode_integer():
+    """Test encoding integers to bytes for ECDSA signatures."""
+    # Test with 256-bit value (P-256 curve)
+    r = 0x12345678901234567890123456789012
+    encoded = encode_integer(r, 256)
+    assert len(encoded) == 32  # 256 bits = 32 bytes
+    assert isinstance(encoded, bytes)
+
+    # Test with 384-bit value (P-384 curve)
+    r = 0x123456789012345678901234567890123456789012345678
+    encoded = encode_integer(r, 384)
+    assert len(encoded) == 48  # 384 bits = 48 bytes
+
+    # Test with 521-bit value (P-521 curve)
+    r = 0x1234567890123456789012345678901234567890123456789012345678901234
+    encoded = encode_integer(r, 521)
+    assert len(encoded) == 66  # (521 + 7) // 8 = 66 bytes
+
+    # Test with zero
+    encoded = encode_integer(0, 256)
+    assert len(encoded) == 32
+    assert encoded == b"\x00" * 32
+
+    # Test with max value for 256 bits
+    max_val = (1 << 256) - 1
+    encoded = encode_integer(max_val, 256)
+    assert len(encoded) == 32
+    assert encoded == b"\xff" * 32
+
+
+def test_decode_integer():
+    """Test decoding bytes to integers for ECDSA signatures."""
+    # Test decoding 32 bytes (256-bit)
+    data = b"\x12\x34\x56\x78\x90\x12\x34\x56\x78\x90\x12\x34\x56\x78\x90\x12" * 2
+    num = decode_integer(data)
+    assert isinstance(num, int)
+    # Verify it decodes correctly (calculated from the actual bytes)
+    assert num > 0
+
+    # Test with zeros
+    data = b"\x00" * 32
+    num = decode_integer(data)
+    assert num == 0
+
+    # Test with all ones
+    data = b"\xff" * 32
+    num = decode_integer(data)
+    assert num == (1 << 256) - 1
+
+    # Test with simple known value
+    data = b"\x00\x00\x00\x01"  # 1 as 4 bytes
+    num = decode_integer(data)
+    assert num == 1
+
+    # Test with another simple value
+    data = b"\x00\x00\x01\x00"  # 256 as 4 bytes
+    num = decode_integer(data)
+    assert num == 256
+
+    # Test round-trip
+    original = 0x123456789ABCDEF
+    encoded = encode_integer(original, 256)
+    decoded = decode_integer(encoded)
+    assert decoded == original
+
+
+def test_encode_decode_integer_roundtrip():
+    """Test that encoding and decoding are inverse operations."""
+    test_values = [
+        (0, 256),
+        (1, 256),
+        (0xFFFFFFFF, 256),
+        (0x123456789ABCDEF0123456789ABCDEF, 256),
+        ((1 << 255) - 1, 256),  # Large value
+        (0x123456789ABCDEF, 384),
+        (0xFEDCBA9876543210, 521),
+    ]
+
+    for num, bits in test_values:
+        encoded = encode_integer(num, bits)
+        decoded = decode_integer(encoded)
+        assert decoded == num, f"Round-trip failed for {num} with {bits} bits"

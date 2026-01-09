@@ -397,6 +397,22 @@ class ECKey(AsymmetricKey["ec.EllipticCurvePrivateKey", "ec.EllipticCurvePublicK
         """Return tuple of valid public key types."""
         return (ec.EllipticCurvePublicKey,)
 
+    @property
+    def curve_name(self) -> str:
+        """Return the curve name of the key."""
+        if self._private_key_obj is not None:
+            return self._private_key_obj.curve.name
+        assert self._public_key_obj is not None
+        return self._public_key_obj.curve.name
+
+    @property
+    def curve_key_size(self) -> int:
+        """Return the key size in bits of the curve."""
+        if self._private_key_obj is not None:
+            return self._private_key_obj.curve.key_size
+        assert self._public_key_obj is not None
+        return self._public_key_obj.curve.key_size
+
     def check_key_security(
         self, key: ec.EllipticCurvePrivateKey | ec.EllipticCurvePublicKey
     ) -> None:

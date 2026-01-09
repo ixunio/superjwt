@@ -1,27 +1,37 @@
 import hashlib
 import hmac
 from abc import ABC, abstractmethod
-from enum import Enum
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
 
 from superjwt.exceptions import SuperJWTError
-from superjwt.keys import BaseKey, NoneKey, OctKey, RSAKey
-from superjwt.utils import check_cryptography_available
+from superjwt.keys import BaseKey, ECKey, NoneKey, OctKey, OKPKey, RSAKey
+from superjwt.utils import check_cryptography_available, decode_integer, encode_integer
 
 
 if check_cryptography_available(raise_error=False):  # pragma: no cover
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding
+    from cryptography.hazmat.primitives.asymmetric.utils import (
+        decode_dss_signature,
+        encode_dss_signature,
+    )
+
+if TYPE_CHECKING:  # pragma: no cover
+    from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurve
+    from cryptography.hazmat.primitives.asymmetric.ed448 import (
+        Ed448PrivateKey,
+        Ed448PublicKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey,
+        Ed25519PublicKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.padding import AsymmetricPadding
+    from cryptography.hazmat.primitives.hashes import HashAlgorithm
 
 
 KeyType = TypeVar("KeyType", bound=BaseKey)
-
-
-class Hash(str, Enum):
-    SHA256 = "SHA-256"
-    SHA384 = "SHA-384"
-    SHA512 = "SHA-512"
 
 
 class BaseJWSAlgorithm(ABC, Generic[KeyType]):
@@ -46,12 +56,8 @@ class HMACWithSHAAlgorithm(BaseJWSAlgorithm[OctKey]):
     key_type = OctKey
     requires_cryptography = False
 
-    def __init__(self, hash_: Hash):
-        self.hash_ = hash_
-
-    @property
-    def hash_algorithm(self) -> Any:
-        return getattr(hashlib, self.hash_.value.replace("-", "").lower())
+    def __init__(self, hash_algorithm: Any):
+        self.hash_algorithm = hash_algorithm
 
     def check_key(self, key: OctKey) -> None:
         if not isinstance(key, OctKey):
@@ -69,18 +75,10 @@ class RSAAlgorithm(BaseJWSAlgorithm[RSAKey]):
 
     key_type = RSAKey
 
-    def __init__(self, hash_: Hash):
+    def __init__(self, hash_algorithm: "HashAlgorithm", padding: "AsymmetricPadding"):
         check_cryptography_available()
-        self.hash_ = hash_
-        self._padding: padding.AsymmetricPadding
-
-    @property
-    def hash_algorithm(self) -> Any:
-        return getattr(hashes, self.hash_.value.replace("-", "").upper())()
-
-    @property
-    def padding(self):
-        return self._padding
+        self.hash_algorithm = hash_algorithm
+        self.padding = padding
 
     def check_key(self, key: RSAKey) -> None:
         if not isinstance(key, RSAKey):
@@ -105,24 +103,131 @@ class RSAAlgorithm(BaseJWSAlgorithm[RSAKey]):
 class RSAPKCS1v15Algorithm(RSAAlgorithm):
     """Base class for RSA using SHA algorithms with PKCS1 v1.5 padding (RSASSA-PKCS1-v1_5)"""
 
-    def __init__(self, hash_: Hash):
-        super().__init__(hash_)
-
-        # Use PKCS1 v1.5 padding
-        self._padding = padding.PKCS1v15()
+    def __init__(self, hash_algorithm: "HashAlgorithm"):
+        super().__init__(hash_algorithm, padding.PKCS1v15())
 
 
 class RSAPSSAlgorithm(RSAAlgorithm):
-    """Base class for RSA using SHA algorithms with PSS padding (RSASSA-PSS)"""
+    """Base class for RSA using SHA algorithms with PSS padding and MGF1 (RSASSA-PSS)"""
 
-    def __init__(self, hash_: Hash):
-        super().__init__(hash_)
-
-        # Use PSS padding with MGF1 and salt length equal to hash digest size
-        self._padding = padding.PSS(
-            mgf=padding.MGF1(self.hash_algorithm),
-            salt_length=self.hash_algorithm.digest_size,
+    def __init__(self, hash_algorithm: "HashAlgorithm"):
+        super().__init__(
+            hash_algorithm,
+            padding.PSS(
+                mgf=padding.MGF1(hash_algorithm),
+                salt_length=hash_algorithm.digest_size,
+            ),
         )
+
+
+class ECDSAAlgorithm(BaseJWSAlgorithm[ECKey]):
+    """Base class for ECDSA (Elliptic Curve Digital Signature Algorithm)"""
+
+    key_type = ECKey
+
+    def __init__(self, hash_algorithm: "HashAlgorithm", curve: "type[EllipticCurve]"):
+        check_cryptography_available()
+        self.hash_algorithm = hash_algorithm
+        self.curve = curve
+        self.curve_name = curve.name
+
+    def check_key(self, key: ECKey) -> None:
+        if not isinstance(key, ECKey):
+            raise SuperJWTError("Key must be an ECKey for ECDSA algorithms")
+
+        # Validate that the key's curve matches the algorithm's expected curve
+        if key.curve_name != self.curve_name:
+            raise SuperJWTError(
+                f"Key curve '{key.curve_name}' does not match algorithm's expected curve '{self.curve_name}'"
+            )
+
+    def sign(self, data: bytes, key: ECKey) -> bytes:
+        self.check_key(key)
+        private_key = key._get_private_key()
+
+        der_signature = private_key.sign(data, ec.ECDSA(self.hash_algorithm))
+
+        # Encode r and s as raw bytes for JWT format
+        r, s = decode_dss_signature(der_signature)
+        size = key.curve_key_size
+        return encode_integer(r, size) + encode_integer(s, size)
+
+    def verify(self, data: bytes, signature: bytes, key: ECKey) -> bool:
+        self.check_key(key)
+
+        # Verify signature has correct length
+        key_size = key.curve_key_size
+        length = (key_size + 7) // 8
+        if len(signature) != 2 * length:
+            return False
+
+        # Decode r and s from raw bytes
+        r = decode_integer(signature[:length])
+        s = decode_integer(signature[length:])
+
+        # Encode as DER signature
+        der_signature = encode_dss_signature(r, s)
+
+        public_key = key._get_public_key()
+        try:
+            public_key.verify(der_signature, data, ec.ECDSA(self.hash_algorithm))
+            return True
+        except InvalidSignature:
+            return False
+
+
+class EdDSAAlgorithm(BaseJWSAlgorithm[OKPKey]):
+    """Base class for EdDSA (Edwards-curve Digital Signature Algorithm)"""
+
+    key_type = OKPKey
+
+    def __init__(
+        self,
+        curve_type_private: "type[Ed25519PrivateKey | Ed448PrivateKey]",
+        curve_type_public: "type[Ed25519PublicKey | Ed448PublicKey]",
+    ):
+        check_cryptography_available()
+        self.curve_type_private = curve_type_private
+        self.curve_type_public = curve_type_public
+
+    def check_key(self, key: OKPKey) -> None:
+        if not isinstance(key, OKPKey):
+            raise SuperJWTError("Key must be an OKPKey for EdDSA algorithms")
+
+        # Validate that the key's curve matches the algorithm's expected curve
+        private_key_obj = key._private_key_obj
+        public_key_obj = key._public_key_obj
+
+        # Check if either private or public key matches the expected curve
+        if private_key_obj is not None:
+            if not isinstance(private_key_obj, self.curve_type_private):
+                key_curve_name = type(private_key_obj).__name__
+                expected_curve_name = self.curve_type_private.__name__
+                raise SuperJWTError(
+                    f"Key curve {key_curve_name} does not match algorithm's expected curve {expected_curve_name}"
+                )
+
+        if public_key_obj is not None:
+            if not isinstance(public_key_obj, self.curve_type_public):
+                key_curve_name = type(public_key_obj).__name__
+                expected_curve_name = self.curve_type_public.__name__
+                raise SuperJWTError(
+                    f"Key curve {key_curve_name} does not match algorithm's expected curve {expected_curve_name}"
+                )
+
+    def sign(self, data: bytes, key: OKPKey) -> bytes:
+        self.check_key(key)
+        private_key = key._get_private_key()
+        return private_key.sign(data)
+
+    def verify(self, data: bytes, signature: bytes, key: OKPKey) -> bool:
+        self.check_key(key)
+        public_key = key._get_public_key()
+        try:
+            public_key.verify(signature, data)
+            return True
+        except InvalidSignature:
+            return False
 
 
 ####################################################################
@@ -152,7 +257,7 @@ class HS256Algorithm(HMACWithSHAAlgorithm):
     description = "HMAC with SHA-256 signature"
 
     def __init__(self):
-        super().__init__(Hash.SHA256)
+        super().__init__(hashlib.sha256)
 
 
 class HS384Algorithm(HMACWithSHAAlgorithm):
@@ -160,7 +265,7 @@ class HS384Algorithm(HMACWithSHAAlgorithm):
     description = "HMAC with SHA-384 signature"
 
     def __init__(self):
-        super().__init__(Hash.SHA384)
+        super().__init__(hashlib.sha384)
 
 
 class HS512Algorithm(HMACWithSHAAlgorithm):
@@ -168,7 +273,7 @@ class HS512Algorithm(HMACWithSHAAlgorithm):
     description = "HMAC with SHA-512 signature"
 
     def __init__(self):
-        super().__init__(Hash.SHA512)
+        super().__init__(hashlib.sha512)
 
 
 class RS256Algorithm(RSAPKCS1v15Algorithm):
@@ -176,7 +281,7 @@ class RS256Algorithm(RSAPKCS1v15Algorithm):
     description = "RSASSA-PKCS1-v1_5 using SHA-256"
 
     def __init__(self):
-        super().__init__(Hash.SHA256)
+        super().__init__(hashes.SHA256())
 
 
 class RS384Algorithm(RSAPKCS1v15Algorithm):
@@ -184,7 +289,7 @@ class RS384Algorithm(RSAPKCS1v15Algorithm):
     description = "RSASSA-PKCS1-v1_5 using SHA-384"
 
     def __init__(self):
-        super().__init__(Hash.SHA384)
+        super().__init__(hashes.SHA384())
 
 
 class RS512Algorithm(RSAPKCS1v15Algorithm):
@@ -192,7 +297,7 @@ class RS512Algorithm(RSAPKCS1v15Algorithm):
     description = "RSASSA-PKCS1-v1_5 using SHA-512"
 
     def __init__(self):
-        super().__init__(Hash.SHA512)
+        super().__init__(hashes.SHA512())
 
 
 class PS256Algorithm(RSAPSSAlgorithm):
@@ -200,7 +305,7 @@ class PS256Algorithm(RSAPSSAlgorithm):
     description = "RSASSA-PSS using SHA-256 and MGF1 with SHA-256"
 
     def __init__(self):
-        super().__init__(Hash.SHA256)
+        super().__init__(hashes.SHA256())
 
 
 class PS384Algorithm(RSAPSSAlgorithm):
@@ -208,7 +313,7 @@ class PS384Algorithm(RSAPSSAlgorithm):
     description = "RSASSA-PSS using SHA-384 and MGF1 with SHA-384"
 
     def __init__(self):
-        super().__init__(Hash.SHA384)
+        super().__init__(hashes.SHA384())
 
 
 class PS512Algorithm(RSAPSSAlgorithm):
@@ -216,4 +321,52 @@ class PS512Algorithm(RSAPSSAlgorithm):
     description = "RSASSA-PSS using SHA-512 and MGF1 with SHA-512"
 
     def __init__(self):
-        super().__init__(Hash.SHA512)
+        super().__init__(hashes.SHA512())
+
+
+class ES256Algorithm(ECDSAAlgorithm):
+    name = "ES256"
+    description = "ECDSA using secp256r1 (NIST P-256) curve and SHA-256"
+
+    def __init__(self):
+        super().__init__(hashes.SHA256(), ec.SECP256R1)
+
+
+class ES256KAlgorithm(ECDSAAlgorithm):
+    name = "ES256K"
+    description = "ECDSA using secp256k1 curve and SHA-256"
+
+    def __init__(self):
+        super().__init__(hashes.SHA256(), ec.SECP256K1)
+
+
+class ES384Algorithm(ECDSAAlgorithm):
+    name = "ES384"
+    description = "ECDSA using secp384r1 (NIST P-384) curve and SHA-384"
+
+    def __init__(self):
+        super().__init__(hashes.SHA384(), ec.SECP384R1)
+
+
+class ES512Algorithm(ECDSAAlgorithm):
+    name = "ES512"
+    description = "ECDSA using secp521r1 (NIST P-521) curve and SHA-512"
+
+    def __init__(self):
+        super().__init__(hashes.SHA512(), ec.SECP521R1)
+
+
+class Ed25519Algorithm(EdDSAAlgorithm):
+    name = "Ed25519"
+    description = "EdDSA signature algorithm using Ed25519 curve"
+
+    def __init__(self):
+        super().__init__(ed25519.Ed25519PrivateKey, ed25519.Ed25519PublicKey)
+
+
+class Ed448Algorithm(EdDSAAlgorithm):
+    name = "Ed448"
+    description = "EdDSA signature algorithm using Ed448 curve"
+
+    def __init__(self):
+        super().__init__(ed448.Ed448PrivateKey, ed448.Ed448PublicKey)

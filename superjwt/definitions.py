@@ -18,6 +18,12 @@ from typing_extensions import Self
 
 from superjwt.algorithms import (
     BaseJWSAlgorithm,
+    Ed448Algorithm,
+    Ed25519Algorithm,
+    ES256Algorithm,
+    ES256KAlgorithm,
+    ES384Algorithm,
+    ES512Algorithm,
     HS256Algorithm,
     HS384Algorithm,
     HS512Algorithm,
@@ -110,13 +116,13 @@ ALGORITHMS: dict[str, type[BaseJWSAlgorithm] | None] = {
     "PS256": PS256Algorithm,
     "PS384": PS384Algorithm,
     "PS512": PS512Algorithm,
-    "ES256": None,  # Placeholder
-    "ES256K": None,  # Placeholder
-    "ES384": None,  # Placeholder
-    "ES512": None,  # Placeholder
+    "ES256": ES256Algorithm,
+    "ES256K": ES256KAlgorithm,
+    "ES384": ES384Algorithm,
+    "ES512": ES512Algorithm,
     "EdDSA": None,  # Deprecated and not supported
-    "Ed25519": None,  # Placeholder
-    "Ed448": None,  # Placeholder
+    "Ed25519": Ed25519Algorithm,
+    "Ed448": Ed448Algorithm,
 }
 
 

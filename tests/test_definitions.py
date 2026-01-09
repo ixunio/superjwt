@@ -10,18 +10,13 @@ from superjwt.exceptions import (
     TokenExpiredError,
     TokenNotYetValidError,
 )
-from superjwt.keys import NoneKey, OctKey
+from superjwt.keys import ECKey, NoneKey, OctKey, OKPKey, RSAKey
 
 from .conftest import (
-    CRYPTOGRAPHY_AVAILABLE,
     JWTCustomClaims,
     check_claims_instance,
     requires_cryptography,
 )
-
-
-if CRYPTOGRAPHY_AVAILABLE:
-    from superjwt.keys import RSAKey
 
 
 try:
@@ -787,3 +782,138 @@ class TestKeyEnum:
             assert isinstance(key, RSAKey)
             assert key.private_key == b""
             assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_key_with_ec_algorithm_es256(self, ec_p256_key_pair):
+        """Test Key.make_key() with ES256 algorithm."""
+        private_pem = ec_p256_key_pair.private_pem
+        public_pem = ec_p256_key_pair.public_pem
+
+        key = Key.make_key("ES256", private_key=private_pem, public_key=public_pem)
+        assert isinstance(key, ECKey)
+        assert key.private_key == private_pem
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_key_with_ec_algorithm_es384(self, ec_p384_key_pair):
+        """Test Key.make_key() with ES384 algorithm."""
+        private_pem = ec_p384_key_pair.private_pem
+        public_pem = ec_p384_key_pair.public_pem
+
+        key = Key.make_key("ES384", private_key=private_pem, public_key=public_pem)
+        assert isinstance(key, ECKey)
+        assert key.private_key == private_pem
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_key_with_ec_algorithm_es512(self, ec_p521_key_pair):
+        """Test Key.make_key() with ES512 algorithm."""
+        private_pem = ec_p521_key_pair.private_pem
+        public_pem = ec_p521_key_pair.public_pem
+
+        key = Key.make_key("ES512", private_key=private_pem, public_key=public_pem)
+        assert isinstance(key, ECKey)
+        assert key.private_key == private_pem
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_signing_key_with_ec_algorithms(
+        self, ec_p256_key_pair, ec_p384_key_pair, ec_p521_key_pair
+    ):
+        """Test Key.make_signing_key() with EC algorithms."""
+        # Test ES256
+        key_es256 = Key.make_signing_key("ES256", ec_p256_key_pair.private_pem)
+        assert isinstance(key_es256, ECKey)
+        assert key_es256.private_key == ec_p256_key_pair.private_pem
+        assert key_es256.public_key != b""
+
+        # Test ES384
+        key_es384 = Key.make_signing_key("ES384", ec_p384_key_pair.private_pem)
+        assert isinstance(key_es384, ECKey)
+        assert key_es384.private_key == ec_p384_key_pair.private_pem
+        assert key_es384.public_key != b""
+
+        # Test ES512
+        key_es512 = Key.make_signing_key("ES512", ec_p521_key_pair.private_pem)
+        assert isinstance(key_es512, ECKey)
+        assert key_es512.private_key == ec_p521_key_pair.private_pem
+        assert key_es512.public_key != b""
+
+    @requires_cryptography
+    def test_make_verifying_key_with_ec_algorithms(
+        self, ec_p256_key_pair, ec_p384_key_pair, ec_p521_key_pair
+    ):
+        """Test Key.make_verifying_key() with EC algorithms."""
+        # Test ES256
+        key_es256 = Key.make_verifying_key("ES256", ec_p256_key_pair.public_pem)
+        assert isinstance(key_es256, ECKey)
+        assert key_es256.private_key == b""
+        assert key_es256.public_key == ec_p256_key_pair.public_pem
+
+        # Test ES384
+        key_es384 = Key.make_verifying_key("ES384", ec_p384_key_pair.public_pem)
+        assert isinstance(key_es384, ECKey)
+        assert key_es384.private_key == b""
+        assert key_es384.public_key == ec_p384_key_pair.public_pem
+
+        # Test ES512
+        key_es512 = Key.make_verifying_key("ES512", ec_p521_key_pair.public_pem)
+        assert isinstance(key_es512, ECKey)
+        assert key_es512.private_key == b""
+        assert key_es512.public_key == ec_p521_key_pair.public_pem
+
+    @requires_cryptography
+    def test_make_key_with_eddsa_algorithm_ed25519(self, ed25519_key_pair):
+        """Test Key.make_key() with Ed25519 algorithm."""
+        private_pem = ed25519_key_pair.private_pem
+        public_pem = ed25519_key_pair.public_pem
+
+        key = Key.make_key("Ed25519", private_key=private_pem, public_key=public_pem)
+        assert isinstance(key, OKPKey)
+        assert key.private_key == private_pem
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_key_with_eddsa_algorithm_ed448(self, ed448_key_pair):
+        """Test Key.make_key() with Ed448 algorithm."""
+        private_pem = ed448_key_pair.private_pem
+        public_pem = ed448_key_pair.public_pem
+
+        key = Key.make_key("Ed448", private_key=private_pem, public_key=public_pem)
+        assert isinstance(key, OKPKey)
+        assert key.private_key == private_pem
+        assert key.public_key == public_pem
+
+    @requires_cryptography
+    def test_make_signing_key_with_eddsa_algorithms(
+        self, ed25519_key_pair, ed448_key_pair
+    ):
+        """Test Key.make_signing_key() with EdDSA algorithms."""
+        # Test Ed25519
+        key_ed25519 = Key.make_signing_key("Ed25519", ed25519_key_pair.private_pem)
+        assert isinstance(key_ed25519, OKPKey)
+        assert key_ed25519.private_key == ed25519_key_pair.private_pem
+        assert key_ed25519.public_key != b""
+
+        # Test Ed448
+        key_ed448 = Key.make_signing_key("Ed448", ed448_key_pair.private_pem)
+        assert isinstance(key_ed448, OKPKey)
+        assert key_ed448.private_key == ed448_key_pair.private_pem
+        assert key_ed448.public_key != b""
+
+    @requires_cryptography
+    def test_make_verifying_key_with_eddsa_algorithms(
+        self, ed25519_key_pair, ed448_key_pair
+    ):
+        """Test Key.make_verifying_key() with EdDSA algorithms."""
+        # Test Ed25519
+        key_ed25519 = Key.make_verifying_key("Ed25519", ed25519_key_pair.public_pem)
+        assert isinstance(key_ed25519, OKPKey)
+        assert key_ed25519.private_key == b""
+        assert key_ed25519.public_key == ed25519_key_pair.public_pem
+
+        # Test Ed448
+        key_ed448 = Key.make_verifying_key("Ed448", ed448_key_pair.public_pem)
+        assert isinstance(key_ed448, OKPKey)
+        assert key_ed448.private_key == b""
+        assert key_ed448.public_key == ed448_key_pair.public_pem
