@@ -161,56 +161,33 @@ class TestRSAKey:
     """Test RSAKey (asymmetric key) class."""
 
     @pytest.fixture
-    def rsa_private_key_pkcs1(self):
-        """Generate a test RSA private key in PKCS#1 format."""
-        private_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-        return private_key.private_bytes(
+    def rsa_private_key_pkcs1(self, rsa_2048_key_pair):
+        """Get RSA private key from session fixture in PKCS#1 format."""
+        private_key_obj = rsa_2048_key_pair.private_key_obj
+        return private_key_obj.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption(),
         )
 
     @pytest.fixture
-    def rsa_private_key_pkcs8(self):
-        """Generate a test RSA private key in PKCS#8 format."""
-        private_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-        return private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+    def rsa_private_key_pkcs8(self, rsa_2048_key_pair):
+        """Get RSA private key from session fixture in PKCS#8 format."""
+        return rsa_2048_key_pair.private_pem
 
     @pytest.fixture
-    def rsa_public_key_pkcs1(self, rsa_private_key_pkcs1):
-        """Extract public key from private key in PKCS#1 format."""
-        private_key = serialization.load_pem_private_key(
-            rsa_private_key_pkcs1, password=None, backend=default_backend()
-        )
-        return private_key.public_key().public_bytes(
+    def rsa_public_key_pkcs1(self, rsa_2048_key_pair):
+        """Get RSA public key from session fixture in PKCS#1 format."""
+        public_key_obj = rsa_2048_key_pair.public_key_obj
+        return public_key_obj.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.PKCS1,
         )
 
     @pytest.fixture
-    def rsa_public_key_spki(self, rsa_private_key_pkcs1):
-        """Extract public key from private key in SubjectPublicKeyInfo format."""
-        private_key = serialization.load_pem_private_key(
-            rsa_private_key_pkcs1, password=None, backend=default_backend()
-        )
-        return private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-
-    def test_rsa_key_class_attributes(self):
-        """Test that RSAKey has correct ClassVar attributes."""
-        assert RSAKey.name == "RSA"
-        assert RSAKey.private_key_types == (rsa.RSAPrivateKey,)
-        assert RSAKey.public_key_types == (rsa.RSAPublicKey,)
+    def rsa_public_key_spki(self, rsa_2048_key_pair):
+        """Get RSA public key from session fixture in SubjectPublicKeyInfo format."""
+        return rsa_2048_key_pair.public_pem
 
     def test_rsa_key_import_private_key_pkcs1(self, rsa_private_key_pkcs1):
         """Test importing RSA private key in PKCS#1 format."""
@@ -346,16 +323,12 @@ invalid base64 data!!!
         assert key._private_key_obj is not None
         assert key._public_key_obj is not None
 
-    def test_rsa_key_both_keys_mismatched_raises_error(self, rsa_private_key_pkcs1):
+    def test_rsa_key_both_keys_mismatched_raises_error(
+        self, rsa_private_key_pkcs1, rsa_2048_key_pair_alt
+    ):
         """Test that providing mismatched private and public keys raises an error."""
-        # Generate a different key pair
-        different_private = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-        different_public_pem = different_private.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
+        # Use different key pair from alternate session fixture
+        different_public_pem = rsa_2048_key_pair_alt.public_pem
 
         # Try to import with mismatched keys
         with pytest.raises(
@@ -390,15 +363,10 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(InvalidKeyError, match=r"Unable to parse RSA private key"):
             RSAKey.import_key(invalid_private_key)
 
-    def test_rsa_key_non_rsa_private_key_raises_error(self):
+    def test_rsa_key_non_rsa_private_key_raises_error(self, ec_p256_key_pair):
         """Test that providing a non-RSA private key (e.g., EC key) raises InvalidKeyError."""
-        # Generate an EC private key instead of RSA
-        ec_private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
-        ec_private_key_pem = ec_private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+        # Use EC private key from session fixture
+        ec_private_key_pem = ec_p256_key_pair.private_pem
         with pytest.raises(InvalidKeyError, match=r"Key must be an RSA private key"):
             RSAKey.import_key(ec_private_key_pem)
 
@@ -410,15 +378,10 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(InvalidKeyError, match=r"Unable to parse RSA public key"):
             RSAKey.import_key(public_key=invalid_public_key)
 
-    def test_rsa_key_non_rsa_public_key_raises_error(self):
+    def test_rsa_key_non_rsa_public_key_raises_error(self, ec_p256_key_pair):
         """Test that providing a non-RSA public key (e.g., EC key) raises InvalidKeyError."""
-        # Generate an EC public key instead of RSA
-        ec_private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
-        ec_public_key = ec_private_key.public_key()
-        ec_public_key_pem = ec_public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
+        # Use EC public key from session fixture
+        ec_public_key_pem = ec_p256_key_pair.public_pem
         with pytest.raises(InvalidKeyError, match=r"Key must be an RSA public key"):
             RSAKey.import_key(public_key=ec_public_key_pem)
 
@@ -475,19 +438,13 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         assert isinstance(public_key_obj, rsa.RSAPublicKey)
         assert key.public_keys_match(public_key_obj, public_key_obj) is True
 
-    def test_rsa_key_public_keys_match_returns_false(self, rsa_private_key_pkcs1):
+    def test_rsa_key_public_keys_match_returns_false(
+        self, rsa_2048_key_pair, rsa_2048_key_pair_alt
+    ):
         """Test that public_keys_match returns False when keys don't match."""
-        # Load the first private key
-        private_key_obj = serialization.load_pem_private_key(
-            rsa_private_key_pkcs1, password=None, backend=default_backend()
-        )
-        public_key_obj1 = private_key_obj.public_key()
-
-        # Generate a different key pair
-        different_private = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-        public_key_obj2 = different_private.public_key()
+        # Use two different key pairs from session fixtures
+        public_key_obj1 = rsa_2048_key_pair.public_key_obj
+        public_key_obj2 = rsa_2048_key_pair_alt.public_key_obj
 
         # Test with mismatched keys
         key = RSAKey()
@@ -501,51 +458,24 @@ class TestECKey:
     """Test ECKey (Elliptic Curve key) class."""
 
     @pytest.fixture
-    def ec_private_key_p256(self):
-        """Generate a test EC private key with P-256 curve."""
-        private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
-        return private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+    def ec_private_key_p256(self, ec_p256_key_pair):
+        """Get EC private key from session fixture with P-256 curve."""
+        return ec_p256_key_pair.private_pem
 
     @pytest.fixture
-    def ec_private_key_p384(self):
-        """Generate a test EC private key with P-384 curve."""
-        private_key = ec.generate_private_key(ec.SECP384R1(), default_backend())
-        return private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+    def ec_private_key_p384(self, ec_p384_key_pair):
+        """Get EC private key from session fixture with P-384 curve."""
+        return ec_p384_key_pair.private_pem
 
     @pytest.fixture
-    def ec_private_key_p521(self):
-        """Generate a test EC private key with P-521 curve."""
-        private_key = ec.generate_private_key(ec.SECP521R1(), default_backend())
-        return private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+    def ec_private_key_p521(self, ec_p521_key_pair):
+        """Get EC private key from session fixture with P-521 curve."""
+        return ec_p521_key_pair.private_pem
 
     @pytest.fixture
-    def ec_public_key_p256(self, ec_private_key_p256):
-        """Extract public key from EC private key with P-256."""
-        private_key = serialization.load_pem_private_key(
-            ec_private_key_p256, password=None, backend=default_backend()
-        )
-        return private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-
-    def test_ec_key_class_attributes(self):
-        """Test that ECKey has correct ClassVar attributes."""
-        assert ECKey.name == "EC"
-        assert ECKey.private_key_types == (ec.EllipticCurvePrivateKey,)
-        assert ECKey.public_key_types == (ec.EllipticCurvePublicKey,)
+    def ec_public_key_p256(self, ec_p256_key_pair):
+        """Get EC public key from session fixture with P-256."""
+        return ec_p256_key_pair.public_pem
 
     def test_ec_key_import_private_key_p256(self, ec_private_key_p256):
         """Test importing EC private key with P-256 curve."""
@@ -673,14 +603,12 @@ invalid base64 data!!!
         assert key._private_key_obj is not None
         assert key._public_key_obj is not None
 
-    def test_ec_key_both_keys_mismatched_raises_error(self, ec_private_key_p256):
+    def test_ec_key_both_keys_mismatched_raises_error(
+        self, ec_private_key_p256, ec_p256_key_pair_alt
+    ):
         """Test that providing mismatched private and public keys raises an error."""
-        # Generate a different key pair
-        different_private = ec.generate_private_key(ec.SECP256R1(), default_backend())
-        different_public_pem = different_private.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
+        # Use different key pair from alternate session fixture
+        different_public_pem = ec_p256_key_pair_alt.public_pem
 
         # Try to import with mismatched keys
         with pytest.raises(
@@ -715,17 +643,10 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(InvalidKeyError, match=r"Unable to parse EC private key"):
             ECKey.import_key(invalid_private_key)
 
-    def test_ec_key_non_ec_private_key_raises_error(self):
+    def test_ec_key_non_ec_private_key_raises_error(self, rsa_2048_key_pair):
         """Test that providing a non-EC private key (e.g., RSA key) raises InvalidKeyError."""
-        # Generate an RSA private key instead of EC
-        rsa_private_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-        rsa_private_key_pem = rsa_private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+        # Use RSA private key from session fixture
+        rsa_private_key_pem = rsa_2048_key_pair.private_pem
         with pytest.raises(InvalidKeyError, match=r"Key must be an EC private key"):
             ECKey.import_key(rsa_private_key_pem)
 
@@ -737,17 +658,10 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(InvalidKeyError, match=r"Unable to parse EC public key"):
             ECKey.import_key(public_key=invalid_public_key)
 
-    def test_ec_key_non_ec_public_key_raises_error(self):
+    def test_ec_key_non_ec_public_key_raises_error(self, rsa_2048_key_pair):
         """Test that providing a non-EC public key (e.g., RSA key) raises InvalidKeyError."""
-        # Generate an RSA public key instead of EC
-        rsa_private_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-        rsa_public_key = rsa_private_key.public_key()
-        rsa_public_key_pem = rsa_public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
+        # Use RSA public key from session fixture
+        rsa_public_key_pem = rsa_2048_key_pair.public_pem
         with pytest.raises(InvalidKeyError, match=r"Key must be an EC public key"):
             ECKey.import_key(public_key=rsa_public_key_pem)
 
@@ -800,17 +714,13 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         assert isinstance(public_key_obj, ec.EllipticCurvePublicKey)
         assert key.public_keys_match(public_key_obj, public_key_obj) is True
 
-    def test_ec_key_public_keys_match_returns_false(self, ec_private_key_p256):
+    def test_ec_key_public_keys_match_returns_false(
+        self, ec_p256_key_pair, ec_p256_key_pair_alt
+    ):
         """Test that public_keys_match returns False when keys don't match."""
-        # Load the first private key
-        private_key_obj = serialization.load_pem_private_key(
-            ec_private_key_p256, password=None, backend=default_backend()
-        )
-        public_key_obj1 = private_key_obj.public_key()
-
-        # Generate a different key pair
-        different_private = ec.generate_private_key(ec.SECP256R1(), default_backend())
-        public_key_obj2 = different_private.public_key()
+        # Use two different key pairs from session fixtures
+        public_key_obj1 = ec_p256_key_pair.public_key_obj
+        public_key_obj2 = ec_p256_key_pair_alt.public_key_obj
 
         # Test with mismatched keys
         key = ECKey()
@@ -824,44 +734,19 @@ class TestOKPKey:
     """Test OKPKey (Octet Key Pair for EdDSA) class."""
 
     @pytest.fixture
-    def okp_private_key_ed25519(self):
-        """Generate a test Ed25519 private key."""
-        private_key = ed25519.Ed25519PrivateKey.generate()
-        return private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+    def okp_private_key_ed25519(self, ed25519_key_pair):
+        """Get Ed25519 private key from session fixture."""
+        return ed25519_key_pair.private_pem
 
     @pytest.fixture
-    def okp_private_key_ed448(self):
-        """Generate a test Ed448 private key."""
-        private_key = ed448.Ed448PrivateKey.generate()
-        return private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+    def okp_private_key_ed448(self, ed448_key_pair):
+        """Get Ed448 private key from session fixture."""
+        return ed448_key_pair.private_pem
 
     @pytest.fixture
-    def okp_public_key_ed25519(self, okp_private_key_ed25519):
-        """Extract public key from Ed25519 private key."""
-        private_key = serialization.load_pem_private_key(
-            okp_private_key_ed25519, password=None, backend=default_backend()
-        )
-        return private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-
-    def test_okp_key_class_attributes(self):
-        """Test that OKPKey has correct ClassVar attributes."""
-        assert OKPKey.name == "OKP"
-        assert OKPKey.private_key_types == (
-            ed25519.Ed25519PrivateKey,
-            ed448.Ed448PrivateKey,
-        )
-        assert OKPKey.public_key_types == (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)
+    def okp_public_key_ed25519(self, ed25519_key_pair):
+        """Get Ed25519 public key from session fixture."""
+        return ed25519_key_pair.public_pem
 
     def test_okp_key_import_private_key_ed25519(self, okp_private_key_ed25519):
         """Test importing Ed25519 private key."""
@@ -992,14 +877,12 @@ invalid base64 data!!!
         assert key._private_key_obj is not None
         assert key._public_key_obj is not None
 
-    def test_okp_key_both_keys_mismatched_raises_error(self, okp_private_key_ed25519):
+    def test_okp_key_both_keys_mismatched_raises_error(
+        self, okp_private_key_ed25519, ed25519_key_pair_alt
+    ):
         """Test that providing mismatched private and public keys raises an error."""
-        # Generate a different key pair
-        different_private = ed25519.Ed25519PrivateKey.generate()
-        different_public_pem = different_private.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
+        # Use different key pair from alternate session fixture
+        different_public_pem = ed25519_key_pair_alt.public_pem
 
         # Try to import with mismatched keys
         with pytest.raises(
@@ -1034,17 +917,10 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(InvalidKeyError, match=r"Unable to parse OKP private key"):
             OKPKey.import_key(invalid_private_key)
 
-    def test_okp_key_non_okp_private_key_raises_error(self):
+    def test_okp_key_non_okp_private_key_raises_error(self, rsa_2048_key_pair):
         """Test that providing a non-EdDSA private key (e.g., RSA key) raises InvalidKeyError."""
-        # Generate an RSA private key instead of EdDSA
-        rsa_private_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-        rsa_private_key_pem = rsa_private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+        # Use RSA private key from session fixture
+        rsa_private_key_pem = rsa_2048_key_pair.private_pem
         with pytest.raises(InvalidKeyError, match=r"Key must be an OKP private key"):
             OKPKey.import_key(rsa_private_key_pem)
 
@@ -1056,17 +932,10 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(InvalidKeyError, match=r"Unable to parse OKP public key"):
             OKPKey.import_key(public_key=invalid_public_key)
 
-    def test_okp_key_non_okp_public_key_raises_error(self):
+    def test_okp_key_non_okp_public_key_raises_error(self, rsa_2048_key_pair):
         """Test that providing a non-EdDSA public key (e.g., RSA key) raises InvalidKeyError."""
-        # Generate an RSA public key instead of EdDSA
-        rsa_private_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-        rsa_public_key = rsa_private_key.public_key()
-        rsa_public_key_pem = rsa_public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
+        # Use RSA public key from session fixture
+        rsa_public_key_pem = rsa_2048_key_pair.public_pem
         with pytest.raises(InvalidKeyError, match=r"Key must be an OKP public key"):
             OKPKey.import_key(public_key=rsa_public_key_pem)
 
@@ -1075,13 +944,10 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(ValueError, match="Secret key must not be empty"):
             OKPKey.import_key(None, b"")
 
-    def test_okp_key_public_keys_match_returns_true(self, okp_private_key_ed25519):
+    def test_okp_key_public_keys_match_returns_true(self, ed25519_key_pair):
         """Test that public_keys_match returns True when keys match."""
-        # Load the private key to extract its public key
-        private_key_obj = serialization.load_pem_private_key(
-            okp_private_key_ed25519, password=None, backend=default_backend()
-        )
-        public_key_obj = private_key_obj.public_key()
+        # Use public key from session fixture
+        public_key_obj = ed25519_key_pair.public_key_obj
 
         # Create OKPKey instance and test
         key = OKPKey()
@@ -1090,17 +956,13 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         )
         assert key.public_keys_match(public_key_obj, public_key_obj) is True
 
-    def test_okp_key_public_keys_match_returns_false(self, okp_private_key_ed25519):
+    def test_okp_key_public_keys_match_returns_false(
+        self, ed25519_key_pair, ed25519_key_pair_alt
+    ):
         """Test that public_keys_match returns False when keys don't match."""
-        # Load the first private key
-        private_key_obj = serialization.load_pem_private_key(
-            okp_private_key_ed25519, password=None, backend=default_backend()
-        )
-        public_key_obj1 = private_key_obj.public_key()
-
-        # Generate a different key pair
-        different_private = ed25519.Ed25519PrivateKey.generate()
-        public_key_obj2 = different_private.public_key()
+        # Use two different key pairs from session fixtures
+        public_key_obj1 = ed25519_key_pair.public_key_obj
+        public_key_obj2 = ed25519_key_pair_alt.public_key_obj
 
         # Test with mismatched keys
         key = OKPKey()

@@ -13,14 +13,14 @@ from superjwt.utils import (
 )
 
 
-if TYPE_CHECKING:
-    from typing_extensions import Self
-
-
-if check_cryptography_available(raise_error=False):
+if check_cryptography_available(raise_error=False):  # pragma: no cover
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 
 class BaseKey(ABC):
@@ -139,32 +139,48 @@ class OctKey(SymmetricKey):
     algorithms = ("HS256", "HS384", "HS512")
 
 
-PrivateKeyType = TypeVar(
-    "PrivateKeyType",
-    bound=rsa.RSAPrivateKey
-    | ec.EllipticCurvePrivateKey
-    | ed25519.Ed25519PrivateKey
-    | ed448.Ed448PrivateKey,
-)
-PublicKeyType = TypeVar(
-    "PublicKeyType",
-    bound=rsa.RSAPublicKey
-    | ec.EllipticCurvePublicKey
-    | ed25519.Ed25519PublicKey
-    | ed448.Ed448PublicKey,
-)
+if TYPE_CHECKING:
+    PrivateKeyType = TypeVar(
+        "PrivateKeyType",
+        bound=rsa.RSAPrivateKey
+        | ec.EllipticCurvePrivateKey
+        | ed25519.Ed25519PrivateKey
+        | ed448.Ed448PrivateKey,
+    )
+    PublicKeyType = TypeVar(
+        "PublicKeyType",
+        bound=rsa.RSAPublicKey
+        | ec.EllipticCurvePublicKey
+        | ed25519.Ed25519PublicKey
+        | ed448.Ed448PublicKey,
+    )
+else:  # pragma: no cover
+    PrivateKeyType = TypeVar("PrivateKeyType")
+    PublicKeyType = TypeVar("PublicKeyType")
 
 
 class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
     """Base class for asymmetric key types (RSA, EC, OKP)."""
 
-    private_key_types: ClassVar[tuple[type, ...]]
-    public_key_types: ClassVar[tuple[type, ...]]
-
     def __init__(self):
         super().__init__()
+
+        check_cryptography_available()
+
         self._private_key_obj: PrivateKeyType | None = None
         self._public_key_obj: PublicKeyType | None = None
+
+    @property
+    @abstractmethod
+    def private_key_types(self) -> tuple[type, ...]:
+        """Return tuple of valid private key types for isinstance checks."""
+        ...  # pragma: no cover
+
+    @property
+    @abstractmethod
+    def public_key_types(self) -> tuple[type, ...]:
+        """Return tuple of valid public key types for isinstance checks."""
+        ...  # pragma: no cover
 
     @classmethod
     def import_signing_key(cls, key: str | bytes) -> Self:
@@ -203,7 +219,6 @@ class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
         If only private_key is provided, the public key will be extracted from it.
         If only public_key is provided, only verification operations will be available.
         """
-        check_cryptography_available()
 
         # Load private key if provided
         if private_key is not None:
@@ -231,7 +246,7 @@ class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
                 private_key, password=None, backend=default_backend()
             )
 
-            if not self.validate_private_key_type(loaded_key):
+            if not isinstance(loaded_key, self.private_key_types):
                 raise InvalidKeyError(f"Key must be an {self.name} private key")
 
             return cast("PrivateKeyType", loaded_key)
@@ -250,7 +265,7 @@ class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
                 public_key, backend=default_backend()
             )
 
-            if not self.validate_public_key_type(loaded_key):
+            if not isinstance(loaded_key, self.public_key_types):
                 raise InvalidKeyError(f"Key must be an {self.name} public key")
 
             return cast("PublicKeyType", loaded_key)
@@ -315,14 +330,6 @@ class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
             self._public_key_obj = loaded_key
             self.public_key = public_key
 
-    def validate_private_key_type(self, key: object) -> bool:
-        """Check if the loaded key is the correct private key type."""
-        return isinstance(key, self.private_key_types)
-
-    def validate_public_key_type(self, key: object) -> bool:
-        """Check if the loaded key is the correct public key type."""
-        return isinstance(key, self.public_key_types)
-
     def _get_private_key(self) -> PrivateKeyType:
         """Get the cryptography private key object for signing."""
         if self._private_key_obj is None:
@@ -340,12 +347,20 @@ class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
         return self._public_key_obj
 
 
-class RSAKey(AsymmetricKey[rsa.RSAPrivateKey, rsa.RSAPublicKey]):
+class RSAKey(AsymmetricKey["rsa.RSAPrivateKey", "rsa.RSAPublicKey"]):
     name = "RSA"
     description = "RSA key for RSASSA-PKCS1-v1_5 and RSASSA-PSS algorithms"
     algorithms = ("RS256", "RS384", "RS512", "PS256", "PS384", "PS512")
-    private_key_types = (rsa.RSAPrivateKey,)
-    public_key_types = (rsa.RSAPublicKey,)
+
+    @property
+    def private_key_types(self) -> tuple[type, ...]:
+        """Return tuple of valid private key types."""
+        return (rsa.RSAPrivateKey,)
+
+    @property
+    def public_key_types(self) -> tuple[type, ...]:
+        """Return tuple of valid public key types."""
+        return (rsa.RSAPublicKey,)
 
     def check_key_security(self, key: rsa.RSAPrivateKey | rsa.RSAPublicKey) -> None:
         if key.key_size < 2048:
@@ -364,15 +379,23 @@ class RSAKey(AsymmetricKey[rsa.RSAPrivateKey, rsa.RSAPublicKey]):
         return key1_numbers.n == key2_numbers.n and key1_numbers.e == key2_numbers.e
 
 
-class ECKey(AsymmetricKey[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey]):
+class ECKey(AsymmetricKey["ec.EllipticCurvePrivateKey", "ec.EllipticCurvePublicKey"]):
     name = "EC"
     description = (
         "Elliptic Curve key for ECDSA algorithms with curve secp256r1 (P-256), "
         "secp256k1, secp384r1 (P-384), and secp521r1 (P-521)"
     )
     algorithms = ("ES256", "ES256K", "ES384", "ES512")
-    private_key_types = (ec.EllipticCurvePrivateKey,)
-    public_key_types = (ec.EllipticCurvePublicKey,)
+
+    @property
+    def private_key_types(self) -> tuple[type, ...]:
+        """Return tuple of valid private key types."""
+        return (ec.EllipticCurvePrivateKey,)
+
+    @property
+    def public_key_types(self) -> tuple[type, ...]:
+        """Return tuple of valid public key types."""
+        return (ec.EllipticCurvePublicKey,)
 
     def check_key_security(
         self, key: ec.EllipticCurvePrivateKey | ec.EllipticCurvePublicKey
@@ -402,15 +425,23 @@ class ECKey(AsymmetricKey[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey]
 
 class OKPKey(
     AsymmetricKey[
-        ed25519.Ed25519PrivateKey | ed448.Ed448PrivateKey,
-        ed25519.Ed25519PublicKey | ed448.Ed448PublicKey,
+        "ed25519.Ed25519PrivateKey | ed448.Ed448PrivateKey",
+        "ed25519.Ed25519PublicKey | ed448.Ed448PublicKey",
     ]
 ):
     name = "OKP"
     description = "Octet Key Pair for EdDSA algorithms (Ed25519, Ed448)"
     algorithms = ("Ed25519", "Ed448")
-    private_key_types = (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)
-    public_key_types = (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)
+
+    @property
+    def private_key_types(self) -> tuple[type, ...]:
+        """Return tuple of valid private key types."""
+        return (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)
+
+    @property
+    def public_key_types(self) -> tuple[type, ...]:
+        """Return tuple of valid public key types."""
+        return (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)
 
     def check_key_security(
         self,

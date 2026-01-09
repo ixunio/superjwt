@@ -12,9 +12,7 @@ from .conftest import CRYPTOGRAPHY_AVAILABLE, requires_cryptography
 
 
 if CRYPTOGRAPHY_AVAILABLE:
-    from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa
     from superjwt.algorithms import (
         PS256Algorithm,
         PS384Algorithm,
@@ -26,33 +24,11 @@ if CRYPTOGRAPHY_AVAILABLE:
     from superjwt.keys import RSAKey
 
 
+# Use session-scoped fixture from conftest.py - alias it for compatibility
 @pytest.fixture
-def rsa_key_pair():
-    """Generate RSA key pair for testing (module-level fixture for all RSA tests)."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
-
-    private_key_obj = rsa.generate_private_key(
-        public_exponent=65537, key_size=2048, backend=default_backend()
-    )
-
-    private_pem = private_key_obj.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    public_pem = private_key_obj.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-    return {
-        "private_pem": private_pem,
-        "public_pem": public_pem,
-        "private_key": RSAKey.import_signing_key(private_pem),
-        "public_key": RSAKey.import_verifying_key(public_pem),
-    }
+def rsa_key_pair(rsa_2048_key_pair):
+    """Alias for session-scoped RSA key pair fixture."""
+    return rsa_2048_key_pair
 
 
 class TestNoneAlgorithm:
@@ -180,27 +156,9 @@ class TestRSAAlgorithms:
     """Test suite for RSA algorithms (RS256, RS384, RS512)."""
 
     @pytest.fixture
-    def wrong_key_pair(self):
-        """Generate a different RSA key pair."""
-        private_key_obj = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
-
-        private_pem = private_key_obj.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-
-        public_pem = private_key_obj.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-
-        return {
-            "private_key": RSAKey.import_signing_key(private_pem),
-            "public_key": RSAKey.import_verifying_key(public_pem),
-        }
+    def wrong_key_pair(self, rsa_2048_key_pair_alt):
+        """Alias for session-scoped alternate RSA key pair fixture."""
+        return rsa_2048_key_pair_alt
 
     @pytest.fixture
     def test_data(self):
@@ -210,68 +168,65 @@ class TestRSAAlgorithms:
     def test_rs256_sign_and_verify(self, rsa_key_pair, test_data):
         """Test RS256 algorithm signing and verification."""
         algorithm = RS256Algorithm()
-        signature = algorithm.sign(test_data, rsa_key_pair["private_key"])
+        signature = algorithm.sign(test_data, rsa_key_pair.private_key)
 
         assert isinstance(signature, bytes)
         assert len(signature) == 256  # 2048-bit RSA produces 256 bytes
-        assert algorithm.verify(test_data, signature, rsa_key_pair["public_key"]) is True
+        assert algorithm.verify(test_data, signature, rsa_key_pair.public_key) is True
 
     def test_rs384_sign_and_verify(self, rsa_key_pair, test_data):
         """Test RS384 algorithm signing and verification."""
         algorithm = RS384Algorithm()
-        signature = algorithm.sign(test_data, rsa_key_pair["private_key"])
+        signature = algorithm.sign(test_data, rsa_key_pair.private_key)
 
         assert isinstance(signature, bytes)
         assert len(signature) == 256  # 2048-bit RSA produces 256 bytes
-        assert algorithm.verify(test_data, signature, rsa_key_pair["public_key"]) is True
+        assert algorithm.verify(test_data, signature, rsa_key_pair.public_key) is True
 
     def test_rs512_sign_and_verify(self, rsa_key_pair, test_data):
         """Test RS512 algorithm signing and verification."""
         algorithm = RS512Algorithm()
-        signature = algorithm.sign(test_data, rsa_key_pair["private_key"])
+        signature = algorithm.sign(test_data, rsa_key_pair.private_key)
 
         assert isinstance(signature, bytes)
         assert len(signature) == 256  # 2048-bit RSA produces 256 bytes
-        assert algorithm.verify(test_data, signature, rsa_key_pair["public_key"]) is True
+        assert algorithm.verify(test_data, signature, rsa_key_pair.public_key) is True
 
     def test_rsa_verify_with_private_key(self, rsa_key_pair, test_data):
         """Test that verification works with private key (contains public component)."""
         algorithm = RS256Algorithm()
-        signature = algorithm.sign(test_data, rsa_key_pair["private_key"])
+        signature = algorithm.sign(test_data, rsa_key_pair.private_key)
 
         # Should be able to verify with private key
-        assert algorithm.verify(test_data, signature, rsa_key_pair["private_key"]) is True
+        assert algorithm.verify(test_data, signature, rsa_key_pair.private_key) is True
 
     def test_rsa_invalid_signature(self, rsa_key_pair, test_data):
         """Test that invalid signatures are rejected."""
         algorithm = RS256Algorithm()
-        signature = algorithm.sign(test_data, rsa_key_pair["private_key"])
+        signature = algorithm.sign(test_data, rsa_key_pair.private_key)
 
         # Tamper with the signature
         invalid_signature = b"X" * len(signature)
         assert (
-            algorithm.verify(test_data, invalid_signature, rsa_key_pair["public_key"])
+            algorithm.verify(test_data, invalid_signature, rsa_key_pair.public_key)
             is False
         )
 
     def test_rsa_wrong_key(self, rsa_key_pair, wrong_key_pair, test_data):
         """Test that signatures fail verification with wrong key."""
         algorithm = RS256Algorithm()
-        signature = algorithm.sign(test_data, rsa_key_pair["private_key"])
+        signature = algorithm.sign(test_data, rsa_key_pair.private_key)
 
-        assert (
-            algorithm.verify(test_data, signature, wrong_key_pair["public_key"]) is False
-        )
+        assert algorithm.verify(test_data, signature, wrong_key_pair.public_key) is False
 
     def test_rsa_tampered_data(self, rsa_key_pair, test_data):
         """Test that tampered data fails verification."""
         algorithm = RS256Algorithm()
-        signature = algorithm.sign(test_data, rsa_key_pair["private_key"])
+        signature = algorithm.sign(test_data, rsa_key_pair.private_key)
 
         tampered_data = test_data + b" (modified)"
         assert (
-            algorithm.verify(tampered_data, signature, rsa_key_pair["public_key"])
-            is False
+            algorithm.verify(tampered_data, signature, rsa_key_pair.public_key) is False
         )
 
     def test_rsa_sign_requires_private_key(self, rsa_key_pair, test_data):
@@ -282,12 +237,12 @@ class TestRSAAlgorithms:
 
         # Try to sign with public key (should fail)
         with pytest.raises(InvalidKeyError, match="private component"):
-            algorithm.sign(test_data, rsa_key_pair["public_key"])
+            algorithm.sign(test_data, rsa_key_pair.public_key)
 
     def test_rsa_check_key_validates_type(self, rsa_key_pair):
         """Test that check_key validates key type."""
         algorithm = RS256Algorithm()
-        algorithm.check_key(rsa_key_pair["private_key"])  # Should not raise
+        algorithm.check_key(rsa_key_pair.private_key)  # Should not raise
 
         # Try with wrong key type
         oct_key = OctKey.import_key(b"test-secret")
@@ -305,11 +260,9 @@ class TestRSAAlgorithms:
         assert "SHA-384" in RS384Algorithm.description
         assert "SHA-512" in RS512Algorithm.description
 
-    def test_rsa_pkcs1_private_key_format(self, test_data):
-        """Test RSA with PKCS#1 private key format (BEGIN RSA PRIVATE KEY)."""
-        private_key_obj = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
+    def test_rsa_pkcs1_private_key_format(self, rsa_2048_key_pair, test_data):
+        """Test RSA with PKCS#1 private key format (BEGIN PRIVATE KEY)."""
+        private_key_obj = rsa_2048_key_pair.private_key_obj
 
         # Export in PKCS#1 format
         pkcs1_pem = private_key_obj.private_bytes(
@@ -327,11 +280,9 @@ class TestRSAAlgorithms:
         signature = algorithm.sign(test_data, rsa_key)
         assert algorithm.verify(test_data, signature, rsa_key) is True
 
-    def test_rsa_pkcs8_private_key_format(self, test_data):
+    def test_rsa_pkcs8_private_key_format(self, rsa_2048_key_pair, test_data):
         """Test RSA with PKCS#8 private key format (BEGIN PRIVATE KEY)."""
-        private_key_obj = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
+        private_key_obj = rsa_2048_key_pair.private_key_obj
 
         # Export in PKCS#8 format
         pkcs8_pem = private_key_obj.private_bytes(
@@ -349,11 +300,9 @@ class TestRSAAlgorithms:
         signature = algorithm.sign(test_data, rsa_key)
         assert algorithm.verify(test_data, signature, rsa_key) is True
 
-    def test_rsa_pkcs1_public_key_format(self):
+    def test_rsa_pkcs1_public_key_format(self, rsa_2048_key_pair):
         """Test RSA with PKCS#1 public key format (BEGIN RSA PUBLIC KEY)."""
-        private_key_obj = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
-        )
+        private_key_obj = rsa_2048_key_pair.private_key_obj
 
         # Export public key in PKCS#1 format
         pkcs1_public_pem = private_key_obj.public_key().public_bytes(
@@ -389,9 +338,9 @@ class TestRSAAlgorithms:
         rs384 = RS384Algorithm()
         rs512 = RS512Algorithm()
 
-        sig256 = rs256.sign(test_data, rsa_key_pair["private_key"])
-        sig384 = rs384.sign(test_data, rsa_key_pair["private_key"])
-        sig512 = rs512.sign(test_data, rsa_key_pair["private_key"])
+        sig256 = rs256.sign(test_data, rsa_key_pair.private_key)
+        sig384 = rs384.sign(test_data, rsa_key_pair.private_key)
+        sig512 = rs512.sign(test_data, rsa_key_pair.private_key)
 
         # Signatures should be different
         assert sig256 != sig384
@@ -399,9 +348,9 @@ class TestRSAAlgorithms:
         assert sig384 != sig512
 
         # Each signature should only verify with its own algorithm
-        assert rs256.verify(test_data, sig256, rsa_key_pair["public_key"]) is True
-        assert rs256.verify(test_data, sig384, rsa_key_pair["public_key"]) is False
-        assert rs256.verify(test_data, sig512, rsa_key_pair["public_key"]) is False
+        assert rs256.verify(test_data, sig256, rsa_key_pair.public_key) is True
+        assert rs256.verify(test_data, sig384, rsa_key_pair.public_key) is False
+        assert rs256.verify(test_data, sig512, rsa_key_pair.public_key) is False
 
 
 @requires_cryptography
@@ -411,8 +360,8 @@ class TestRSAPSSAlgorithms:
     def test_ps256_sign_and_verify(self, rsa_key_pair):
         """Test PS256 algorithm can sign and verify."""
         algo = PS256Algorithm()
-        private_key = rsa_key_pair["private_key"]
-        public_key = rsa_key_pair["public_key"]
+        private_key = rsa_key_pair.private_key
+        public_key = rsa_key_pair.public_key
 
         data = b"test data"
         signature = algo.sign(data, private_key)
@@ -422,8 +371,8 @@ class TestRSAPSSAlgorithms:
     def test_ps384_sign_and_verify(self, rsa_key_pair):
         """Test PS384 algorithm can sign and verify."""
         algo = PS384Algorithm()
-        private_key = rsa_key_pair["private_key"]
-        public_key = rsa_key_pair["public_key"]
+        private_key = rsa_key_pair.private_key
+        public_key = rsa_key_pair.public_key
 
         data = b"test data"
         signature = algo.sign(data, private_key)
@@ -433,8 +382,8 @@ class TestRSAPSSAlgorithms:
     def test_ps512_sign_and_verify(self, rsa_key_pair):
         """Test PS512 algorithm can sign and verify."""
         algo = PS512Algorithm()
-        private_key = rsa_key_pair["private_key"]
-        public_key = rsa_key_pair["public_key"]
+        private_key = rsa_key_pair.private_key
+        public_key = rsa_key_pair.public_key
 
         data = b"test data"
         signature = algo.sign(data, private_key)
@@ -444,8 +393,8 @@ class TestRSAPSSAlgorithms:
     def test_ps256_invalid_signature(self, rsa_key_pair):
         """Test PS256 algorithm rejects invalid signature."""
         algo = PS256Algorithm()
-        private_key = rsa_key_pair["private_key"]
-        public_key = rsa_key_pair["public_key"]
+        private_key = rsa_key_pair.private_key
+        public_key = rsa_key_pair.public_key
 
         data = b"test data"
         signature = algo.sign(data, private_key)
@@ -458,8 +407,8 @@ class TestRSAPSSAlgorithms:
     def test_ps384_invalid_signature(self, rsa_key_pair):
         """Test PS384 algorithm rejects invalid signature."""
         algo = PS384Algorithm()
-        private_key = rsa_key_pair["private_key"]
-        public_key = rsa_key_pair["public_key"]
+        private_key = rsa_key_pair.private_key
+        public_key = rsa_key_pair.public_key
 
         data = b"test data"
         signature = algo.sign(data, private_key)
@@ -472,8 +421,8 @@ class TestRSAPSSAlgorithms:
     def test_ps512_invalid_signature(self, rsa_key_pair):
         """Test PS512 algorithm rejects invalid signature."""
         algo = PS512Algorithm()
-        private_key = rsa_key_pair["private_key"]
-        public_key = rsa_key_pair["public_key"]
+        private_key = rsa_key_pair.private_key
+        public_key = rsa_key_pair.public_key
 
         data = b"test data"
         signature = algo.sign(data, private_key)
@@ -486,8 +435,8 @@ class TestRSAPSSAlgorithms:
     def test_ps256_tampered_data(self, rsa_key_pair):
         """Test PS256 algorithm rejects tampered data."""
         algo = PS256Algorithm()
-        private_key = rsa_key_pair["private_key"]
-        public_key = rsa_key_pair["public_key"]
+        private_key = rsa_key_pair.private_key
+        public_key = rsa_key_pair.public_key
 
         data = b"test data"
         signature = algo.sign(data, private_key)
@@ -498,8 +447,8 @@ class TestRSAPSSAlgorithms:
 
     def test_ps_algorithms_produce_different_signatures(self, rsa_key_pair):
         """Test that different PS algorithms produce different signatures."""
-        private_key = rsa_key_pair["private_key"]
-        public_key = rsa_key_pair["public_key"]
+        private_key = rsa_key_pair.private_key
+        public_key = rsa_key_pair.public_key
         data = b"test data"
 
         algo256 = PS256Algorithm()
@@ -559,7 +508,7 @@ class TestRSAPSSAlgorithms:
     def test_ps256_verify_with_private_key(self, rsa_key_pair):
         """Test PS256 can verify with private key (which contains public key)."""
         algo = PS256Algorithm()
-        private_key = rsa_key_pair["private_key"]
+        private_key = rsa_key_pair.private_key
 
         data = b"test data"
         signature = algo.sign(data, private_key)
@@ -570,8 +519,8 @@ class TestRSAPSSAlgorithms:
     def test_pss_padding_randomization(self, rsa_key_pair):
         """Test that PSS padding produces different signatures each time."""
         algo = PS256Algorithm()
-        private_key = rsa_key_pair["private_key"]
-        public_key = rsa_key_pair["public_key"]
+        private_key = rsa_key_pair.private_key
+        public_key = rsa_key_pair.public_key
 
         data = b"test data"
 

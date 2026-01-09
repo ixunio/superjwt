@@ -37,7 +37,7 @@ from superjwt.exceptions import (
     TokenNotYetValidError,
 )
 from superjwt.keys import BaseKey
-from superjwt.utils import delta_datetime_timestamp
+from superjwt.utils import check_cryptography_available, delta_datetime_timestamp
 
 
 try:
@@ -55,6 +55,7 @@ MAX_TOKEN_BYTES: int = 16 * 1024  # 16 KB
 class Alg(str, Enum):
     """JWS/JWT Algorithm names with associated implementation instances."""
 
+    none = "none"
     HS256 = "HS256"
     HS384 = "HS384"
     HS512 = "HS512"
@@ -73,25 +74,22 @@ class Alg(str, Enum):
     Ed448 = "Ed448"
 
     def get_instance(self) -> BaseJWSAlgorithm:
-        instance = ALG_INSTANCES.get(self.value)
-        if instance is None:
+        class_ = ALGORITHMS.get(self.value)
+        if class_ is None:
             raise AlgorithmNotSupportedError(
                 f"JWS Algorithm '{self.value}' is not yet implemented"
             )
-        return instance
+        if class_.requires_cryptography:
+            check_cryptography_available()
+        return class_()
 
     @staticmethod
     def get_instance_by_name(name: str) -> BaseJWSAlgorithm:
-        if name not in ALG_INSTANCES:
+        if name not in ALGORITHMS:
             raise InvalidAlgorithmError(
                 f"Algorithm '{name}' is not a valid JWS algorithm"
             )
-        instance = ALG_INSTANCES[name]
-        if instance is None:
-            raise AlgorithmNotSupportedError(
-                f"JWS Algorithm '{name}' is not yet implemented"
-            )
-        return instance
+        return getattr(Alg, name).get_instance()
 
     @classmethod
     def get_algorithm(cls, algorithm: Self | Literal["none"] | str) -> BaseJWSAlgorithm:
@@ -101,17 +99,17 @@ class Alg(str, Enum):
             return cls.get_instance_by_name(algorithm)
 
 
-ALG_INSTANCES: dict[str, BaseJWSAlgorithm | None] = {
-    "none": NoneAlgorithm(),
-    "HS256": HS256Algorithm(),
-    "HS384": HS384Algorithm(),
-    "HS512": HS512Algorithm(),
-    "RS256": RS256Algorithm(),
-    "RS384": RS384Algorithm(),
-    "RS512": RS512Algorithm(),
-    "PS256": PS256Algorithm(),
-    "PS384": PS384Algorithm(),
-    "PS512": PS512Algorithm(),
+ALGORITHMS: dict[str, type[BaseJWSAlgorithm] | None] = {
+    "none": NoneAlgorithm,
+    "HS256": HS256Algorithm,
+    "HS384": HS384Algorithm,
+    "HS512": HS512Algorithm,
+    "RS256": RS256Algorithm,
+    "RS384": RS384Algorithm,
+    "RS512": RS512Algorithm,
+    "PS256": PS256Algorithm,
+    "PS384": PS384Algorithm,
+    "PS512": PS512Algorithm,
     "ES256": None,  # Placeholder
     "ES256K": None,  # Placeholder
     "ES384": None,  # Placeholder
