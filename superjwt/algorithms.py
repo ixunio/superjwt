@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
 
 from superjwt.exceptions import SuperJWTError
 from superjwt.keys import BaseKey, ECKey, NoneKey, OctKey, OKPKey, RSAKey
@@ -59,6 +59,23 @@ class HMACWithSHAAlgorithm(BaseJWSAlgorithm[OctKey]):
     def __init__(self, hash_algorithm: Any):
         self.hash_algorithm = hash_algorithm
 
+    def generate_key(self, key_size: int | None = None) -> OctKey:
+        """Generate a random symmetric key for HMAC.
+
+        Args:
+            key_size: The size of the key in bytes. If None, uses the hash output size.
+                      For HS256: defaults to 32 bytes (256 bits)
+                      For HS384: defaults to 48 bytes (384 bits)
+                      For HS512: defaults to 64 bytes (512 bits)
+
+        Returns:
+            A new OctKey instance with a randomly generated key.
+        """
+        final_key_size = (
+            key_size if key_size is not None else self.hash_algorithm().digest_size
+        )
+        return self.key_type.generate(final_key_size)
+
     def check_key(self, key: OctKey) -> None:
         if not isinstance(key, OctKey):
             raise SuperJWTError("Key must be an OctKey for HMAC algorithms")
@@ -79,6 +96,16 @@ class RSAAlgorithm(BaseJWSAlgorithm[RSAKey]):
         check_cryptography_available()
         self.hash_algorithm = hash_algorithm
         self.padding = padding
+
+    def generate_key(self, key_size: Literal[2048, 3072, 4096] = 2048) -> RSAKey:
+        """Generate a new RSA key pair.
+
+        Args:
+            key_size: The size of the key in bits. Default is 2048.
+                      Recommended values: 2048, 3072, 4096.
+        """
+
+        return self.key_type.generate(key_size)
 
     def check_key(self, key: RSAKey) -> None:
         if not isinstance(key, RSAKey):
@@ -130,6 +157,10 @@ class ECDSAAlgorithm(BaseJWSAlgorithm[ECKey]):
         self.hash_algorithm = hash_algorithm
         self.curve = curve
         self.curve_name = curve.name
+
+    def generate_key(self) -> ECKey:
+        """Generate a new EC key pair for this algorithm's curve."""
+        return self.key_type.generate(self.curve())
 
     def check_key(self, key: ECKey) -> None:
         if not isinstance(key, ECKey):
@@ -189,6 +220,10 @@ class EdDSAAlgorithm(BaseJWSAlgorithm[OKPKey]):
         check_cryptography_available()
         self.curve_type_private = curve_type_private
         self.curve_type_public = curve_type_public
+
+    def generate_key(self) -> OKPKey:
+        """Generate a new OKP key pair for this algorithm's curve."""
+        return self.key_type.generate(cast("Literal['Ed25519', 'Ed448']", self.name))
 
     def check_key(self, key: OKPKey) -> None:
         if not isinstance(key, OKPKey):

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import secrets
 import warnings
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, ClassVar, Generic, Literal, TypeVar, cast
 
-from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning
+from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning, SuperJWTError
 from superjwt.utils import (
     as_bytes,
     check_cryptography_available,
@@ -19,7 +20,7 @@ if check_cryptography_available(raise_error=False):  # pragma: no cover
     from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
 
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from typing_extensions import Self
 
 
@@ -116,7 +117,7 @@ class SymmetricKey(BaseKey):
 
     def _prepare_key(self, secret_key: bytes, _) -> None:
         if _ is not None:
-            raise InvalidKeyError("Symmetric key should not have a public key component")
+            raise SuperJWTError("Symmetric key should not have a public key component")
         if is_pem_format(secret_key) or is_ssh_key(secret_key):
             raise InvalidKeyError(
                 "The specified key is an asymmetric key or x509 certificate and"
@@ -137,6 +138,26 @@ class OctKey(SymmetricKey):
     name = "oct"
     description = "Octet sequence key for HMAC algorithms"
     algorithms = ("HS256", "HS384", "HS512")
+
+    @classmethod
+    def generate(cls, key_size: int = 32, *, human_readable: bool = True) -> Self:
+        """Generate a random symmetric key.
+
+        Args:
+            key_size: The size of the key in bytes. Default is 32 bytes (256 bits).
+                      Recommended values:
+                      - 32 bytes (256 bits) for HS256
+                      - 48 bytes (384 bits) for HS384
+                      - 64 bytes (512 bits) for HS512
+            human_readable: If True, returns key as hex string (default).
+                           If False, returns raw bytes.
+
+        Returns:
+            A new OctKey instance with a randomly generated key.
+        """
+        random_key_bytes = secrets.token_bytes(key_size)
+        random_key = random_key_bytes.hex() if human_readable else random_key_bytes
+        return cls.import_key(random_key, None)
 
 
 if TYPE_CHECKING:
@@ -277,9 +298,6 @@ class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
 
         Returns:
             Tuple of (public_key_obj, public_key_pem)
-
-        Raises:
-            InvalidKeyError: If no private key is loaded
         """
         assert self._private_key_obj is not None
         derived_public_key_obj = cast("PublicKeyType", self._private_key_obj.public_key())
@@ -333,24 +351,70 @@ class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
     def _get_private_key(self) -> PrivateKeyType:
         """Get the cryptography private key object for signing."""
         if self._private_key_obj is None:
-            raise InvalidKeyError(
-                "This key does not have a private component for signing"
-            )
+            raise SuperJWTError("This key does not have a private component for signing")
         return self._private_key_obj
 
     def _get_public_key(self) -> PublicKeyType:
         """Get the cryptography public key object for verification."""
         if self._public_key_obj is None:
-            raise InvalidKeyError(
+            raise SuperJWTError(
                 "This key does not have a public component for verification"
             )
         return self._public_key_obj
+
+    def export_private_key_pem(self) -> bytes:
+        """Export the private key as PEM-encoded PKCS8 format.
+
+        Returns:
+            bytes: The private key in PEM format (PKCS8)
+        """
+        private_key_obj = self._get_private_key()
+        return private_key_obj.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+    def export_public_key_pem(self) -> bytes:
+        """Export the public key as PEM-encoded SubjectPublicKeyInfo format.
+
+        If only a private key is available, derives and exports the public key from it.
+
+        Returns:
+            bytes: The public key in PEM format (SubjectPublicKeyInfo)
+        """
+        public_key_obj = self._get_public_key()
+        return public_key_obj.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
 
 
 class RSAKey(AsymmetricKey["rsa.RSAPrivateKey", "rsa.RSAPublicKey"]):
     name = "RSA"
     description = "RSA key for RSASSA-PKCS1-v1_5 and RSASSA-PSS algorithms"
     algorithms = ("RS256", "RS384", "RS512", "PS256", "PS384", "PS512")
+
+    @classmethod
+    def generate(cls, key_size: Literal[2048, 3072, 4096]) -> Self:
+        """Generate a new RSA key pair.
+
+        Args:
+            key_size: The size of the key in bits.
+                      Recommended values: 2048, 3072, 4096.
+        """
+        check_cryptography_available()
+        private_key_obj = rsa.generate_private_key(
+            public_exponent=65537, key_size=key_size, backend=default_backend()
+        )
+
+        private_key_pem = private_key_obj.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+        return cls.import_key(private_key=private_key_pem)
 
     @property
     def private_key_types(self) -> tuple[type, ...]:
@@ -386,6 +450,78 @@ class ECKey(AsymmetricKey["ec.EllipticCurvePrivateKey", "ec.EllipticCurvePublicK
         "secp256k1, secp384r1 (P-384), and secp521r1 (P-521)"
     )
     algorithms = ("ES256", "ES256K", "ES384", "ES512")
+
+    @classmethod
+    def generate(
+        cls,
+        curve: ec.EllipticCurve
+        | Literal[
+            # for ES256 algorithm
+            "ES256",
+            "secp256r1",
+            "P-256",
+            # for ES256K algorithm
+            "ES256K",
+            "secp256k1",
+            # for ES384 algorithm
+            "ES384",
+            "secp384r1",
+            "P-384",
+            # for ES512 algorithm
+            "ES512",
+            "secp521r1",
+            "P-521",
+        ],
+    ) -> Self:
+        """Generate a new EC key pair.
+
+        Args:
+            curve: The elliptic curve to use. Can be an EllipticCurve instance,
+                   a curve name: "P-256", "P-384", "P-521", "secp256r1",
+                   "secp384r1", "secp521r1", "secp256k1",
+                   or an algorithm name: "ES256", "ES256K", "ES384", "ES512".
+        """
+        check_cryptography_available()
+
+        # Map string names to curve instances
+        if isinstance(curve, str):
+            curve_map = {
+                # Standard curve names
+                "P-256": ec.SECP256R1(),
+                "secp256r1": ec.SECP256R1(),
+                "P-384": ec.SECP384R1(),
+                "secp384r1": ec.SECP384R1(),
+                "P-521": ec.SECP521R1(),
+                "secp521r1": ec.SECP521R1(),
+                "secp256k1": ec.SECP256K1(),
+                # Algorithm names
+                "ES256": ec.SECP256R1(),
+                "ES256K": ec.SECP256K1(),
+                "ES384": ec.SECP384R1(),
+                "ES512": ec.SECP521R1(),
+            }
+            if curve not in curve_map:
+                raise SuperJWTError(
+                    f"Unsupported curve: {curve}. "
+                    f"Supported curves: {', '.join(curve_map.keys())}"
+                )
+            curve = curve_map[curve]
+        elif not isinstance(curve, ec.EllipticCurve):
+            raise SuperJWTError(
+                "curve must be an instance of EllipticCurve or a valid curve name"
+            )
+
+        private_key_obj = ec.generate_private_key(
+            cast("ec.EllipticCurve", curve), default_backend()
+        )
+
+        private_key_pem = private_key_obj.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+        return cls.import_key(private_key=private_key_pem)
 
     @property
     def private_key_types(self) -> tuple[type, ...]:
@@ -448,6 +584,33 @@ class OKPKey(
     name = "OKP"
     description = "Octet Key Pair for EdDSA algorithms (Ed25519, Ed448)"
     algorithms = ("Ed25519", "Ed448")
+
+    @classmethod
+    def generate(cls, curve: Literal["Ed25519", "Ed448"]) -> Self:
+        """Generate a new OKP key pair.
+
+        Args:
+            curve: The EdDSA curve to use: "Ed25519" or "Ed448".
+        """
+        check_cryptography_available()
+
+        if curve == "Ed25519":
+            private_key_obj = ed25519.Ed25519PrivateKey.generate()
+        elif curve == "Ed448":
+            private_key_obj = ed448.Ed448PrivateKey.generate()
+        else:
+            raise SuperJWTError(
+                f"Unsupported OKP algorithm: {curve}. "
+                "Supported algorithms: Ed25519, Ed448"
+            )
+
+        private_key_pem = private_key_obj.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+        return cls.import_key(private_key=private_key_pem)
 
     @property
     def private_key_types(self) -> tuple[type, ...]:

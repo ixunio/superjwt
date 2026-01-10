@@ -1,5 +1,5 @@
 import json
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 from pydantic import ValidationError
 
@@ -33,7 +33,7 @@ from superjwt.utils import as_bytes, urlsafe_b64decode, urlsafe_b64encode
 class JWS:
     def __init__(
         self,
-        algorithm: Alg | Literal["none"] | str,
+        algorithm: Alg | BaseJWSAlgorithm | str,
         max_token_bytes: int = MAX_TOKEN_BYTES,
         default_headers_validation: JWTValidation = JWTHeadersDefaultValidation,
     ):

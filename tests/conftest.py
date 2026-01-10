@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from superjwt.definitions import Alg, JWTClaims, JWTDatetime
 from superjwt.jws import JWS
 from superjwt.jwt import JWT
-from superjwt.keys import ECKey, OKPKey, RSAKey
+from superjwt.keys import AsymmetricKey, ECKey, OKPKey, RSAKey
 from superjwt.utils import check_cryptography_available
 
 
@@ -160,7 +160,7 @@ requires_cryptography = pytest.mark.skipif(
 if CRYPTOGRAPHY_AVAILABLE:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 
 class KeyPair(BaseModel):
@@ -196,38 +196,24 @@ class KeyPair(BaseModel):
     # (RSAKey | ECKey | OKPKey)
     key_instance_from_public_pem: Any
 
+    @classmethod
+    def make_obj(cls, key: AsymmetricKey):
+        return KeyPair(
+            private_key_obj=key._private_key_obj,
+            public_key_obj=key._public_key_obj,
+            private_pem=key.private_key,
+            public_pem=key.public_key,
+            key_instance_from_private_pem=type(key).import_signing_key(key.private_key),
+            key_instance_from_public_pem=type(key).import_verifying_key(key.public_key),
+        )
+
 
 @pytest.fixture(scope="session")
 def rsa_2048_key_pair():
     """Generate RSA-2048 key pair once per session for all RSA tests."""
     if not CRYPTOGRAPHY_AVAILABLE:
         pytest.skip("cryptography not available")
-
-    from superjwt.keys import RSAKey
-
-    private_key_obj = rsa.generate_private_key(
-        public_exponent=65537, key_size=2048, backend=default_backend()
-    )
-
-    private_pem = private_key_obj.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    public_pem = private_key_obj.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-    return KeyPair(
-        private_key_obj=private_key_obj,
-        public_key_obj=private_key_obj.public_key(),
-        private_pem=private_pem,
-        public_pem=public_pem,
-        key_instance_from_private_pem=RSAKey.import_signing_key(private_pem),
-        key_instance_from_public_pem=RSAKey.import_verifying_key(public_pem),
-    )
+    return KeyPair.make_obj(RSAKey.generate(2048))
 
 
 @pytest.fixture(scope="session")
@@ -235,30 +221,7 @@ def rsa_2048_key_pair_alt():
     """Generate a second RSA-2048 key pair for wrong key tests."""
     if not CRYPTOGRAPHY_AVAILABLE:
         pytest.skip("cryptography not available")
-
-    private_key_obj = rsa.generate_private_key(
-        public_exponent=65537, key_size=2048, backend=default_backend()
-    )
-
-    private_pem = private_key_obj.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    public_pem = private_key_obj.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-    return KeyPair(
-        private_key_obj=private_key_obj,
-        public_key_obj=private_key_obj.public_key(),
-        private_pem=private_pem,
-        public_pem=public_pem,
-        key_instance_from_private_pem=RSAKey.import_signing_key(private_pem),
-        key_instance_from_public_pem=RSAKey.import_verifying_key(public_pem),
-    )
+    return KeyPair.make_obj(RSAKey.generate(2048))
 
 
 @pytest.fixture(scope="session")
@@ -266,28 +229,7 @@ def ec_p256_key_pair():
     """Generate EC P-256 (SECP256R1) key pair once per session."""
     if not CRYPTOGRAPHY_AVAILABLE:
         pytest.skip("cryptography not available")
-
-    private_key_obj = ec.generate_private_key(ec.SECP256R1(), default_backend())
-
-    private_pem = private_key_obj.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    public_pem = private_key_obj.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-    return KeyPair(
-        private_key_obj=private_key_obj,
-        public_key_obj=private_key_obj.public_key(),
-        private_pem=private_pem,
-        public_pem=public_pem,
-        key_instance_from_private_pem=ECKey.import_signing_key(private_pem),
-        key_instance_from_public_pem=ECKey.import_verifying_key(public_pem),
-    )
+    return KeyPair.make_obj(ECKey.generate("P-256"))
 
 
 @pytest.fixture(scope="session")
@@ -295,28 +237,7 @@ def ec_p256_key_pair_alt():
     """Generate a second EC P-256 key pair for wrong key tests."""
     if not CRYPTOGRAPHY_AVAILABLE:
         pytest.skip("cryptography not available")
-
-    private_key_obj = ec.generate_private_key(ec.SECP256R1(), default_backend())
-
-    private_pem = private_key_obj.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    public_pem = private_key_obj.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-    return KeyPair(
-        private_key_obj=private_key_obj,
-        public_key_obj=private_key_obj.public_key(),
-        private_pem=private_pem,
-        public_pem=public_pem,
-        key_instance_from_private_pem=ECKey.import_signing_key(private_pem),
-        key_instance_from_public_pem=ECKey.import_verifying_key(public_pem),
-    )
+    return KeyPair.make_obj(ECKey.generate("P-256"))
 
 
 @pytest.fixture(scope="session")
@@ -324,28 +245,7 @@ def ec_p384_key_pair():
     """Generate EC P-384 (SECP384R1) key pair once per session."""
     if not CRYPTOGRAPHY_AVAILABLE:
         pytest.skip("cryptography not available")
-
-    private_key_obj = ec.generate_private_key(ec.SECP384R1(), default_backend())
-
-    private_pem = private_key_obj.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    public_pem = private_key_obj.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-    return KeyPair(
-        private_key_obj=private_key_obj,
-        public_key_obj=private_key_obj.public_key(),
-        private_pem=private_pem,
-        public_pem=public_pem,
-        key_instance_from_private_pem=ECKey.import_signing_key(private_pem),
-        key_instance_from_public_pem=ECKey.import_verifying_key(public_pem),
-    )
+    return KeyPair.make_obj(ECKey.generate("P-384"))
 
 
 @pytest.fixture(scope="session")
@@ -353,28 +253,7 @@ def ec_p521_key_pair():
     """Generate EC P-521 (SECP521R1) key pair once per session."""
     if not CRYPTOGRAPHY_AVAILABLE:
         pytest.skip("cryptography not available")
-
-    private_key_obj = ec.generate_private_key(ec.SECP521R1(), default_backend())
-
-    private_pem = private_key_obj.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    public_pem = private_key_obj.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-    return KeyPair(
-        private_key_obj=private_key_obj,
-        public_key_obj=private_key_obj.public_key(),
-        private_pem=private_pem,
-        public_pem=public_pem,
-        key_instance_from_private_pem=ECKey.import_signing_key(private_pem),
-        key_instance_from_public_pem=ECKey.import_verifying_key(public_pem),
-    )
+    return KeyPair.make_obj(ECKey.generate("P-521"))
 
 
 @pytest.fixture(scope="session")
@@ -382,28 +261,7 @@ def ed25519_key_pair():
     """Generate Ed25519 key pair once per session."""
     if not CRYPTOGRAPHY_AVAILABLE:
         pytest.skip("cryptography not available")
-
-    private_key_obj = ed25519.Ed25519PrivateKey.generate()
-
-    private_pem = private_key_obj.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    public_pem = private_key_obj.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-    return KeyPair(
-        private_key_obj=private_key_obj,
-        public_key_obj=private_key_obj.public_key(),
-        private_pem=private_pem,
-        public_pem=public_pem,
-        key_instance_from_private_pem=OKPKey.import_signing_key(private_pem),
-        key_instance_from_public_pem=OKPKey.import_verifying_key(public_pem),
-    )
+    return KeyPair.make_obj(OKPKey.generate("Ed25519"))
 
 
 @pytest.fixture(scope="session")
@@ -411,28 +269,7 @@ def ed25519_key_pair_alt():
     """Generate a second Ed25519 key pair for wrong key tests."""
     if not CRYPTOGRAPHY_AVAILABLE:
         pytest.skip("cryptography not available")
-
-    private_key_obj = ed25519.Ed25519PrivateKey.generate()
-
-    private_pem = private_key_obj.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    public_pem = private_key_obj.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-    return KeyPair(
-        private_key_obj=private_key_obj,
-        public_key_obj=private_key_obj.public_key(),
-        private_pem=private_pem,
-        public_pem=public_pem,
-        key_instance_from_private_pem=OKPKey.import_signing_key(private_pem),
-        key_instance_from_public_pem=OKPKey.import_verifying_key(public_pem),
-    )
+    return KeyPair.make_obj(OKPKey.generate("Ed25519"))
 
 
 @pytest.fixture(scope="session")
@@ -440,25 +277,72 @@ def ed448_key_pair():
     """Generate Ed448 key pair once per session."""
     if not CRYPTOGRAPHY_AVAILABLE:
         pytest.skip("cryptography not available")
+    return KeyPair.make_obj(OKPKey.generate("Ed448"))
 
-    private_key_obj = ed448.Ed448PrivateKey.generate()
 
-    private_pem = private_key_obj.private_bytes(
+# Additional RSA key sizes for testing
+@pytest.fixture(scope="session")
+def rsa_3072_key_pair():
+    """Generate RSA-3072 key pair once per session."""
+    if not CRYPTOGRAPHY_AVAILABLE:
+        pytest.skip("cryptography not available")
+    return KeyPair.make_obj(RSAKey.generate(3072))
+
+
+@pytest.fixture(scope="session")
+def rsa_4096_key_pair():
+    """Generate RSA-4096 key pair once per session."""
+    if not CRYPTOGRAPHY_AVAILABLE:
+        pytest.skip("cryptography not available")
+    return KeyPair.make_obj(RSAKey.generate(4096))
+
+
+# Weak keys for security warning tests (session-scoped for performance)
+@pytest.fixture(scope="session")
+def rsa_1024_weak_key():
+    """Generate weak RSA-1024 key pair once per session for warning tests."""
+    if not CRYPTOGRAPHY_AVAILABLE:
+        pytest.skip("cryptography not available")
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=1024, backend=default_backend()
+    )
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return {"private_pem": private_pem, "public_pem": public_pem}
+
+
+@pytest.fixture(scope="session")
+def ec_p192_weak_key():
+    """Generate weak EC P-192 key pair once per session for warning tests."""
+    if not CRYPTOGRAPHY_AVAILABLE:
+        pytest.skip("cryptography not available")
+
+    private_key = ec.generate_private_key(ec.SECP192R1(), default_backend())
+    private_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
+    return {"private_pem": private_pem}
 
-    public_pem = private_key_obj.public_key().public_bytes(
+
+@pytest.fixture(scope="session")
+def ec_p224_weak_key():
+    """Generate weak EC P-224 key pair once per session for warning tests."""
+    if not CRYPTOGRAPHY_AVAILABLE:
+        pytest.skip("cryptography not available")
+
+    private_key = ec.generate_private_key(ec.SECP224R1(), default_backend())
+    public_pem = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-
-    return KeyPair(
-        private_key_obj=private_key_obj,
-        public_key_obj=private_key_obj.public_key(),
-        private_pem=private_pem,
-        public_pem=public_pem,
-        key_instance_from_private_pem=OKPKey.import_signing_key(private_pem),
-        key_instance_from_public_pem=OKPKey.import_verifying_key(public_pem),
-    )
+    return {"public_pem": public_pem}

@@ -233,8 +233,9 @@ class JWT:
         Returns:
             JWSToken: a JWSToken instance representing the unsafe non-verified decoded JWT token.
         """
+        from superjwt.algorithms import NoneAlgorithm
 
-        self.jws = JWS("none", max_token_bytes=self.max_token_bytes)
+        self.jws = JWS(NoneAlgorithm(), max_token_bytes=self.max_token_bytes)
 
         if has_detached_payload:
             self.jws.enable_detached_payload()

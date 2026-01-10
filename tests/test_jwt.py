@@ -14,6 +14,7 @@ from superjwt.definitions import (
     JWTDatetimeFloat,
     JWTDatetimeInt,
     JWTValidation,
+    Key,
     Validation,
 )
 from superjwt.exceptions import (
@@ -1068,8 +1069,6 @@ def test_hmac_algorithms(jwt: JWT, claims: JWTCustomClaims, secret_key: str):
 @requires_cryptography
 def test_rsa_pkcs1_algorithms(jwt: JWT, claims: JWTCustomClaims, rsa_2048_key_pair):
     """Test RSA PKCS#1 v1.5 algorithms with different key usage patterns."""
-    from superjwt.definitions import Key
-
     rsa_algorithms = [Alg.RS256, Alg.RS384, Alg.RS512]
 
     for alg in rsa_algorithms:
@@ -1113,8 +1112,6 @@ def test_rsa_pkcs1_algorithms(jwt: JWT, claims: JWTCustomClaims, rsa_2048_key_pa
 @requires_cryptography
 def test_rsa_pss_algorithms(jwt: JWT, claims: JWTCustomClaims, rsa_2048_key_pair):
     """Test RSA-PSS algorithms with different key usage patterns."""
-    from superjwt.definitions import Key
-
     rsa_pss_algorithms = [Alg.PS256, Alg.PS384, Alg.PS512]
 
     for alg in rsa_pss_algorithms:
@@ -1164,8 +1161,6 @@ def test_ecdsa_algorithms(
     ec_p521_key_pair,
 ):
     """Test ECDSA algorithms with different key usage patterns."""
-    from superjwt.definitions import Key
-
     # Map algorithms to their corresponding key pairs
     ecdsa_test_cases = [
         (Alg.ES256, ec_p256_key_pair),
@@ -1210,8 +1205,6 @@ def test_eddsa_algorithms(
     jwt: JWT, claims: JWTCustomClaims, ed25519_key_pair, ed448_key_pair
 ):
     """Test EdDSA algorithms with different key usage patterns."""
-    from superjwt.definitions import Key
-
     # Map algorithms to their corresponding key pairs
     eddsa_test_cases = [
         (Alg.Ed25519, ed25519_key_pair),

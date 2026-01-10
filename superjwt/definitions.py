@@ -61,7 +61,6 @@ MAX_TOKEN_BYTES: int = 16 * 1024  # 16 KB
 class Alg(str, Enum):
     """JWS/JWT Algorithm names with associated implementation instances."""
 
-    none = "none"
     HS256 = "HS256"
     HS384 = "HS384"
     HS512 = "HS512"
@@ -98,9 +97,11 @@ class Alg(str, Enum):
         return getattr(Alg, name).get_instance()
 
     @classmethod
-    def get_algorithm(cls, algorithm: Self | Literal["none"] | str) -> BaseJWSAlgorithm:
+    def get_algorithm(cls, algorithm: Self | BaseJWSAlgorithm | str) -> BaseJWSAlgorithm:
         if isinstance(algorithm, cls):
             return algorithm.get_instance()
+        elif isinstance(algorithm, BaseJWSAlgorithm):
+            return algorithm
         else:
             return cls.get_instance_by_name(algorithm)
 

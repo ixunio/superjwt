@@ -1,7 +1,9 @@
 """Tests for superjwt.keys module."""
 
+import warnings
+
 import pytest
-from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning
+from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning, SuperJWTError
 from superjwt.keys import ECKey, NoneKey, OctKey, OKPKey, RSAKey
 from superjwt.utils import check_cryptography_available
 
@@ -122,8 +124,6 @@ MIIEpAIBAAKCAQEA4Z9v...
 
     def test_oct_key_sufficient_length(self):
         """Test that sufficiently long keys don't trigger warnings."""
-        import warnings
-
         # 14 bytes = 112 bits (minimum)
         secret = b"a" * 14
         with warnings.catch_warnings(record=True) as warning_list:
@@ -153,6 +153,49 @@ MIIEpAIBAAKCAQEA4Z9v...
         """Test that empty public_key parameter raises ValueError."""
         with pytest.raises(ValueError, match="Secret key must not be empty"):
             OctKey.import_key(None, b"")
+
+    def test_oct_key_generate_default_size(self):
+        """Test OctKey.generate() with default size (32 bytes as hex = 64 chars)."""
+        key = OctKey.generate()
+        assert isinstance(key, OctKey)
+        assert len(key.private_key) == 64  # 32 bytes as hex = 64 characters
+
+    def test_oct_key_generate_default_size_raw_bytes(self):
+        """Test OctKey.generate() with default size and raw bytes."""
+        key = OctKey.generate(human_readable=False)
+        assert isinstance(key, OctKey)
+        assert len(key.private_key) == 32  # 32 bytes raw
+
+    def test_oct_key_generate_custom_size(self):
+        """Test OctKey.generate() with custom size."""
+        key = OctKey.generate(64)
+        assert isinstance(key, OctKey)
+        assert len(key.private_key) == 128  # 64 bytes as hex = 128 characters
+
+    def test_oct_key_generate_custom_size_raw_bytes(self):
+        """Test OctKey.generate() with custom size and raw bytes."""
+        key = OctKey.generate(64, human_readable=False)
+        assert isinstance(key, OctKey)
+        assert len(key.private_key) == 64  # 64 bytes raw
+
+    def test_oct_key_generate_creates_different_keys(self):
+        """Test that OctKey.generate() creates different keys each time."""
+        key1 = OctKey.generate(32)
+        key2 = OctKey.generate(32)
+        assert key1.private_key != key2.private_key
+
+    def test_oct_key_generated_key_is_usable(self):
+        """Test that generated key can be used for HMAC operations."""
+        key = OctKey.generate(32)
+        # Test with HMAC algorithm
+        import hashlib
+        import hmac
+
+        test_data = b"test message"
+        signature = hmac.new(key.private_key, test_data, hashlib.sha256).digest()
+        # Verify the signature
+        expected = hmac.new(key.private_key, test_data, hashlib.sha256).digest()
+        assert hmac.compare_digest(signature, expected)
 
 
 @requires_cryptography
@@ -241,11 +284,9 @@ class TestRSAKey:
         self, rsa_public_key_spki
     ):
         """Test that getting private key from public-only key raises error."""
-        from superjwt.keys import RSAKey
-
         key = RSAKey.import_key(public_key=rsa_public_key_spki)
         with pytest.raises(
-            InvalidKeyError, match="does not have a private component for signing"
+            SuperJWTError, match="does not have a private component for signing"
         ):
             key._get_private_key()
 
@@ -253,7 +294,7 @@ class TestRSAKey:
         """Test that calling get_public_key() on an uninitialized key raises error."""
         key = RSAKey()
         with pytest.raises(
-            InvalidKeyError, match="does not have a public component for verification"
+            SuperJWTError, match="does not have a public component for verification"
         ):
             key._get_public_key()
 
@@ -384,40 +425,21 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(InvalidKeyError, match=r"Key must be an RSA public key"):
             RSAKey.import_key(public_key=ec_public_key_pem)
 
-    def test_rsa_key_small_key_warning_private(self):
+    def test_rsa_key_small_key_warning_private(self, rsa_1024_weak_key):
         """Test that small RSA private key triggers security warning."""
-        # Generate a small 1024-bit key
-        small_private_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=1024, backend=default_backend()
-        )
-        small_private_pem = small_private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-
         with pytest.warns(
             KeyLengthSecurityWarning,
             match=r"RSA key size is 1024 bits.*should be >= 2048 bits",
         ):
-            RSAKey.import_key(small_private_pem)
+            RSAKey.import_key(rsa_1024_weak_key["private_pem"])
 
-    def test_rsa_key_small_key_warning_public(self):
+    def test_rsa_key_small_key_warning_public(self, rsa_1024_weak_key):
         """Test that small RSA public key triggers security warning."""
-        # Generate a small 1024-bit key
-        small_private_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=1024, backend=default_backend()
-        )
-        small_public_pem = small_private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-
         with pytest.warns(
             KeyLengthSecurityWarning,
             match=r"RSA key size is 1024 bits.*should be >= 2048 bits",
         ):
-            RSAKey.import_key(public_key=small_public_pem)
+            RSAKey.import_key(public_key=rsa_1024_weak_key["public_pem"])
 
     def test_rsa_key_empty_public_key_raises_error(self):
         """Test that empty public_key parameter raises ValueError."""
@@ -450,6 +472,22 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         assert isinstance(public_key_obj1, rsa.RSAPublicKey)
         assert isinstance(public_key_obj2, rsa.RSAPublicKey)
         assert key.public_keys_match(public_key_obj1, public_key_obj2) is False
+
+    def test_rsa_key_export_private_key_pem(self, rsa_2048_key_pair):
+        """Test exporting private key as PEM."""
+        key = rsa_2048_key_pair.key_instance_from_private_pem
+        pem = key.export_private_key_pem()
+
+        assert isinstance(pem, bytes)
+        assert b"BEGIN PRIVATE KEY" in pem
+
+    def test_rsa_key_export_public_key_pem(self, rsa_2048_key_pair):
+        """Test exporting public key as PEM."""
+        key = rsa_2048_key_pair.key_instance_from_private_pem
+        pem = key.export_public_key_pem()
+
+        assert isinstance(pem, bytes)
+        assert b"BEGIN PUBLIC KEY" in pem
 
 
 @requires_cryptography
@@ -529,7 +567,7 @@ class TestECKey:
         """Test that getting private key from public-only key raises error."""
         key = ECKey.import_key(public_key=ec_public_key_p256)
         with pytest.raises(
-            InvalidKeyError, match="does not have a private component for signing"
+            SuperJWTError, match="does not have a private component for signing"
         ):
             key._get_private_key()
 
@@ -537,7 +575,7 @@ class TestECKey:
         """Test that calling get_public_key() on an uninitialized key raises error."""
         key = ECKey()
         with pytest.raises(
-            InvalidKeyError, match="does not have a public component for verification"
+            SuperJWTError, match="does not have a public component for verification"
         ):
             key._get_public_key()
 
@@ -664,36 +702,21 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(InvalidKeyError, match=r"Key must be an EC public key"):
             ECKey.import_key(public_key=rsa_public_key_pem)
 
-    def test_ec_key_small_curve_warning_private(self):
+    def test_ec_key_small_curve_warning_private(self, ec_p192_weak_key):
         """Test that small EC curve private key triggers security warning."""
-        # Generate a key with P-192 (weak curve)
-        small_private_key = ec.generate_private_key(ec.SECP192R1(), default_backend())
-        small_private_pem = small_private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-
         with pytest.warns(
             KeyLengthSecurityWarning,
             match=r"EC curve.*has weak security",
         ):
-            ECKey.import_key(small_private_pem)
+            ECKey.import_key(ec_p192_weak_key["private_pem"])
 
-    def test_ec_key_small_curve_warning_public(self):
+    def test_ec_key_small_curve_warning_public(self, ec_p224_weak_key):
         """Test that small EC curve public key triggers security warning."""
-        # Generate a key with P-224 (weak curve)
-        small_private_key = ec.generate_private_key(ec.SECP224R1(), default_backend())
-        small_public_pem = small_private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-
         with pytest.warns(
             KeyLengthSecurityWarning,
             match=r"EC curve.*has weak security",
         ):
-            ECKey.import_key(public_key=small_public_pem)
+            ECKey.import_key(public_key=ec_p224_weak_key["public_pem"])
 
     def test_ec_key_empty_public_key_raises_error(self):
         """Test that empty public_key parameter raises ValueError."""
@@ -726,6 +749,42 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         assert isinstance(public_key_obj1, ec.EllipticCurvePublicKey)
         assert isinstance(public_key_obj2, ec.EllipticCurvePublicKey)
         assert key.public_keys_match(public_key_obj1, public_key_obj2) is False
+
+    def test_ec_key_generate_with_invalid_curve_string(self):
+        """Test that ECKey.generate() raises error for invalid curve string."""
+        with pytest.raises(SuperJWTError, match="Unsupported curve"):
+            ECKey.generate("INVALID-CURVE")  # type: ignore
+
+    def test_ec_key_generate_with_invalid_type(self):
+        """Test that ECKey.generate() raises error for invalid curve type."""
+        with pytest.raises(SuperJWTError, match="curve must be an instance"):
+            ECKey.generate(123)  # type: ignore
+
+    def test_ec_key_export_private_key_pem(self, ec_p256_key_pair):
+        """Test exporting private key as PEM."""
+        key = ec_p256_key_pair.key_instance_from_private_pem
+        pem = key.export_private_key_pem()
+
+        assert isinstance(pem, bytes)
+        assert b"BEGIN PRIVATE KEY" in pem
+
+    def test_ec_key_export_public_key_pem(self, ec_p256_key_pair):
+        """Test exporting public key as PEM."""
+        key = ec_p256_key_pair.key_instance_from_private_pem
+        pem = key.export_public_key_pem()
+
+        assert isinstance(pem, bytes)
+        assert b"BEGIN PUBLIC KEY" in pem
+
+    def test_ec_key_curve_name_from_public_only(self, ec_public_key_p256):
+        """Test getting curve name from public-only key."""
+        key = ECKey.import_key(public_key=ec_public_key_p256)
+        assert key.curve_name == "secp256r1"
+
+    def test_ec_key_curve_key_size_from_public_only(self, ec_public_key_p256):
+        """Test getting curve key size from public-only key."""
+        key = ECKey.import_key(public_key=ec_public_key_p256)
+        assert key.curve_key_size == 256
 
 
 @requires_cryptography
@@ -793,7 +852,7 @@ class TestOKPKey:
         """Test that getting private key from public-only key raises error."""
         key = OKPKey.import_key(public_key=okp_public_key_ed25519)
         with pytest.raises(
-            InvalidKeyError, match="does not have a private component for signing"
+            SuperJWTError, match="does not have a private component for signing"
         ):
             key._get_private_key()
 
@@ -801,7 +860,7 @@ class TestOKPKey:
         """Test that calling get_public_key() on an uninitialized key raises error."""
         key = OKPKey()
         with pytest.raises(
-            InvalidKeyError, match="does not have a public component for verification"
+            SuperJWTError, match="does not have a public component for verification"
         ):
             key._get_public_key()
 
@@ -972,3 +1031,24 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
             public_key_obj2, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)
         )
         assert key.public_keys_match(public_key_obj1, public_key_obj2) is False
+
+    def test_okp_key_generate_with_invalid_algorithm(self):
+        """Test that OKPKey.generate() raises error for invalid algorithm."""
+        with pytest.raises(SuperJWTError, match="Unsupported OKP algorithm"):
+            OKPKey.generate("Ed519")  # type: ignore
+
+    def test_okp_key_export_private_key_pem(self, ed25519_key_pair):
+        """Test exporting private key as PEM."""
+        key = ed25519_key_pair.key_instance_from_private_pem
+        pem = key.export_private_key_pem()
+
+        assert isinstance(pem, bytes)
+        assert b"BEGIN PRIVATE KEY" in pem
+
+    def test_okp_key_export_public_key_pem(self, ed25519_key_pair):
+        """Test exporting public key as PEM."""
+        key = ed25519_key_pair.key_instance_from_private_pem
+        pem = key.export_public_key_pem()
+
+        assert isinstance(pem, bytes)
+        assert b"BEGIN PUBLIC KEY" in pem

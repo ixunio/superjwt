@@ -1,4 +1,5 @@
 import pytest
+from superjwt.algorithms import NoneAlgorithm
 from superjwt.definitions import JOSEHeader, Validation
 from superjwt.exceptions import (
     AlgorithmMismatchError,
@@ -82,7 +83,11 @@ def test_wrong_header_algorithm(
 
 
 def test_none_algorithm_not_allowed_decode():
-    """Test that decoding with 'none' algorithm raises error when not explicitly allowed."""
+    """Test that decoding with 'none' algorithm raises error when not explicitly allowed.
+
+    Note: NoneAlgorithm is used internally for inspect() functionality but not exposed
+    in the public Alg enum.
+    """
 
     none_token = (
         "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0"
@@ -92,7 +97,7 @@ def test_none_algorithm_not_allowed_decode():
         "ZHVtbXk"
     )
 
-    jws_none = JWS(algorithm="none")
+    jws_none = JWS(algorithm=NoneAlgorithm())
     none_key = NoneKey()
 
     # Test decode with none algorithm not allowed
@@ -107,8 +112,12 @@ def test_none_algorithm_not_allowed_decode():
 
 
 def test_none_algorithm_not_allowed_encode(claims_fixed_dt: JWTCustomClaims):
-    """Test that encoding with 'none' algorithm raises error when not explicitly allowed."""
-    jws_none = JWS(algorithm="none")
+    """Test that encoding with 'none' algorithm raises error when not explicitly allowed.
+
+    Note: NoneAlgorithm is used internally for inspect() functionality but not exposed
+    in the public Alg enum.
+    """
+    jws_none = JWS(algorithm=NoneAlgorithm())
     none_key = NoneKey()
 
     # Test encode with none algorithm not allowed

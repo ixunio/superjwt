@@ -17,7 +17,7 @@ from superjwt.algorithms import (
     RS384Algorithm,
     RS512Algorithm,
 )
-from superjwt.exceptions import InvalidKeyError, SuperJWTError
+from superjwt.exceptions import SuperJWTError
 from superjwt.keys import ECKey, NoneKey, OctKey, OKPKey, RSAKey
 
 from .conftest import CRYPTOGRAPHY_AVAILABLE, requires_cryptography
@@ -303,12 +303,10 @@ class TestRSAAlgorithms:
 
     def test_rsa_sign_requires_private_key(self, rsa_key_pair, test_data):
         """Test that signing requires a private key."""
-        from superjwt.exceptions import InvalidKeyError
-
         algorithm = RS256Algorithm()
 
         # Try to sign with public key (should fail)
-        with pytest.raises(InvalidKeyError, match="private component"):
+        with pytest.raises(SuperJWTError, match="private component"):
             algorithm.sign(test_data, rsa_key_pair.key_instance_from_public_pem)
 
     def test_rsa_check_key_validates_type(self, rsa_key_pair):
@@ -723,7 +721,7 @@ class TestECDSAAlgorithms:
         algorithm = ES256Algorithm()
         public_key = ec_p256_key_pair.key_instance_from_public_pem
 
-        with pytest.raises(InvalidKeyError):
+        with pytest.raises(SuperJWTError):
             algorithm.sign(test_data, public_key)
 
     def test_ecdsa_check_key_validates_type(self, ec_p256_key_pair):
@@ -882,7 +880,7 @@ class TestEdDSAAlgorithms:
         algorithm = Ed25519Algorithm()
         public_key = ed25519_key_pair.key_instance_from_public_pem
 
-        with pytest.raises(InvalidKeyError):
+        with pytest.raises(SuperJWTError):
             algorithm.sign(test_data, public_key)
 
     def test_eddsa_check_key_validates_type(self, ed25519_key_pair):
@@ -995,3 +993,222 @@ class TestEdDSAAlgorithms:
         # Should raise error when trying to verify with Ed25519 algorithm (wrong curve)
         with pytest.raises(SuperJWTError, match=r"Key curve .* does not match"):
             ed25519_algo.verify(test_data, signature, ed448_public_only)
+
+
+class TestHMACGenerateKey:
+    """Test HMAC algorithm key generation."""
+
+    def test_hs256_generate_key_default_size(self):
+        """Test HS256 generates key with default size (32 bytes as hex = 64 chars)."""
+        algo = HS256Algorithm()
+        key = algo.generate_key()
+        assert isinstance(key, OctKey)
+        assert len(key.private_key) == 64  # 32 bytes as hex
+
+    def test_hs384_generate_key_default_size(self):
+        """Test HS384 generates key with default size (48 bytes as hex = 96 chars)."""
+        algo = HS384Algorithm()
+        key = algo.generate_key()
+        assert isinstance(key, OctKey)
+        assert len(key.private_key) == 96  # 48 bytes as hex
+
+    def test_hs512_generate_key_default_size(self):
+        """Test HS512 generates key with default size (64 bytes as hex = 128 chars)."""
+        algo = HS512Algorithm()
+        key = algo.generate_key()
+        assert isinstance(key, OctKey)
+        assert len(key.private_key) == 128  # 64 bytes as hex
+
+    def test_hmac_generate_key_custom_size(self):
+        """Test HMAC can generate key with custom size."""
+        algo = HS256Algorithm()
+        key = algo.generate_key(16)
+        assert isinstance(key, OctKey)
+        assert len(key.private_key) == 32  # 16 bytes as hex
+
+    def test_hmac_generated_key_works_for_signing(self):
+        """Test that generated key can be used for signing and verification."""
+        algo = HS256Algorithm()
+        key = algo.generate_key()
+        test_data = b"test message"
+
+        signature = algo.sign(test_data, key)
+        assert algo.verify(test_data, signature, key)
+
+    def test_hmac_generated_keys_are_different(self):
+        """Test that multiple generated keys are different."""
+        algo = HS256Algorithm()
+        key1 = algo.generate_key()
+        key2 = algo.generate_key()
+        assert key1.private_key != key2.private_key
+
+
+@requires_cryptography
+class TestRSAGenerateKey:
+    """Test RSA algorithm key generation."""
+
+    def test_rs256_generate_key_2048(self):
+        """Test RS256 can generate 2048-bit key."""
+        algo = RS256Algorithm()
+        key = algo.generate_key(2048)
+        assert isinstance(key, RSAKey)
+        private_key = key._get_private_key()
+        assert private_key.key_size == 2048
+
+    def test_rs384_generate_key_3072(self):
+        """Test RS384 can generate 3072-bit key."""
+        algo = RS384Algorithm()
+        key = algo.generate_key(3072)
+        assert isinstance(key, RSAKey)
+        private_key = key._get_private_key()
+        assert private_key.key_size == 3072
+
+    def test_rs512_generate_key_4096(self):
+        """Test RS512 can generate 4096-bit key."""
+        algo = RS512Algorithm()
+        key = algo.generate_key(4096)
+        assert isinstance(key, RSAKey)
+        private_key = key._get_private_key()
+        assert private_key.key_size == 4096
+
+    def test_rsa_generated_key_works_for_signing(self):
+        """Test that generated RSA key can be used for signing and verification."""
+        algo = RS256Algorithm()
+        key = algo.generate_key(2048)
+        test_data = b"test message"
+
+        signature = algo.sign(test_data, key)
+        assert algo.verify(test_data, signature, key)
+
+
+@requires_cryptography
+class TestRSAPSSGenerateKey:
+    """Test RSA-PSS algorithm key generation."""
+
+    def test_ps256_generate_key(self):
+        """Test PS256 can generate key."""
+        algo = PS256Algorithm()
+        key = algo.generate_key(2048)
+        assert isinstance(key, RSAKey)
+        private_key = key._get_private_key()
+        assert private_key.key_size == 2048
+
+    def test_ps384_generate_key(self):
+        """Test PS384 can generate key."""
+        algo = PS384Algorithm()
+        key = algo.generate_key(2048)
+        assert isinstance(key, RSAKey)
+
+    def test_ps512_generate_key(self):
+        """Test PS512 can generate key."""
+        algo = PS512Algorithm()
+        key = algo.generate_key(2048)
+        assert isinstance(key, RSAKey)
+
+    def test_pss_generated_key_works_for_signing(self):
+        """Test that generated RSA-PSS key can be used for signing and verification."""
+        algo = PS256Algorithm()
+        key = algo.generate_key(2048)
+        test_data = b"test message"
+
+        signature = algo.sign(test_data, key)
+        assert algo.verify(test_data, signature, key)
+
+
+@requires_cryptography
+class TestECDSAGenerateKey:
+    """Test ECDSA algorithm key generation."""
+
+    def test_es256_generate_key(self):
+        """Test ES256 generates key with P-256 curve."""
+        algo = ES256Algorithm()
+        key = algo.generate_key()
+        assert isinstance(key, ECKey)
+        assert key.curve_name == "secp256r1"
+
+    def test_es256k_generate_key(self):
+        """Test ES256K generates key with secp256k1 curve."""
+        algo = ES256KAlgorithm()
+        key = algo.generate_key()
+        assert isinstance(key, ECKey)
+        assert key.curve_name == "secp256k1"
+
+    def test_es384_generate_key(self):
+        """Test ES384 generates key with P-384 curve."""
+        algo = ES384Algorithm()
+        key = algo.generate_key()
+        assert isinstance(key, ECKey)
+        assert key.curve_name == "secp384r1"
+
+    def test_es512_generate_key(self):
+        """Test ES512 generates key with P-521 curve."""
+        algo = ES512Algorithm()
+        key = algo.generate_key()
+        assert isinstance(key, ECKey)
+        assert key.curve_name == "secp521r1"
+
+    def test_ecdsa_generated_key_works_for_signing(self):
+        """Test that generated EC key can be used for signing and verification."""
+        algo = ES256Algorithm()
+        key = algo.generate_key()
+        test_data = b"test message"
+
+        signature = algo.sign(test_data, key)
+        assert algo.verify(test_data, signature, key)
+
+    def test_ecdsa_generated_signatures_are_different(self):
+        """Test that ECDSA produces different signatures (randomization)."""
+        algo = ES256Algorithm()
+        key = algo.generate_key()
+        test_data = b"test message"
+
+        signature1 = algo.sign(test_data, key)
+        signature2 = algo.sign(test_data, key)
+        # ECDSA signatures should be different due to random nonce
+        assert signature1 != signature2
+        # But both should verify
+        assert algo.verify(test_data, signature1, key)
+        assert algo.verify(test_data, signature2, key)
+
+
+@requires_cryptography
+class TestEdDSAGenerateKey:
+    """Test EdDSA algorithm key generation."""
+
+    def test_ed25519_generate_key(self):
+        """Test Ed25519 can generate key."""
+        algo = Ed25519Algorithm()
+        key = algo.generate_key()
+        assert isinstance(key, OKPKey)
+        # Verify it's Ed25519 by checking the key type
+        private_key = key._get_private_key()
+        assert type(private_key).__name__ == "Ed25519PrivateKey"
+
+    def test_ed448_generate_key(self):
+        """Test Ed448 can generate key."""
+        algo = Ed448Algorithm()
+        key = algo.generate_key()
+        assert isinstance(key, OKPKey)
+        # Verify it's Ed448 by checking the key type
+        private_key = key._get_private_key()
+        assert type(private_key).__name__ == "Ed448PrivateKey"
+
+    def test_eddsa_generated_key_works_for_signing(self):
+        """Test that generated EdDSA key can be used for signing and verification."""
+        algo = Ed25519Algorithm()
+        key = algo.generate_key()
+        test_data = b"test message"
+
+        signature = algo.sign(test_data, key)
+        assert algo.verify(test_data, signature, key)
+
+    def test_eddsa_signatures_are_deterministic(self):
+        """Test that EdDSA produces deterministic signatures."""
+        algo = Ed25519Algorithm()
+        key = algo.generate_key()
+        test_data = b"test message"
+
+        signature1 = algo.sign(test_data, key)
+        signature2 = algo.sign(test_data, key)
+        # EdDSA signatures should be identical (deterministic)
+        assert signature1 == signature2
