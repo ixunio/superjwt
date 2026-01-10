@@ -40,7 +40,7 @@ class JWTCustomClaims(JWTClaims):
 def check_claims_instance(
     claim_before: JWTCustomClaims,
     claim_after: JWTCustomClaims,
-    jwtdatetime_force_int: bool,
+    jwtdatetime_force_int: bool = True,
 ) -> None:
     assert claim_after.iss == claim_before.iss
     assert claim_after.sub == claim_before.sub
@@ -190,11 +190,11 @@ class KeyPair(BaseModel):
 
     # SuperJWT key instances
     # (RSAKey | ECKey | OKPKey)
-    private_key: Any
+    key_instance_from_private_pem: Any
 
     # SuperJWT key instances
     # (RSAKey | ECKey | OKPKey)
-    public_key: Any
+    key_instance_from_public_pem: Any
 
 
 @pytest.fixture(scope="session")
@@ -225,8 +225,8 @@ def rsa_2048_key_pair():
         public_key_obj=private_key_obj.public_key(),
         private_pem=private_pem,
         public_pem=public_pem,
-        private_key=RSAKey.import_signing_key(private_pem),
-        public_key=RSAKey.import_verifying_key(public_pem),
+        key_instance_from_private_pem=RSAKey.import_signing_key(private_pem),
+        key_instance_from_public_pem=RSAKey.import_verifying_key(public_pem),
     )
 
 
@@ -256,8 +256,8 @@ def rsa_2048_key_pair_alt():
         public_key_obj=private_key_obj.public_key(),
         private_pem=private_pem,
         public_pem=public_pem,
-        private_key=RSAKey.import_signing_key(private_pem),
-        public_key=RSAKey.import_verifying_key(public_pem),
+        key_instance_from_private_pem=RSAKey.import_signing_key(private_pem),
+        key_instance_from_public_pem=RSAKey.import_verifying_key(public_pem),
     )
 
 
@@ -285,8 +285,8 @@ def ec_p256_key_pair():
         public_key_obj=private_key_obj.public_key(),
         private_pem=private_pem,
         public_pem=public_pem,
-        private_key=ECKey.import_signing_key(private_pem),
-        public_key=ECKey.import_verifying_key(public_pem),
+        key_instance_from_private_pem=ECKey.import_signing_key(private_pem),
+        key_instance_from_public_pem=ECKey.import_verifying_key(public_pem),
     )
 
 
@@ -314,8 +314,8 @@ def ec_p256_key_pair_alt():
         public_key_obj=private_key_obj.public_key(),
         private_pem=private_pem,
         public_pem=public_pem,
-        private_key=ECKey.import_signing_key(private_pem),
-        public_key=ECKey.import_verifying_key(public_pem),
+        key_instance_from_private_pem=ECKey.import_signing_key(private_pem),
+        key_instance_from_public_pem=ECKey.import_verifying_key(public_pem),
     )
 
 
@@ -343,8 +343,8 @@ def ec_p384_key_pair():
         public_key_obj=private_key_obj.public_key(),
         private_pem=private_pem,
         public_pem=public_pem,
-        private_key=ECKey.import_signing_key(private_pem),
-        public_key=ECKey.import_verifying_key(public_pem),
+        key_instance_from_private_pem=ECKey.import_signing_key(private_pem),
+        key_instance_from_public_pem=ECKey.import_verifying_key(public_pem),
     )
 
 
@@ -372,8 +372,8 @@ def ec_p521_key_pair():
         public_key_obj=private_key_obj.public_key(),
         private_pem=private_pem,
         public_pem=public_pem,
-        private_key=ECKey.import_signing_key(private_pem),
-        public_key=ECKey.import_verifying_key(public_pem),
+        key_instance_from_private_pem=ECKey.import_signing_key(private_pem),
+        key_instance_from_public_pem=ECKey.import_verifying_key(public_pem),
     )
 
 
@@ -401,8 +401,8 @@ def ed25519_key_pair():
         public_key_obj=private_key_obj.public_key(),
         private_pem=private_pem,
         public_pem=public_pem,
-        private_key=OKPKey.import_signing_key(private_pem),
-        public_key=OKPKey.import_verifying_key(public_pem),
+        key_instance_from_private_pem=OKPKey.import_signing_key(private_pem),
+        key_instance_from_public_pem=OKPKey.import_verifying_key(public_pem),
     )
 
 
@@ -430,8 +430,8 @@ def ed25519_key_pair_alt():
         public_key_obj=private_key_obj.public_key(),
         private_pem=private_pem,
         public_pem=public_pem,
-        private_key=OKPKey.import_signing_key(private_pem),
-        public_key=OKPKey.import_verifying_key(public_pem),
+        key_instance_from_private_pem=OKPKey.import_signing_key(private_pem),
+        key_instance_from_public_pem=OKPKey.import_verifying_key(public_pem),
     )
 
 
@@ -459,6 +459,6 @@ def ed448_key_pair():
         public_key_obj=private_key_obj.public_key(),
         private_pem=private_pem,
         public_pem=public_pem,
-        private_key=OKPKey.import_signing_key(private_pem),
-        public_key=OKPKey.import_verifying_key(public_pem),
+        key_instance_from_private_pem=OKPKey.import_signing_key(private_pem),
+        key_instance_from_public_pem=OKPKey.import_verifying_key(public_pem),
     )
