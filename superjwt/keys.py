@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, ClassVar, Generic, Literal, TypeVar, cast
 
 from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning, SuperJWTError
 from superjwt.utils import (
+    CRYPTOGRAPHY_AVAILABLE,
     as_bytes,
     check_cryptography_available,
     is_pem_format,
@@ -14,7 +15,7 @@ from superjwt.utils import (
 )
 
 
-if check_cryptography_available(raise_error=False):  # pragma: no cover
+if CRYPTOGRAPHY_AVAILABLE:  # pragma: no cover
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
@@ -24,7 +25,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from typing_extensions import Self
 
 
-class BaseKey(ABC):
+class Key(ABC):
     name: ClassVar[str]
     description: ClassVar[str]
     algorithms: ClassVar[tuple[str, ...]]
@@ -34,8 +35,39 @@ class BaseKey(ABC):
         self.public_key = b""
 
     @classmethod
+    @abstractmethod
+    def import_signing_key(cls, key: bytes | str) -> Self:
+        """Import a key for signing/encoding operations.
+
+        For symmetric keys: imports the secret key.
+        For asymmetric keys: imports the private key.
+        """
+        raise NotImplementedError(
+            f"{cls.__name__} must implement import_signing_key()"
+        )  # pragma: no cover
+
+    @classmethod
+    @abstractmethod
+    def import_verifying_key(cls, key: bytes | str) -> Self:
+        """Import a key for verification/decoding operations.
+
+        For symmetric keys: imports the secret key (same as signing key).
+        For asymmetric keys: imports the public key.
+        """
+        raise NotImplementedError(
+            f"{cls.__name__} must implement import_verifying_key()"
+        )  # pragma: no cover
+
+    @abstractmethod
+    def _prepare_key(
+        self,
+        private_key: bytes | None = None,
+        public_key: bytes | None = None,
+    ) -> None: ...  # pragma: no cover
+
+    @classmethod
     def import_key(
-        cls, private_key: str | bytes | None = None, public_key: str | bytes | None = None
+        cls, private_key: bytes | str | None = None, public_key: bytes | str | None = None
     ) -> Self:
         if cls is NoneKey:
             return cls()
@@ -56,39 +88,8 @@ class BaseKey(ABC):
         key._prepare_key(private_key, public_key)
         return key
 
-    @classmethod
-    @abstractmethod
-    def import_signing_key(cls, key: str | bytes) -> Self:
-        """Import a key for signing/encoding operations.
 
-        For symmetric keys: imports the secret key.
-        For asymmetric keys: imports the private key.
-        """
-        raise NotImplementedError(
-            f"{cls.__name__} must implement import_signing_key()"
-        )  # pragma: no cover
-
-    @classmethod
-    @abstractmethod
-    def import_verifying_key(cls, key: str | bytes) -> Self:
-        """Import a key for verification/decoding operations.
-
-        For symmetric keys: imports the secret key (same as signing key).
-        For asymmetric keys: imports the public key.
-        """
-        raise NotImplementedError(
-            f"{cls.__name__} must implement import_verifying_key()"
-        )  # pragma: no cover
-
-    @abstractmethod
-    def _prepare_key(
-        self,
-        private_key: bytes | None = None,
-        public_key: bytes | None = None,
-    ) -> None: ...  # pragma: no cover
-
-
-class NoneKey(BaseKey):
+class NoneKey(Key):
     name = "NoneKey"
     description = "No key (used for 'none' algorithm)"
     algorithms = ("none",)
@@ -104,14 +105,14 @@ class NoneKey(BaseKey):
     def _prepare_key(self, *_) -> None: ...
 
 
-class SymmetricKey(BaseKey):
+class SymmetricKey(Key):
     @classmethod
-    def import_signing_key(cls, key: str | bytes) -> Self:
+    def import_signing_key(cls, key: bytes | str) -> Self:
         """Import key for signing."""
         return cls.import_key(key, None)
 
     @classmethod
-    def import_verifying_key(cls, key: str | bytes) -> Self:
+    def import_verifying_key(cls, key: bytes | str) -> Self:
         """Import key for verification."""
         return cls.import_key(key, None)
 
@@ -180,7 +181,7 @@ else:  # pragma: no cover
     PublicKeyType = TypeVar("PublicKeyType")
 
 
-class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
+class AsymmetricKey(Key, Generic[PrivateKeyType, PublicKeyType]):
     """Base class for asymmetric key types (RSA, EC, OKP)."""
 
     def __init__(self):
@@ -204,12 +205,12 @@ class AsymmetricKey(BaseKey, Generic[PrivateKeyType, PublicKeyType]):
         ...  # pragma: no cover
 
     @classmethod
-    def import_signing_key(cls, key: str | bytes) -> Self:
+    def import_signing_key(cls, key: bytes | str) -> Self:
         """Import private key for signing."""
         return cls.import_key(key, None)
 
     @classmethod
-    def import_verifying_key(cls, key: str | bytes) -> Self:
+    def import_verifying_key(cls, key: bytes | str) -> Self:
         """Import public key for verification."""
         return cls.import_key(None, key)
 

@@ -19,6 +19,9 @@ def check_cryptography_available(raise_error: bool = True) -> bool:
         return False
 
 
+CRYPTOGRAPHY_AVAILABLE = check_cryptography_available(raise_error=False)
+
+
 def as_bytes(s: str | bytes) -> bytes:
     if isinstance(s, str):
         return s.encode("utf-8")

@@ -5,9 +5,9 @@ import warnings
 import pytest
 from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning, SuperJWTError
 from superjwt.keys import ECKey, NoneKey, OctKey, OKPKey, RSAKey
-from superjwt.utils import check_cryptography_available
+from superjwt.utils import CRYPTOGRAPHY_AVAILABLE, check_cryptography_available
 
-from .conftest import CRYPTOGRAPHY_AVAILABLE, requires_cryptography
+from .conftest import requires_cryptography
 
 
 if CRYPTOGRAPHY_AVAILABLE:
@@ -153,6 +153,14 @@ MIIEpAIBAAKCAQEA4Z9v...
         """Test that empty public_key parameter raises ValueError."""
         with pytest.raises(ValueError, match="Secret key must not be empty"):
             OctKey.import_key(None, b"")
+
+    def test_oct_key_public_key_not_allowed(self):
+        """Test that providing a public_key to a symmetric key raises SuperJWTError."""
+        secret = b"my-secret-key-at-least-32-bytes-long"
+        with pytest.raises(
+            SuperJWTError, match="Symmetric key should not have a public key component"
+        ):
+            OctKey.import_key(secret, b"some-public-key")
 
     def test_oct_key_generate_default_size(self):
         """Test OctKey.generate() with default size (32 bytes as hex = 64 chars)."""

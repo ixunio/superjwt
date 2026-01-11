@@ -4,11 +4,12 @@ from typing import Any
 
 import pytest
 from pydantic import BaseModel, Field
-from superjwt.definitions import Alg, JWTClaims, JWTDatetime
+from superjwt.algorithms import Alg
 from superjwt.jws import JWS
 from superjwt.jwt import JWT
 from superjwt.keys import AsymmetricKey, ECKey, OKPKey, RSAKey
-from superjwt.utils import check_cryptography_available
+from superjwt.utils import CRYPTOGRAPHY_AVAILABLE
+from superjwt.validations import JWTClaims, JWTDatetime
 
 
 try:
@@ -152,7 +153,6 @@ def claims_fixed_dt() -> JWTCustomClaims:
 # ============================================================================
 
 # Mark to skip tests that require cryptography
-CRYPTOGRAPHY_AVAILABLE = check_cryptography_available(raise_error=False)
 requires_cryptography = pytest.mark.skipif(
     not CRYPTOGRAPHY_AVAILABLE, reason="cryptography library not installed"
 )

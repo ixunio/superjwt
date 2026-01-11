@@ -3,25 +3,19 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from superjwt.definitions import (
-    MAX_TOKEN_BYTES,
-    Alg,
+from superjwt.algorithms import Alg
+from superjwt.exceptions import ClaimsValidationError, SuperJWTError
+from superjwt.jws import JWS, MAX_TOKEN_BYTES, JWSToken
+from superjwt.keys import Key, NoneKey
+from superjwt.validations import (
     JOSEHeader,
-    JWSToken,
     JWTBaseModel,
     JWTClaimsDefaultValidation,
     JWTHeadersDefaultValidation,
     JWTValidation,
-    Key,
     Validation,
     get_validation_config,
 )
-from superjwt.exceptions import (
-    ClaimsValidationError,
-    SuperJWTError,
-)
-from superjwt.jws import JWS
-from superjwt.keys import BaseKey, NoneKey
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +37,7 @@ class JWT:
     def encode(
         self,
         claims: JWTBaseModel | dict[str, Any] | None,
-        key: str | bytes | BaseKey,
+        key: Key | bytes | str,
         algorithm: Alg | str,
         *,
         headers: JOSEHeader | dict[str, Any] | None = None,
@@ -60,7 +54,7 @@ class JWT:
 
         Args:
             claims (JWTBaseModel | dict[str, Any] | None): Claims to include in the JWT payload.
-            key (str | bytes | BaseKey): The key instance to sign the JWT with.
+            key (Key | bytes | str): The key instance to sign the JWT with.
             algorithm (Algorithm): The algorithm to use for signing the JWT.
                 Will default to 'HS256' (HMAC with SHA-256).
             headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
@@ -94,10 +88,6 @@ class JWT:
         except ValidationError as e:
             raise ClaimsValidationError(validation_errors=e.errors()) from e
 
-        # prepare key
-        if not isinstance(key, BaseKey):
-            key = Key.make_signing_key(algorithm, key)
-
         # encode as JWS
         self.jws.encode(
             headers=headers,
@@ -128,8 +118,8 @@ class JWT:
 
     def decode(
         self,
-        compact: str | bytes,
-        key: str | bytes | BaseKey,
+        compact: bytes | str,
+        key: Key | bytes | str,
         algorithm: Alg | str,
         *,
         with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
@@ -145,8 +135,8 @@ class JWT:
         """Decode the JWT token with signature verification.
 
         Args:
-            compact (str | bytes): The JWT compact token to decode.
-            key (str | bytes | BaseKey): The key instance to verify the JWT signature.
+            compact (bytes | str): The JWT compact token to decode.
+            key (Key | bytes | str): The key instance to verify the JWT signature.
             algorithm (Algorithm): The algorithm to use for verifying the JWT.
             with_detached_payload (JWTBaseModel | dict[str, Any] | None, opt.):
                 Detached payload to use for signature verification, if any.
@@ -168,10 +158,6 @@ class JWT:
             max_token_bytes=self.max_token_bytes,
             default_headers_validation=self.default_headers_validation,
         )
-
-        # prepare key
-        if not isinstance(key, BaseKey):
-            key = Key.make_verifying_key(algorithm, key)
 
         # CASE 1: detached payload mode
         if with_detached_payload is not None:
@@ -220,14 +206,14 @@ class JWT:
 
     def inspect(
         self,
-        compact: str | bytes,
+        compact: bytes | str,
         has_detached_payload: bool = False,
     ) -> JWSToken:
         """Decode the JWT token without signature verification.
         For debugging purposes only. Never to be used in production.
 
         Args:
-            compact (str | bytes): The JWT compact token to decode.
+            compact (bytes | str): The JWT compact token to decode.
             has_detached_payload (bool, opt.): If True, indicates that the token has a detached payload.
 
         Returns:

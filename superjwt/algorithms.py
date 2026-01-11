@@ -1,14 +1,26 @@
 import hashlib
 import hmac
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
 
-from superjwt.exceptions import SuperJWTError
-from superjwt.keys import BaseKey, ECKey, NoneKey, OctKey, OKPKey, RSAKey
-from superjwt.utils import check_cryptography_available, decode_integer, encode_integer
+from typing_extensions import Self
+
+from superjwt.exceptions import (
+    AlgorithmNotSupportedError,
+    InvalidAlgorithmError,
+    SuperJWTError,
+)
+from superjwt.keys import ECKey, Key, NoneKey, OctKey, OKPKey, RSAKey
+from superjwt.utils import (
+    CRYPTOGRAPHY_AVAILABLE,
+    check_cryptography_available,
+    decode_integer,
+    encode_integer,
+)
 
 
-if check_cryptography_available(raise_error=False):  # pragma: no cover
+if CRYPTOGRAPHY_AVAILABLE:  # pragma: no cover
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding
@@ -31,7 +43,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from cryptography.hazmat.primitives.hashes import HashAlgorithm
 
 
-KeyType = TypeVar("KeyType", bound=BaseKey)
+KeyType = TypeVar("KeyType", bound=Key)
 
 
 class BaseJWSAlgorithm(ABC, Generic[KeyType]):
@@ -50,7 +62,7 @@ class BaseJWSAlgorithm(ABC, Generic[KeyType]):
     def verify(self, data: bytes, signature: bytes, key: KeyType) -> bool: ...
 
 
-class HMACWithSHAAlgorithm(BaseJWSAlgorithm[OctKey]):
+class HMACAlgorithm(BaseJWSAlgorithm[OctKey]):
     """Base class for HMAC using SHA algorithms"""
 
     key_type = OctKey
@@ -287,7 +299,7 @@ class NoneAlgorithm(BaseJWSAlgorithm[NoneKey]):
         return True
 
 
-class HS256Algorithm(HMACWithSHAAlgorithm):
+class HS256Algorithm(HMACAlgorithm):
     name = "HS256"
     description = "HMAC with SHA-256 signature"
 
@@ -295,7 +307,7 @@ class HS256Algorithm(HMACWithSHAAlgorithm):
         super().__init__(hashlib.sha256)
 
 
-class HS384Algorithm(HMACWithSHAAlgorithm):
+class HS384Algorithm(HMACAlgorithm):
     name = "HS384"
     description = "HMAC with SHA-384 signature"
 
@@ -303,7 +315,7 @@ class HS384Algorithm(HMACWithSHAAlgorithm):
         super().__init__(hashlib.sha384)
 
 
-class HS512Algorithm(HMACWithSHAAlgorithm):
+class HS512Algorithm(HMACAlgorithm):
     name = "HS512"
     description = "HMAC with SHA-512 signature"
 
@@ -405,3 +417,72 @@ class Ed448Algorithm(EdDSAAlgorithm):
 
     def __init__(self):
         super().__init__(ed448.Ed448PrivateKey, ed448.Ed448PublicKey)
+
+
+class Alg(str, Enum):
+    """JWS/JWT Algorithm names with associated implementation instances."""
+
+    HS256 = "HS256"
+    HS384 = "HS384"
+    HS512 = "HS512"
+    RS256 = "RS256"
+    RS384 = "RS384"
+    RS512 = "RS512"
+    PS256 = "PS256"
+    PS384 = "PS384"
+    PS512 = "PS512"
+    ES256 = "ES256"
+    ES256K = "ES256K"
+    ES384 = "ES384"
+    ES512 = "ES512"
+    EdDSA = "EdDSA"
+    Ed25519 = "Ed25519"
+    Ed448 = "Ed448"
+
+    def get_instance(self) -> BaseJWSAlgorithm:
+        class_ = ALGORITHMS.get(self.value)
+        if class_ is None:
+            raise AlgorithmNotSupportedError(
+                f"JWS Algorithm '{self.value}' is not yet implemented"
+            )
+        if class_.requires_cryptography:
+            check_cryptography_available()
+        return class_()
+
+    @staticmethod
+    def get_instance_by_name(name: str) -> BaseJWSAlgorithm:
+        if name not in ALGORITHMS:
+            raise InvalidAlgorithmError(
+                f"Algorithm '{name}' is not a valid JWS algorithm"
+            )
+        return getattr(Alg, name).get_instance()
+
+    @classmethod
+    def get_algorithm(cls, algorithm: Self | BaseJWSAlgorithm | str) -> BaseJWSAlgorithm:
+        if isinstance(algorithm, cls):
+            return algorithm.get_instance()
+        elif isinstance(algorithm, BaseJWSAlgorithm):
+            return algorithm
+        else:
+            return cls.get_instance_by_name(algorithm)
+
+
+ALGORITHMS: dict[str, type[BaseJWSAlgorithm] | None] = {
+    "none": NoneAlgorithm,
+    "HS256": HS256Algorithm,
+    "HS384": HS384Algorithm,
+    "HS512": HS512Algorithm,
+    "RS256": RS256Algorithm,
+    "RS384": RS384Algorithm,
+    "RS512": RS512Algorithm,
+    "PS256": PS256Algorithm,
+    "PS384": PS384Algorithm,
+    "PS512": PS512Algorithm,
+    "ES256": ES256Algorithm,
+    "ES256K": ES256KAlgorithm,
+    "ES384": ES384Algorithm,
+    "ES512": ES512Algorithm,
+    "EdDSA": None,  # Deprecated and not supported
+    "Ed25519": Ed25519Algorithm,
+    "Ed448": Ed448Algorithm,
+}

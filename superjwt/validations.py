@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from enum import Enum
 from inspect import isclass
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from pydantic import (
     BaseModel,
@@ -10,40 +10,18 @@ from pydantic import (
     PlainSerializer,
     UrlConstraints,
     ValidationInfo,
-    computed_field,
     field_validator,
     model_validator,
 )
 from typing_extensions import Self
 
-from superjwt.algorithms import (
-    BaseJWSAlgorithm,
-    Ed448Algorithm,
-    Ed25519Algorithm,
-    ES256Algorithm,
-    ES256KAlgorithm,
-    ES384Algorithm,
-    ES512Algorithm,
-    HS256Algorithm,
-    HS384Algorithm,
-    HS512Algorithm,
-    NoneAlgorithm,
-    PS256Algorithm,
-    PS384Algorithm,
-    PS512Algorithm,
-    RS256Algorithm,
-    RS384Algorithm,
-    RS512Algorithm,
-)
+from superjwt.algorithms import Alg
 from superjwt.exceptions import (
-    AlgorithmNotSupportedError,
-    InvalidAlgorithmError,
     InvalidHeadersError,
     TokenExpiredError,
     TokenNotYetValidError,
 )
-from superjwt.keys import BaseKey
-from superjwt.utils import check_cryptography_available, delta_datetime_timestamp
+from superjwt.utils import delta_datetime_timestamp
 
 
 try:
@@ -54,117 +32,7 @@ except ImportError:  # pragma: no cover
 
     UTC = timezone.utc
 
-
-MAX_TOKEN_BYTES: int = 16 * 1024  # 16 KB
-
-
-class Alg(str, Enum):
-    """JWS/JWT Algorithm names with associated implementation instances."""
-
-    HS256 = "HS256"
-    HS384 = "HS384"
-    HS512 = "HS512"
-    RS256 = "RS256"
-    RS384 = "RS384"
-    RS512 = "RS512"
-    PS256 = "PS256"
-    PS384 = "PS384"
-    PS512 = "PS512"
-    ES256 = "ES256"
-    ES256K = "ES256K"
-    ES384 = "ES384"
-    ES512 = "ES512"
-    EdDSA = "EdDSA"
-    Ed25519 = "Ed25519"
-    Ed448 = "Ed448"
-
-    def get_instance(self) -> BaseJWSAlgorithm:
-        class_ = ALGORITHMS.get(self.value)
-        if class_ is None:
-            raise AlgorithmNotSupportedError(
-                f"JWS Algorithm '{self.value}' is not yet implemented"
-            )
-        if class_.requires_cryptography:
-            check_cryptography_available()
-        return class_()
-
-    @staticmethod
-    def get_instance_by_name(name: str) -> BaseJWSAlgorithm:
-        if name not in ALGORITHMS:
-            raise InvalidAlgorithmError(
-                f"Algorithm '{name}' is not a valid JWS algorithm"
-            )
-        return getattr(Alg, name).get_instance()
-
-    @classmethod
-    def get_algorithm(cls, algorithm: Self | BaseJWSAlgorithm | str) -> BaseJWSAlgorithm:
-        if isinstance(algorithm, cls):
-            return algorithm.get_instance()
-        elif isinstance(algorithm, BaseJWSAlgorithm):
-            return algorithm
-        else:
-            return cls.get_instance_by_name(algorithm)
-
-
-ALGORITHMS: dict[str, type[BaseJWSAlgorithm] | None] = {
-    "none": NoneAlgorithm,
-    "HS256": HS256Algorithm,
-    "HS384": HS384Algorithm,
-    "HS512": HS512Algorithm,
-    "RS256": RS256Algorithm,
-    "RS384": RS384Algorithm,
-    "RS512": RS512Algorithm,
-    "PS256": PS256Algorithm,
-    "PS384": PS384Algorithm,
-    "PS512": PS512Algorithm,
-    "ES256": ES256Algorithm,
-    "ES256K": ES256KAlgorithm,
-    "ES384": ES384Algorithm,
-    "ES512": ES512Algorithm,
-    "EdDSA": None,  # Deprecated and not supported
-    "Ed25519": Ed25519Algorithm,
-    "Ed448": Ed448Algorithm,
-}
-
-
-class Key(str, Enum):
-    """JWT Key types with associated implementation instances."""
-
-    OctKey = "OctKey"
-    RSAKey = "RSAKey"
-    ECKey = "ECKey"
-    OKPKey = "OKPKey"
-
-    @staticmethod
-    def make_key(
-        algorithm: Alg | Literal["none"] | str,
-        private_key: str | bytes | None,
-        public_key: str | bytes | None,
-    ) -> BaseKey:
-        key_type: type[BaseKey] = Alg.get_algorithm(algorithm).key_type
-        return key_type.import_key(private_key, public_key)
-
-    @staticmethod
-    def make_signing_key(
-        algorithm: Alg | Literal["none"] | str, key: str | bytes
-    ) -> BaseKey:
-        key_type: type[BaseKey] = Alg.get_algorithm(algorithm).key_type
-        return key_type.import_signing_key(key)
-
-    @staticmethod
-    def make_verifying_key(
-        algorithm: Alg | Literal["none"] | str, key: str | bytes
-    ) -> BaseKey:
-        key_type: type[BaseKey] = Alg.get_algorithm(algorithm).key_type
-        return key_type.import_verifying_key(key)
-
-
-class HttpsUrl(HttpUrl):
-    _constraints = UrlConstraints(max_length=2083, allowed_schemes=["https"])
-
-
 DEFAULT_JWTDATETIME_FORCE_INT: bool = True
-DEFAULT_LEEWAY_SECONDS: float = 5.0
 
 
 class JWTBaseModel(BaseModel):
@@ -196,6 +64,10 @@ class JWTBaseModel(BaseModel):
     def spoof_time(self, set_now: datetime | None) -> None:
         """Spoof the current time for testing purposes. Set to None to disable spoofing."""
         self.internal__now = set_now
+
+
+class HttpsUrl(HttpUrl):
+    _constraints = UrlConstraints(max_length=2083, allowed_schemes=["https"])
 
 
 class JOSEHeader(JWTBaseModel):
@@ -281,19 +153,6 @@ class JOSEHeader(JWTBaseModel):
         return self
 
 
-def serialize_jwtdatetime_timestamp(
-    value: datetime | int | float, info: ValidationInfo
-) -> int | float:
-    jwtdatetime_force_int = getattr(info, "context", {}).get(
-        "jwtdatetime_force_int", DEFAULT_JWTDATETIME_FORCE_INT
-    )
-    if jwtdatetime_force_int is True:
-        return serialize_jwtdatetime_timestamp_to_int(value)
-    elif jwtdatetime_force_int is False:
-        return serialize_jwtdatetime_timestamp_to_float(value)
-    raise ValueError("Invalid timestamp config type")
-
-
 def serialize_jwtdatetime_timestamp_to_int(value: datetime | int | float) -> int:
     if isinstance(value, (int, float)):
         return int(value)
@@ -308,16 +167,27 @@ def serialize_jwtdatetime_timestamp_to_float(value: datetime | int | float) -> f
         return value.timestamp()
 
 
+def serialize_jwtdatetime_timestamp(
+    value: datetime | int | float, info: ValidationInfo
+) -> int | float:
+    jwtdatetime_force_int = getattr(info, "context", {}).get(
+        "jwtdatetime_force_int", DEFAULT_JWTDATETIME_FORCE_INT
+    )
+    if jwtdatetime_force_int is True:
+        return serialize_jwtdatetime_timestamp_to_int(value)
+    elif jwtdatetime_force_int is False:
+        return serialize_jwtdatetime_timestamp_to_float(value)
+    raise ValueError("Invalid timestamp config type")
+
+
 JWTDatetime = Annotated[
     datetime,
     PlainSerializer(serialize_jwtdatetime_timestamp),
 ]
-
 JWTDatetimeInt = Annotated[
     datetime,
     PlainSerializer(serialize_jwtdatetime_timestamp_to_int),
 ]
-
 JWTDatetimeFloat = Annotated[
     datetime,
     PlainSerializer(serialize_jwtdatetime_timestamp_to_float),
@@ -357,6 +227,7 @@ class JWTClaimsModel(JWTBaseModel):
     ] = None
 
 
+DEFAULT_LEEWAY_SECONDS: float = 5.0
 DEFAULT_ALLOW_FUTURE_IAT: bool = False
 
 
@@ -458,47 +329,6 @@ class JWTClaims(JWTClaimsModel):
             return self.model_copy(update={"iat": self.now, "exp": exp_time})
 
         return self.model_copy(update={"exp": exp_time})
-
-
-class JWSTokenModel(BaseModel):
-    headers: JOSEHeader | None = None
-    claims: JWTBaseModel | None = None
-
-
-class JWSToken(BaseModel):
-    headers: dict[str, Any] = {}
-    payload: dict[str, Any] = {}
-    signature: bytes = b""
-
-    encoded_headers: bytes = b""
-    encoded_payload: bytes = b""
-    encoded_signature: bytes = b""
-    has_detached_payload: bool = False
-
-    model: JWSTokenModel = JWSTokenModel()
-
-    @computed_field
-    @property
-    def signing_input(self) -> bytes:
-        return b".".join((self.encoded_headers, self.encoded_payload))
-
-    @computed_field
-    @property
-    def compact(self) -> bytes:
-        if self.has_detached_payload:
-            return b".".join((self.encoded_headers, b"", self.encoded_signature))
-        return b".".join(
-            (
-                self.encoded_headers,
-                self.encoded_payload,
-                self.encoded_signature,
-            )
-        )
-
-
-class JWSTokenLifeCycle(BaseModel):
-    unsafe: JWSToken = JWSToken()
-    verified: JWSToken = JWSToken()
 
 
 class JWTValidation(BaseModel):

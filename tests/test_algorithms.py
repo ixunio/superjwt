@@ -1,5 +1,6 @@
 import pytest
 from superjwt.algorithms import (
+    Alg,
     Ed448Algorithm,
     Ed25519Algorithm,
     ES256Algorithm,
@@ -17,10 +18,15 @@ from superjwt.algorithms import (
     RS384Algorithm,
     RS512Algorithm,
 )
-from superjwt.exceptions import SuperJWTError
+from superjwt.exceptions import (
+    AlgorithmNotSupportedError,
+    InvalidAlgorithmError,
+    SuperJWTError,
+)
 from superjwt.keys import ECKey, NoneKey, OctKey, OKPKey, RSAKey
+from superjwt.utils import CRYPTOGRAPHY_AVAILABLE
 
-from .conftest import CRYPTOGRAPHY_AVAILABLE, requires_cryptography
+from .conftest import requires_cryptography
 
 
 if CRYPTOGRAPHY_AVAILABLE:
@@ -32,6 +38,65 @@ if CRYPTOGRAPHY_AVAILABLE:
 def rsa_key_pair(rsa_2048_key_pair):
     """Alias for session-scoped RSA key pair fixture."""
     return rsa_2048_key_pair
+
+
+class TestAlgEnum:
+    """Test suite for the Alg enum methods."""
+
+    def test_get_instance_not_implemented(self):
+        """Test that get_instance() raises AlgorithmNotSupportedError for unimplemented algorithms."""
+        # EdDSA is defined but not yet implemented (ALG_INSTANCES[RS256] = None)
+        with pytest.raises(
+            AlgorithmNotSupportedError, match=r"EdDSA.*not yet implemented"
+        ):
+            Alg.EdDSA.get_instance()
+
+    def test_get_instance_by_name_invalid_algorithm(self):
+        """Test that get_instance_by_name() raises InvalidAlgorithmError for invalid algorithm names."""
+        with pytest.raises(
+            InvalidAlgorithmError, match=r"INVALID.*not a valid JWS algorithm"
+        ):
+            Alg.get_instance_by_name("INVALID")
+
+    def test_get_instance_by_name_not_implemented(self):
+        """Test that get_instance_by_name() raises AlgorithmNotSupportedError for unimplemented algorithms."""
+        # EdDSA is defined but not yet implemented (ALG_INSTANCES[PS256] = None)
+        with pytest.raises(
+            AlgorithmNotSupportedError, match=r"EdDSA.*not yet implemented"
+        ):
+            Alg.get_instance_by_name("EdDSA")
+
+    def test_get_instance_success(self):
+        """Test that get_instance() successfully returns an algorithm instance for implemented algorithms."""
+        instance = Alg.HS256.get_instance()
+        assert instance is not None
+        assert instance.__class__.__name__ == "HS256Algorithm"
+
+    def test_get_instance_by_name_success(self):
+        """Test that get_instance_by_name() successfully returns an algorithm instance for implemented algorithms."""
+        instance = Alg.get_instance_by_name("HS256")
+        assert instance is not None
+        assert instance.__class__.__name__ == "HS256Algorithm"
+
+    def test_get_algorithm_with_enum(self):
+        """Test that get_algorithm() handles Alg enum values."""
+        instance = Alg.get_algorithm(Alg.HS256)
+        assert instance is not None
+        assert instance.__class__.__name__ == "HS256Algorithm"
+
+    def test_get_algorithm_with_string(self):
+        """Test that get_algorithm() handles string algorithm names."""
+        instance = Alg.get_algorithm("HS256")
+        assert instance is not None
+        assert instance.__class__.__name__ == "HS256Algorithm"
+
+    def test_get_algorithm_with_instance(self):
+        """Test that get_algorithm() passes through algorithm instances."""
+        from superjwt.algorithms import HS256Algorithm
+
+        original_instance = HS256Algorithm()
+        returned_instance = Alg.get_algorithm(original_instance)
+        assert returned_instance is original_instance
 
 
 class TestSymmetricAlgorithmKeyTypes:

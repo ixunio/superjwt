@@ -1,6 +1,5 @@
 import pytest
 from superjwt.algorithms import NoneAlgorithm
-from superjwt.definitions import JOSEHeader, Validation
 from superjwt.exceptions import (
     AlgorithmMismatchError,
     HeadersValidationError,
@@ -10,8 +9,9 @@ from superjwt.exceptions import (
 )
 from superjwt.jws import JWS
 from superjwt.keys import NoneKey, OctKey
+from superjwt.validations import JOSEHeader, Validation
 
-from tests.conftest import JWTCustomClaims
+from .conftest import JWTCustomClaims
 
 
 def test_not_reset_jws_instance(

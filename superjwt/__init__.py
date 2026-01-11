@@ -1,10 +1,12 @@
 from typing import Any
 
 from superjwt._version import __version__
-from superjwt.definitions import (
-    Alg,
+from superjwt.algorithms import Alg
+from superjwt.jws import JWSToken
+from superjwt.jwt import JWT
+from superjwt.keys import ECKey, Key, OctKey, OKPKey, RSAKey
+from superjwt.validations import (
     JOSEHeader,
-    JWSToken,
     JWTBaseModel,
     JWTClaims,
     JWTDatetime,
@@ -13,14 +15,11 @@ from superjwt.definitions import (
     JWTValidation,
     Validation,
 )
-from superjwt.jwt import JWT
-from superjwt.keys import BaseKey, ECKey, OctKey, OKPKey, RSAKey
 
 
 __all__ = [
     "JWT",
     "Alg",
-    "BaseKey",
     "ECKey",
     "JOSEHeader",
     "JWSToken",
@@ -43,7 +42,7 @@ __all__ = [
 
 def encode(
     claims: JWTBaseModel | dict[str, Any] | None,
-    key: str | bytes | BaseKey,
+    key: Key | bytes | str,
     algorithm: Alg | str,
     *,
     headers: JOSEHeader | dict[str, Any] | None = None,
@@ -61,7 +60,7 @@ def encode(
 
     Args:
         claims (JWTBaseModel | dict[str, Any] | None): Claims to include in the JWT payload.
-        key (str | bytes | BaseKey): The key instance to sign the JWT with.
+        key (Key | bytes | str): The key instance to sign the JWT with.
         algorithm (Algorithm): The algorithm to use for signing the JWT.
         headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
             in the JWT. Will use default JWS headers if not provided.
@@ -97,7 +96,7 @@ def encode(
 
 def decode(
     compact: bytes | str,
-    key: str | bytes | BaseKey,
+    key: Key | bytes | str,
     algorithm: Alg | str,
     *,
     with_detached_payload: JWTClaims | dict[str, Any] | None = None,
@@ -113,8 +112,8 @@ def decode(
     """Decode the JWT token with signature verification.
 
     Args:
-        token (str | bytes): The JWT compact token to decode.
-        key (str | bytes | BaseKey): The key instance to verify the JWT signature.
+        token (bytes | str): The JWT compact token to decode.
+        key (Key | bytes | str): The key instance to verify the JWT signature.
         algorithm (Algorithm): The algorithm to use for verifying the JWT.
         with_detached_payload (JWTClaims | dict[str, Any] | None, opt.):
             Detached payload to use for signature verification, if any.
@@ -145,14 +144,14 @@ def decode(
 
 
 def inspect(
-    compact: str | bytes,
+    compact: bytes | str,
     has_detached_payload: bool = False,
 ) -> JWSToken:
     """Decode the JWT token without signature verification.
     For debugging purposes only. Never to be used in production.
 
     Args:
-        compact (str | bytes): The JWT compact token to decode.
+        compact (bytes | str): The JWT compact token to decode.
         has_detached_payload (bool, opt.): If True, indicates that the token has a detached payload.
 
     Returns:

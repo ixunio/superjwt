@@ -1,20 +1,9 @@
 import json
 from typing import Any, cast
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError, computed_field
 
-from superjwt.algorithms import BaseJWSAlgorithm, NoneAlgorithm
-from superjwt.definitions import (
-    MAX_TOKEN_BYTES,
-    Alg,
-    JOSEHeader,
-    JWSToken,
-    JWSTokenLifeCycle,
-    JWTHeadersDefaultValidation,
-    JWTValidation,
-    Validation,
-    get_validation_config,
-)
+from superjwt.algorithms import Alg, BaseJWSAlgorithm, NoneAlgorithm
 from superjwt.exceptions import (
     AlgorithmMismatchError,
     HeadersValidationError,
@@ -26,8 +15,19 @@ from superjwt.exceptions import (
     SizeExceededError,
     SuperJWTError,
 )
-from superjwt.keys import BaseKey
+from superjwt.keys import Key
 from superjwt.utils import as_bytes, urlsafe_b64decode, urlsafe_b64encode
+from superjwt.validations import (
+    JOSEHeader,
+    JWTBaseModel,
+    JWTHeadersDefaultValidation,
+    JWTValidation,
+    Validation,
+    get_validation_config,
+)
+
+
+MAX_TOKEN_BYTES: int = 16 * 1024  # 16 KB
 
 
 class JWS:
@@ -38,7 +38,7 @@ class JWS:
         default_headers_validation: JWTValidation = JWTHeadersDefaultValidation,
     ):
         self.token: JWSTokenLifeCycle = JWSTokenLifeCycle()
-        self.algorithm: BaseJWSAlgorithm[BaseKey] = Alg.get_algorithm(algorithm)
+        self.algorithm: BaseJWSAlgorithm[Key] = Alg.get_algorithm(algorithm)
 
         self.has_detached_payload: bool = False
 
@@ -61,15 +61,18 @@ class JWS:
         self,
         headers: JOSEHeader | dict[str, Any] | None,
         payload: dict[str, Any],
-        key: BaseKey,
+        key: Key | bytes | str,
         *,
         headers_validation: type[JOSEHeader]
         | JWTValidation
         | Validation
         | None = Validation.DEFAULT,
-    ) -> JWSToken:
+    ) -> "JWSToken":
         if self.token.verified.compact != b"..":
             raise SuperJWTError("JWS instance data must be reset")
+
+        # prepare key
+        key = self.prepare_signing_key(key)
 
         # prepare headers data and perform validation
         if headers is None:
@@ -115,17 +118,20 @@ class JWS:
 
     def decode(
         self,
-        compact: str | bytes,
-        key: BaseKey,
+        compact: bytes | str,
+        key: Key | bytes | str,
         *,
         with_detached_payload: dict[str, Any] | None = None,
         headers_validation: type[JOSEHeader]
         | JWTValidation
         | Validation
         | None = Validation.DEFAULT,
-    ) -> JWSToken:
+    ) -> "JWSToken":
         if self.token.verified.compact != b".." or self.token.unsafe.compact != b"..":
             raise SuperJWTError("JWS instance data must be reset")
+
+        # prepare key
+        key = self.prepare_verifying_key(key)
 
         # decode JWT token parts
         self.decode_parts(compact, with_detached_payload)
@@ -141,15 +147,15 @@ class JWS:
         return self.token.verified
 
     def decode_parts(
-        self, token: str | bytes, detached_payload: dict[str, Any] | None = None
+        self, compact: bytes | str, detached_payload: dict[str, Any] | None = None
     ) -> None:
-        if len(token) > self.max_token_bytes:
+        if len(compact) > self.max_token_bytes:
             raise SizeExceededError(
-                f"Token size ({len(token)} bytes) exceeds maximum of {self.max_token_bytes} bytes"
+                f"Token size ({len(compact)} bytes) exceeds maximum of {self.max_token_bytes} bytes"
             )
 
-        if token is not None:
-            self.raw_jws = as_bytes(token)
+        if compact is not None:
+            self.raw_jws = as_bytes(compact)
 
         self.extract_parts()
 
@@ -173,9 +179,9 @@ class JWS:
         self.decode_raw_signature()
 
     def extract_parts(self) -> tuple[bytes, bytes]:
-        token = self.raw_jws.strip(b".")
+        compact = self.raw_jws.strip(b".")
         try:
-            signing_input, signature = token.rsplit(b".", 1)
+            signing_input, signature = compact.rsplit(b".", 1)
             header, payload = signing_input.split(b".")
         except ValueError as e:
             raise InvalidTokenError(
@@ -234,6 +240,20 @@ class JWS:
                 "Signature is not encoded as a valid Base64url"
             ) from e
 
+    def prepare_signing_key(self, key: Key | bytes | str) -> Key:
+        if not isinstance(key, Key):
+            key_type = self.algorithm.key_type
+            key = key_type.import_signing_key(key)
+        self.algorithm.check_key(key)
+        return key
+
+    def prepare_verifying_key(self, key: Key | bytes | str) -> Key:
+        if not isinstance(key, Key):
+            key_type = self.algorithm.key_type
+            key = key_type.import_verifying_key(key)
+        self.algorithm.check_key(key)
+        return key
+
     def validate_headers_and_algorithm(self, headers_validation: JWTValidation) -> None:
         # validate headers
         try:
@@ -254,7 +274,7 @@ class JWS:
                 f"JWS algorithm '{headers_validated.alg}' does not match expected '{self.algorithm.name}'"
             )
 
-    def verify_signature(self, key: BaseKey) -> bool:
+    def verify_signature(self, key: Key) -> bool:
         if isinstance(self.algorithm, NoneAlgorithm) and not self._allow_none_algorithm:
             raise InvalidAlgorithmError("None algorithm is not allowed")
         self.algorithm.check_key(key)
@@ -283,3 +303,44 @@ class JWS:
             self.default_headers_validation,
             fallback_data_model=JOSEHeader,
         )
+
+
+class JWSTokenModel(BaseModel):
+    headers: JOSEHeader | None = None
+    claims: JWTBaseModel | None = None
+
+
+class JWSToken(BaseModel):
+    headers: dict[str, Any] = {}
+    payload: dict[str, Any] = {}
+    signature: bytes = b""
+
+    encoded_headers: bytes = b""
+    encoded_payload: bytes = b""
+    encoded_signature: bytes = b""
+    has_detached_payload: bool = False
+
+    model: JWSTokenModel = JWSTokenModel()
+
+    @computed_field
+    @property
+    def signing_input(self) -> bytes:
+        return b".".join((self.encoded_headers, self.encoded_payload))
+
+    @computed_field
+    @property
+    def compact(self) -> bytes:
+        if self.has_detached_payload:
+            return b".".join((self.encoded_headers, b"", self.encoded_signature))
+        return b".".join(
+            (
+                self.encoded_headers,
+                self.encoded_payload,
+                self.encoded_signature,
+            )
+        )
+
+
+class JWSTokenLifeCycle(BaseModel):
+    unsafe: JWSToken = JWSToken()
+    verified: JWSToken = JWSToken()
