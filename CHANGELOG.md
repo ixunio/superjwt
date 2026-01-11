@@ -4,16 +4,31 @@
 
 ### :sparkles: New
 
+#### Algorithms & Keys
+
+- Asymmetric JWS signature algorithms support
+    - RSA PKCS1 v1.5 (`RS256`, `RS384`, `RS512`) ([#68])
+    - RSA PSS (`PS256`, `PS384`, `PS512`) ([#69])
+    - ECDSA (`ES256`, `ES256K`, `ES384`, `ES512`) ([#71])
+    - EdDSA (`Ed25519`, `Ed448`) ([#71])
+- Asymmetric keys support
+    - RSA key pair ([#67])
+    - EC (Elliptic Curve) key pair for ECDSA ([#70])
+    - OKP (Octet Key Pair) for EdDSA ([#70])
+- Key generation ([#72])
+- Pick algorithm from `Alg` str Enum ([#57])
+
+#### Validation
+
+- Validation can be configured via `ValidationConfig` and supports internal params (leeway, now, allow_future_iat) ([#62]) ([#75])
 - Choose timestamp serialization format (`int` or `float`) ([#53])
     - Configure `JWTDatetime` default behavior (default `int`)
-    - Use `JWTDatetimeInt` to serialize as `int` any field
-    - Use `JWTDatetimeFloat` to serialize as `float` any field
-- Time spoofing for validation and testing purposes ([#51])
+    - New `JWTDatetimeInt` field type to serialize as `int` timestamp
+    - New `JWTDatetimeFloat` field type to serialize as `float` timestamp
 - Time integrity validation update ([#55])
     - add leeway support for `'iat'`, `'exp'`, and `'nbf'` comparison against *now*
-    - new check that `'iat'` is not in the future. Can be disabled via config.
-- Validation can be configured via `JWTValidation` and supports internal params (leeway, timestamp format, ...etc) ([#62])
-- Select algorithm from `Alg` str Enum ([#57])
+    - new check that `'iat'` is not in the future. Can be disabled via validation config.
+- Time spoofing for validation and testing purposes ([#51])
 
 ### :gear: Changes
 
@@ -101,6 +116,13 @@
 :tada: superjwt repository initialization
 
 
+[#75]: https://github.com/ixunio/superjwt/issues/75
+[#72]: https://github.com/ixunio/superjwt/issues/72
+[#71]: https://github.com/ixunio/superjwt/issues/71
+[#70]: https://github.com/ixunio/superjwt/issues/70
+[#69]: https://github.com/ixunio/superjwt/issues/69
+[#68]: https://github.com/ixunio/superjwt/issues/68
+[#67]: https://github.com/ixunio/superjwt/issues/67
 [#62]: https://github.com/ixunio/superjwt/issues/62
 [#57]: https://github.com/ixunio/superjwt/issues/57
 [#55]: https://github.com/ixunio/superjwt/issues/55
