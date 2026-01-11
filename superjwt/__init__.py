@@ -12,8 +12,8 @@ from superjwt.validations import (
     JWTDatetime,
     JWTDatetimeFloat,
     JWTDatetimeInt,
-    JWTValidation,
     Validation,
+    ValidationConfig,
 )
 
 
@@ -28,11 +28,11 @@ __all__ = [
     "JWTDatetime",
     "JWTDatetimeFloat",
     "JWTDatetimeInt",
-    "JWTValidation",
     "OKPKey",
     "OctKey",
     "RSAKey",
     "Validation",
+    "ValidationConfig",
     "__version__",
     "decode",
     "encode",
@@ -48,11 +48,11 @@ def encode(
     headers: JOSEHeader | dict[str, Any] | None = None,
     detach_payload: bool = False,
     claims_validation: type[JWTBaseModel]
-    | JWTValidation
+    | ValidationConfig
     | Validation
     | None = Validation.DEFAULT,
     headers_validation: type[JOSEHeader]
-    | JWTValidation
+    | ValidationConfig
     | Validation
     | None = Validation.DEFAULT,
 ) -> bytes:
@@ -101,11 +101,11 @@ def decode(
     *,
     with_detached_payload: JWTClaims | dict[str, Any] | None = None,
     claims_validation: type[JWTBaseModel]
-    | JWTValidation
+    | ValidationConfig
     | Validation
     | None = Validation.DEFAULT,
     headers_validation: type[JOSEHeader]
-    | JWTValidation
+    | ValidationConfig
     | Validation
     | None = Validation.DEFAULT,
 ) -> dict[str, Any]:

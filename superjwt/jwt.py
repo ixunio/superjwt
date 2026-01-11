@@ -12,8 +12,8 @@ from superjwt.validations import (
     JWTBaseModel,
     JWTClaimsDefaultValidation,
     JWTHeadersDefaultValidation,
-    JWTValidation,
     Validation,
+    ValidationConfig,
     get_validation_config,
 )
 
@@ -25,8 +25,8 @@ class JWT:
     def __init__(
         self,
         max_token_bytes: int = MAX_TOKEN_BYTES,
-        default_claims_validation: JWTValidation = JWTClaimsDefaultValidation,
-        default_headers_validation: JWTValidation = JWTHeadersDefaultValidation,
+        default_claims_validation: ValidationConfig = JWTClaimsDefaultValidation,
+        default_headers_validation: ValidationConfig = JWTHeadersDefaultValidation,
     ) -> None:
         self.jws: JWS
 
@@ -42,11 +42,11 @@ class JWT:
         *,
         headers: JOSEHeader | dict[str, Any] | None = None,
         claims_validation: type[JWTBaseModel]
-        | JWTValidation
+        | ValidationConfig
         | Validation
         | None = Validation.DEFAULT,
         headers_validation: type[JOSEHeader]
-        | JWTValidation
+        | ValidationConfig
         | Validation
         | None = Validation.DEFAULT,
     ) -> JWSToken:
@@ -124,11 +124,11 @@ class JWT:
         *,
         with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
         claims_validation: type[JWTBaseModel]
-        | JWTValidation
+        | ValidationConfig
         | Validation
         | None = Validation.DEFAULT,
         headers_validation: type[JOSEHeader]
-        | JWTValidation
+        | ValidationConfig
         | Validation
         | None = Validation.DEFAULT,
     ) -> JWSToken:
@@ -237,8 +237,8 @@ class JWT:
     def get_claims_validation(
         self,
         data: JWTBaseModel | dict[str, Any],
-        validation: type[JWTBaseModel] | JWTValidation | Validation | None,
-    ) -> JWTValidation:
+        validation: type[JWTBaseModel] | ValidationConfig | Validation | None,
+    ) -> ValidationConfig:
         return get_validation_config(
             data,
             validation,

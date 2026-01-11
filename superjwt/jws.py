@@ -21,8 +21,8 @@ from superjwt.validations import (
     JOSEHeader,
     JWTBaseModel,
     JWTHeadersDefaultValidation,
-    JWTValidation,
     Validation,
+    ValidationConfig,
     get_validation_config,
 )
 
@@ -35,7 +35,7 @@ class JWS:
         self,
         algorithm: Alg | BaseJWSAlgorithm | str,
         max_token_bytes: int = MAX_TOKEN_BYTES,
-        default_headers_validation: JWTValidation = JWTHeadersDefaultValidation,
+        default_headers_validation: ValidationConfig = JWTHeadersDefaultValidation,
     ):
         self.token: JWSTokenLifeCycle = JWSTokenLifeCycle()
         self.algorithm: BaseJWSAlgorithm[Key] = Alg.get_algorithm(algorithm)
@@ -64,7 +64,7 @@ class JWS:
         key: Key | bytes | str,
         *,
         headers_validation: type[JOSEHeader]
-        | JWTValidation
+        | ValidationConfig
         | Validation
         | None = Validation.DEFAULT,
     ) -> "JWSToken":
@@ -123,7 +123,7 @@ class JWS:
         *,
         with_detached_payload: dict[str, Any] | None = None,
         headers_validation: type[JOSEHeader]
-        | JWTValidation
+        | ValidationConfig
         | Validation
         | None = Validation.DEFAULT,
     ) -> "JWSToken":
@@ -254,7 +254,9 @@ class JWS:
         self.algorithm.check_key(key)
         return key
 
-    def validate_headers_and_algorithm(self, headers_validation: JWTValidation) -> None:
+    def validate_headers_and_algorithm(
+        self, headers_validation: ValidationConfig
+    ) -> None:
         # validate headers
         try:
             headers_validation.run(self.token.unsafe.headers)
@@ -295,8 +297,8 @@ class JWS:
     def get_headers_validation(
         self,
         data: JOSEHeader | dict[str, Any],
-        validation: type[JOSEHeader] | JWTValidation | Validation | None,
-    ) -> JWTValidation:
+        validation: type[JOSEHeader] | ValidationConfig | Validation | None,
+    ) -> ValidationConfig:
         return get_validation_config(
             data,
             validation,

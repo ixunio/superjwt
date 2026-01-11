@@ -331,7 +331,7 @@ class JWTClaims(JWTClaimsModel):
         return self.model_copy(update={"exp": exp_time})
 
 
-class JWTValidation(BaseModel):
+class ValidationConfig(BaseModel):
     """JWT data validation object."""
 
     model_config = {"extra": "forbid"}
@@ -341,15 +341,13 @@ class JWTValidation(BaseModel):
     enabled: bool = True
 
     """The pydantic model to use for data validation."""
-    validation_model: type[JWTBaseModel] | None = None
+    model: type[JWTBaseModel] | None = None
 
     """Forward the data pydantic model to validation config (and its internal config)."""
     forward_pydantic_model: bool = True
 
     """The default pydantic model to use for data storage when data is a dict."""
-    data_model: type[JWTBaseModel] = Field(
-        default_factory=lambda data: data["validation_model"]
-    )
+    data_model: type[JWTBaseModel] = Field(default_factory=lambda data: data["model"])
 
     # ------------- JWTBaseModel specific internal config -------------
     """Spoofed 'now' datetime."""
@@ -377,9 +375,7 @@ class JWTValidation(BaseModel):
         """Get internal config values as a dict for injection into validation."""
         internal_config = {}
         for param, model_type, _ in self._internal_params_matrix():
-            if self.validation_model is not None and issubclass(
-                self.validation_model, model_type
-            ):
+            if self.model is not None and issubclass(self.model, model_type):
                 value = getattr(self, param)
                 if value is not None:
                     internal_config[f"internal__{param}"] = value
@@ -399,7 +395,7 @@ class JWTValidation(BaseModel):
         if self.enabled is False:
             return data.to_dict() if isinstance(data, JWTBaseModel) else data
 
-        if self.validation_model is None:
+        if self.model is None:
             raise ValueError("Validation model is not set in JWTValidation")
 
         # case pydantic model
@@ -414,20 +410,20 @@ class JWTValidation(BaseModel):
             raise TypeError("Wrong type during data preparation and validation")
 
         ##### BEGIN VALIDATION #####
-        self.validation_model.model_validate(data_dict | self._get_internal_cfg())
+        self.model.model_validate(data_dict | self._get_internal_cfg())
         ##### END VALIDATION #####
 
         return data_dict
 
 
-JWTClaimsDefaultValidation = JWTValidation(
-    validation_model=JWTBaseModel,
+JWTClaimsDefaultValidation = ValidationConfig(
+    model=JWTBaseModel,
 )
-JWTClaimsStrictValidation = JWTValidation(
-    validation_model=JWTClaims,
+JWTClaimsStrictValidation = ValidationConfig(
+    model=JWTClaims,
 )
-JWTHeadersDefaultValidation = JWTValidation(
-    validation_model=JOSEHeader,
+JWTHeadersDefaultValidation = ValidationConfig(
+    model=JOSEHeader,
 )
 
 
@@ -440,13 +436,13 @@ class Validation(Enum):
 
 def get_data_model(
     data: JWTBaseModel | dict[str, Any],
-    validation: type[JWTBaseModel] | JWTValidation | Validation | None,
-    default_validation: JWTValidation,
+    validation: type[JWTBaseModel] | ValidationConfig | Validation | None,
+    default_validation: ValidationConfig,
     fallback_model: type[JWTBaseModel],
 ) -> type[JWTBaseModel]:
     if validation is Validation.DEFAULT and isinstance(data, dict):
         return default_validation.data_model
-    elif isinstance(validation, JWTValidation):
+    elif isinstance(validation, ValidationConfig):
         if validation.data_model is None:
             return fallback_model
         return validation.data_model
@@ -463,10 +459,10 @@ def get_data_model(
 
 def get_validation_config(
     data: JWTBaseModel | dict[str, Any],
-    validation: type[JWTBaseModel] | JWTValidation | Validation | None,
-    default_validation: JWTValidation,
+    validation: type[JWTBaseModel] | ValidationConfig | Validation | None,
+    default_validation: ValidationConfig,
     fallback_data_model: type[JWTBaseModel],
-) -> JWTValidation:
+) -> ValidationConfig:
     data_model = get_data_model(data, validation, default_validation, fallback_data_model)
 
     ##############################
@@ -474,9 +470,9 @@ def get_validation_config(
     if (
         validation is Validation.DISABLE
         or validation is None
-        or (isinstance(validation, JWTValidation) and validation.enabled is False)
+        or (isinstance(validation, ValidationConfig) and validation.enabled is False)
     ):
-        return JWTValidation(enabled=False, data_model=data_model)
+        return ValidationConfig(enabled=False, data_model=data_model)
 
     ##############################
     # case validation is ENABLED
@@ -489,30 +485,30 @@ def get_validation_config(
             if validation_cfg.forward_pydantic_model is True:
                 # ALWAYS forward data model to validation model in DEFAULT case
                 # --> the validation model was a mere fallback for dict data
-                validation_cfg.validation_model = None  # we will forward the model below
+                validation_cfg.model = None  # we will forward the model below
 
     # 2. case CUSTOM
-    elif isinstance(validation, JWTValidation) or (
+    elif isinstance(validation, ValidationConfig) or (
         isclass(validation) and issubclass(validation, JWTBaseModel)
     ):
         # 2.1 case JWTValidation instance
-        if isinstance(validation, JWTValidation):
+        if isinstance(validation, ValidationConfig):
             # make a copy, mutable object!!
             validation_cfg = validation.model_copy(deep=True)
 
         # 2.2 case Pydantic model
         if isclass(validation) and issubclass(validation, JWTBaseModel):
-            validation_cfg = JWTValidation(validation_model=validation)
+            validation_cfg = ValidationConfig(model=validation)
 
     else:
         raise TypeError("Wrong validation object type")
 
     # finalize internal config
     if isinstance(data, JWTBaseModel):
-        if validation_cfg.validation_model is None:
+        if validation_cfg.model is None:
             if validation_cfg.forward_pydantic_model is True:
                 # forward data model type to validation model
-                validation_cfg.validation_model = type(data)
+                validation_cfg.model = type(data)
                 # forward internal config from data model
                 validation_cfg.apply_internal_cfg(data)
             else:
