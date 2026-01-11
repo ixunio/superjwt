@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime, timedelta
 from enum import Enum
 from inspect import isclass
@@ -353,9 +354,6 @@ class ValidationConfig(BaseModel):
     """Spoofed 'now' datetime."""
     now: datetime | None = None
 
-    """Timestamp format for JWTDatetime fields."""
-    jwtdatetime_force_int: bool | None = None
-
     # ------------- JWTClaims specific internal config -------------
     """Leeway for time-based validations, in seconds."""
     leeway: float | None = None
@@ -366,7 +364,6 @@ class ValidationConfig(BaseModel):
     def _internal_params_matrix(self) -> list[tuple[str, type[JWTBaseModel], Any]]:
         return [
             ("now", JWTBaseModel, None),
-            ("jwtdatetime_force_int", JWTBaseModel, DEFAULT_JWTDATETIME_FORCE_INT),
             ("leeway", JWTClaims, DEFAULT_LEEWAY_SECONDS),
             ("allow_future_iat", JWTClaims, DEFAULT_ALLOW_FUTURE_IAT),
         ]
@@ -404,7 +401,7 @@ class ValidationConfig(BaseModel):
 
         # case dict
         elif isinstance(data, dict):
-            data_dict = data.copy()
+            data_dict = deepcopy(data)
 
         else:
             raise TypeError("Wrong type during data preparation and validation")

@@ -15,7 +15,6 @@ from superjwt.algorithms import Alg
 from superjwt.exceptions import TokenExpiredError, TokenNotYetValidError
 from superjwt.validations import (
     DEFAULT_ALLOW_FUTURE_IAT,
-    DEFAULT_JWTDATETIME_FORCE_INT,
     DEFAULT_LEEWAY_SECONDS,
     JWTBaseModel,
     JWTClaims,
@@ -631,7 +630,6 @@ def test_jwtvalidation_default_initialization():
     assert validation.forward_pydantic_model is True
     assert validation.leeway is None
     assert validation.allow_future_iat is None
-    assert validation.jwtdatetime_force_int is None
     assert validation.now is None
 
 
@@ -644,7 +642,6 @@ def test_jwtvalidation_custom_initialization():
         forward_pydantic_model=False,
         leeway=10.0,
         allow_future_iat=True,
-        jwtdatetime_force_int=False,
         now=now,
     )
 
@@ -653,7 +650,6 @@ def test_jwtvalidation_custom_initialization():
     assert validation.forward_pydantic_model is False
     assert validation.leeway == 10.0
     assert validation.allow_future_iat is True
-    assert validation.jwtdatetime_force_int is False
     assert validation.now == now
 
 
@@ -662,7 +658,6 @@ def test_jwtvalidation_apply_internal_cfg_with_none_model():
     validation = ValidationConfig(
         leeway=None,
         allow_future_iat=None,
-        jwtdatetime_force_int=None,
         now=None,
     )
 
@@ -670,7 +665,6 @@ def test_jwtvalidation_apply_internal_cfg_with_none_model():
 
     assert validation.leeway == DEFAULT_LEEWAY_SECONDS
     assert validation.allow_future_iat == DEFAULT_ALLOW_FUTURE_IAT
-    assert validation.jwtdatetime_force_int == DEFAULT_JWTDATETIME_FORCE_INT
     assert validation.now is None
 
 
@@ -688,7 +682,6 @@ def test_jwtvalidation_apply_internal_cfg_inherits_from_model():
     validation = ValidationConfig(
         leeway=None,
         allow_future_iat=None,
-        jwtdatetime_force_int=None,
         now=None,
     )
 
@@ -696,7 +689,6 @@ def test_jwtvalidation_apply_internal_cfg_inherits_from_model():
 
     assert validation.leeway == 20.0
     assert validation.allow_future_iat is True
-    assert validation.jwtdatetime_force_int is False
     assert validation.now == custom_now
 
 
@@ -715,7 +707,6 @@ def test_jwtvalidation_apply_internal_cfg_does_not_override():
     validation = ValidationConfig(
         leeway=7.0,
         allow_future_iat=False,
-        jwtdatetime_force_int=True,
         now=config_now,
     )
 
@@ -723,7 +714,6 @@ def test_jwtvalidation_apply_internal_cfg_does_not_override():
 
     assert validation.leeway == 7.0  # NOT 100.0
     assert validation.allow_future_iat is False  # NOT True
-    assert validation.jwtdatetime_force_int is True  # NOT False
     assert validation.now == config_now  # NOT model_now
 
 
@@ -739,7 +729,6 @@ def test_jwtvalidation_apply_internal_cfg_mixed():
     validation = ValidationConfig(
         leeway=10.0,  # Set - should NOT be overridden
         allow_future_iat=None,  # None - should inherit True
-        jwtdatetime_force_int=True,  # Set - should NOT be overridden
         now=None,  # None - should inherit model_now
     )
 
@@ -747,7 +736,6 @@ def test_jwtvalidation_apply_internal_cfg_mixed():
 
     assert validation.leeway == 10.0  # Used validation's value
     assert validation.allow_future_iat is True  # Inherited from model
-    assert validation.jwtdatetime_force_int is True  # Used validation's value
     assert validation.now == model_now  # Inherited from model
 
 
@@ -1134,7 +1122,6 @@ def test_get_validation_config_custom_jwtvalidation_inherits_from_model():
         model=None,
         forward_pydantic_model=True,
         leeway=None,  # Should inherit from data
-        jwtdatetime_force_int=None,  # Should inherit from data
     )
     default_validation = ValidationConfig(model=JWTBaseModel)
 
@@ -1146,7 +1133,6 @@ def test_get_validation_config_custom_jwtvalidation_inherits_from_model():
     )
 
     assert result.leeway == 30.0
-    assert result.jwtdatetime_force_int is False
 
 
 # ============================================================================
@@ -1198,7 +1184,6 @@ def test_get_validation_config_applies_defaults_for_dict_data():
         model=JWTClaims,
         leeway=None,
         allow_future_iat=None,
-        jwtdatetime_force_int=None,
     )
     default_validation = ValidationConfig(model=JWTBaseModel)
 
@@ -1212,7 +1197,6 @@ def test_get_validation_config_applies_defaults_for_dict_data():
     # Should have default values applied
     assert result.leeway == DEFAULT_LEEWAY_SECONDS
     assert result.allow_future_iat == DEFAULT_ALLOW_FUTURE_IAT
-    assert result.jwtdatetime_force_int == DEFAULT_JWTDATETIME_FORCE_INT
 
 
 def test_get_validation_config_does_not_override_explicit_values():
