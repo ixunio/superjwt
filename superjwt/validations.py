@@ -393,7 +393,7 @@ class ValidationConfig(BaseModel):
             return data.to_dict() if isinstance(data, JWTBaseModel) else data
 
         if self.model is None:
-            raise ValueError("Validation model is not set in JWTValidation")
+            raise ValueError("Validation model is not set in ValidationConfig")
 
         # case pydantic model
         if isinstance(data, JWTBaseModel):
@@ -488,7 +488,7 @@ def get_validation_config(
     elif isinstance(validation, ValidationConfig) or (
         isclass(validation) and issubclass(validation, JWTBaseModel)
     ):
-        # 2.1 case JWTValidation instance
+        # 2.1 case ValidationConfig instance
         if isinstance(validation, ValidationConfig):
             # make a copy, mutable object!!
             validation_cfg = validation.model_copy(deep=True)

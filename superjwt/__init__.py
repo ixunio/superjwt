@@ -65,12 +65,12 @@ def encode(
         headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
             in the JWT. Will use default JWS headers if not provided.
         detach_payload (bool, opt.): whether to produce a JWT token with detached payload.
-        claims_validation (type[JWTBaseModel] | JWTValidation | Validation | None, opt.):
-            Validation configuration for claims. Can be a pydantic model class, a JWTValidation
+        claims_validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
+            Validation configuration for claims. Can be a pydantic model class, a ValidationConfig
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
             or None (no validation).
-        headers_validation (type[JOSEHeader] | JWTValidation | Validation | None, opt.):
-            Validation configuration for headers. Can be a pydantic model class, a JWTValidation
+        headers_validation (type[JOSEHeader] | ValidationConfig | Validation | None, opt.):
+            Validation configuration for headers. Can be a pydantic model class, a ValidationConfig
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
             or None (no validation).
 
@@ -117,12 +117,12 @@ def decode(
         algorithm (Algorithm): The algorithm to use for verifying the JWT.
         with_detached_payload (JWTClaims | dict[str, Any] | None, opt.):
             Detached payload to use for signature verification, if any.
-        claims_validation (type[JWTBaseModel] | JWTValidation | Validation | None, opt.):
-            Validation configuration for claims. Can be a pydantic model class, a JWTValidation
+        claims_validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
+            Validation configuration for claims. Can be a pydantic model class, a ValidationConfig
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
             or None (no validation).
-        headers_validation (type[JOSEHeader] | JWTValidation | Validation | None, opt.):
-            Validation configuration for headers. Can be a pydantic model class, a JWTValidation
+        headers_validation (type[JOSEHeader] | ValidationConfig | Validation | None, opt.):
+            Validation configuration for headers. Can be a pydantic model class, a ValidationConfig
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
             or None (no validation).
 
