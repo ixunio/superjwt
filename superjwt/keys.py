@@ -37,10 +37,10 @@ class Key(ABC):
     @classmethod
     @abstractmethod
     def import_signing_key(cls, key: bytes | str) -> Self:
-        """Import a key for signing/encoding operations.
+        """Make a Key instance from the component needed for signing the JWT.
 
-        For symmetric keys: imports the secret key.
-        For asymmetric keys: imports the private key.
+        For symmetric keys: requires the secret key.
+        For asymmetric keys: requires the private key.
         """
         raise NotImplementedError(
             f"{cls.__name__} must implement import_signing_key()"
@@ -49,13 +49,21 @@ class Key(ABC):
     @classmethod
     @abstractmethod
     def import_verifying_key(cls, key: bytes | str) -> Self:
-        """Import a key for verification/decoding operations.
+        """Make a Key instance from the component needed for JWT verification.
 
-        For symmetric keys: imports the secret key (same as signing key).
-        For asymmetric keys: imports the public key.
+        For symmetric keys: requires the secret key.
+        For asymmetric keys: requires the public key.
         """
         raise NotImplementedError(
             f"{cls.__name__} must implement import_verifying_key()"
+        )  # pragma: no cover
+
+    @classmethod
+    @abstractmethod
+    def generate(cls, *args: object) -> Self:
+        """Generate a new Key instance."""
+        raise NotImplementedError(
+            f"{cls.__name__} must implement generate()"
         )  # pragma: no cover
 
     @abstractmethod
@@ -63,29 +71,43 @@ class Key(ABC):
         self,
         private_key: bytes | None = None,
         public_key: bytes | None = None,
-    ) -> None: ...  # pragma: no cover
+        derive_public_key: bool = True,
+    ) -> None:
+        """Prepare the key instance by loading the provided key components."""
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement _prepare_key()"
+        )  # pragma: no cover
 
     @classmethod
     def import_key(
-        cls, private_key: bytes | str | None = None, public_key: bytes | str | None = None
+        cls,
+        private_key: bytes | str | None = None,
+        public_key: bytes | str | None = None,
+        derive_public_key: bool = True,
     ) -> Self:
+        """Make a Key instance by importing key(s).
+
+        When importing an asymmetric key, if only the private key is provided,
+        the public key will be derived from it unless derive_public_key is False.
+        If both private_key and public_key are provided and derive_public_key is True,
+        they will be checked against each other for consistency.
+        """
         if cls is NoneKey:
             return cls()
 
         if private_key is None and public_key is None:
-            raise ValueError("Secret key must not be empty")
+            raise ValueError("No key was provided")
 
         if private_key is not None:
             private_key = as_bytes(private_key)
             if len(private_key) == 0:
-                raise ValueError("Secret key must not be empty")
+                raise ValueError("Private key must not be empty")
         if public_key is not None:
             public_key = as_bytes(public_key)
             if len(public_key) == 0:
-                raise ValueError("Secret key must not be empty")
-
+                raise ValueError("Public key must not be empty")
         key = cls()
-        key._prepare_key(private_key, public_key)
+        key._prepare_key(private_key, public_key, derive_public_key)
         return key
 
 
@@ -102,21 +124,23 @@ class NoneKey(Key):
     def import_verifying_key(cls, _) -> Self:
         return cls()
 
+    @classmethod
+    def generate(cls) -> Self:
+        return cls()  # pragma: no cover
+
     def _prepare_key(self, *_) -> None: ...
 
 
 class SymmetricKey(Key):
     @classmethod
     def import_signing_key(cls, key: bytes | str) -> Self:
-        """Import key for signing."""
-        return cls.import_key(key, None)
+        return cls.import_key(key)
 
     @classmethod
     def import_verifying_key(cls, key: bytes | str) -> Self:
-        """Import key for verification."""
-        return cls.import_key(key, None)
+        return cls.import_key(key)
 
-    def _prepare_key(self, secret_key: bytes, _) -> None:
+    def _prepare_key(self, secret_key: bytes, _, __) -> None:
         if _ is not None:
             raise SuperJWTError("Symmetric key should not have a public key component")
         if is_pem_format(secret_key) or is_ssh_key(secret_key):
@@ -204,16 +228,6 @@ class AsymmetricKey(Key, Generic[PrivateKeyType, PublicKeyType]):
         """Return tuple of valid public key types for isinstance checks."""
         ...  # pragma: no cover
 
-    @classmethod
-    def import_signing_key(cls, key: bytes | str) -> Self:
-        """Import private key for signing."""
-        return cls.import_key(key, None)
-
-    @classmethod
-    def import_verifying_key(cls, key: bytes | str) -> Self:
-        """Import public key for verification."""
-        return cls.import_key(None, key)
-
     @abstractmethod
     def check_key_security(self, key: PrivateKeyType | PublicKeyType) -> None:
         """Check key for security issues and emit warnings if needed.
@@ -225,35 +239,62 @@ class AsymmetricKey(Key, Generic[PrivateKeyType, PublicKeyType]):
 
     @abstractmethod
     def public_keys_match(self, key1: PublicKeyType, key2: PublicKeyType) -> bool:
-        """Compare two public keys for equality.
+        """Compare two public keys for equality."""
+        ...  # pragma: no cover
 
-        Returns:
-            True if the keys match, False otherwise
-        """  # pragma: no cover
-        ...
+    @classmethod
+    def import_signing_key(cls, key: bytes | str) -> Self:
+        return cls.import_private_key(key)
+
+    @classmethod
+    def import_verifying_key(cls, key: bytes | str) -> Self:
+        return cls.import_public_key(key)
+
+    @classmethod
+    def import_private_key(cls, key: bytes | str) -> Self:
+        """Make a Key instance from PEM private key."""
+        return cls.import_key(key, None, derive_public_key=False)
+
+    @classmethod
+    def import_public_key(cls, key: bytes | str) -> Self:
+        """Make a Key instance from PEM public key."""
+        return cls.import_key(None, key)
 
     def _prepare_key(
-        self, private_key: bytes | None = None, public_key: bytes | None = None
+        self,
+        private_key: bytes | None = None,
+        public_key: bytes | None = None,
+        derive_public_key: bool = True,
     ) -> None:
-        """
-        Prepare asymmetric key from PEM-encoded data.
-        Private keys contain both private and public components.
-        If only private_key is provided, the public key will be extracted from it.
-        If only public_key is provided, only verification operations will be available.
-        """
-
-        # Load private key if provided
+        # Private key loading
         if private_key is not None:
-            self._load_private_key(private_key)
-            assert self._private_key_obj is not None
+            self._private_key_obj = self._load_pem_private_key_common(private_key)
+            self.private_key = private_key
             self.check_key_security(self._private_key_obj)
 
-        # Load public key (either provided or derived from private key)
-        self._load_public_key(public_key)
+            # load public key from private key derivation if not provided
+            if public_key is None and derive_public_key:
+                derived_obj, derived_pem = self._derive_public_key_from_private()
+                self._public_key_obj = derived_obj
+                self.public_key = derived_pem
 
-        # Check security on the loaded public key (if not already checked via private key)
-        if private_key is None:
-            assert self._public_key_obj is not None
+            if public_key is not None and derive_public_key:
+                # check public key matches derived from private key
+                loaded_public_key_obj = self._load_pem_public_key_common(public_key)
+                derived_obj, derived_pem = self._derive_public_key_from_private()
+                if not self.public_keys_match(derived_obj, loaded_public_key_obj):
+                    raise InvalidKeyError(
+                        "Provided public key does not match the public key derived "
+                        "from the private key"
+                    )
+                self._public_key_obj = loaded_public_key_obj
+                self.public_key = public_key
+
+        # Public key loading
+        if private_key is None and public_key is not None:
+            # Load public key
+            self._public_key_obj = self._load_pem_public_key_common(public_key)
+            self.public_key = public_key
             self.check_key_security(self._public_key_obj)
 
     def _load_pem_private_key_common(self, private_key: bytes) -> PrivateKeyType:
@@ -295,59 +336,15 @@ class AsymmetricKey(Key, Generic[PrivateKeyType, PublicKeyType]):
             raise InvalidKeyError(f"Unable to parse {self.name} public key: {e}") from e
 
     def _derive_public_key_from_private(self) -> tuple[PublicKeyType, bytes]:
-        """Derive public key from the loaded private key.
-
-        Returns:
-            Tuple of (public_key_obj, public_key_pem)
-        """
-        assert self._private_key_obj is not None
+        """Derive public key from the loaded private key."""
+        if self._private_key_obj is None:
+            raise SuperJWTError("Cannot derive public key without a private key")
         derived_public_key_obj = cast("PublicKeyType", self._private_key_obj.public_key())
         derived_public_key_pem = derived_public_key_obj.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
         return derived_public_key_obj, derived_public_key_pem
-
-    def _load_private_key(self, private_key: bytes) -> None:
-        """Load a private key from PEM-encoded data.
-
-        Sets self._private_key_obj and self.private_key.
-        """
-        loaded_key = self._load_pem_private_key_common(private_key)
-        self._private_key_obj = loaded_key
-        self.private_key = private_key
-
-    def _load_public_key(self, public_key: bytes | None) -> None:
-        """Load a public key from PEM-encoded data.
-
-        If public_key is None and a private key exists, derives the public key from it.
-        Sets self._public_key_obj and self.public_key.
-        """
-        # If no public key provided, derive from private key
-        if public_key is None:
-            derived_obj, derived_pem = self._derive_public_key_from_private()
-            self._public_key_obj = derived_obj
-            self.public_key = derived_pem
-            return
-
-        # Load provided public key
-        loaded_key = self._load_pem_public_key_common(public_key)
-
-        # If private key exists, verify public key matches
-        if self._private_key_obj is not None:
-            derived_obj, derived_pem = self._derive_public_key_from_private()
-
-            if not self.public_keys_match(loaded_key, derived_obj):
-                raise InvalidKeyError(
-                    "Provided public key does not match the public key derived from the private key"
-                )
-
-            # Use the derived public key for consistency
-            self._public_key_obj = derived_obj
-            self.public_key = derived_pem
-        else:
-            self._public_key_obj = loaded_key
-            self.public_key = public_key
 
     def _get_private_key(self) -> PrivateKeyType:
         """Get the cryptography private key object for signing."""
@@ -419,12 +416,10 @@ class RSAKey(AsymmetricKey["rsa.RSAPrivateKey", "rsa.RSAPublicKey"]):
 
     @property
     def private_key_types(self) -> tuple[type, ...]:
-        """Return tuple of valid private key types."""
         return (rsa.RSAPrivateKey,)
 
     @property
     def public_key_types(self) -> tuple[type, ...]:
-        """Return tuple of valid public key types."""
         return (rsa.RSAPublicKey,)
 
     def check_key_security(self, key: rsa.RSAPrivateKey | rsa.RSAPublicKey) -> None:
@@ -437,7 +432,6 @@ class RSAKey(AsymmetricKey["rsa.RSAPrivateKey", "rsa.RSAPublicKey"]):
             )
 
     def public_keys_match(self, key1: rsa.RSAPublicKey, key2: rsa.RSAPublicKey) -> bool:
-        """Compare two RSA public keys for equality."""
         key1_numbers = key1.public_numbers()
         key2_numbers = key2.public_numbers()
 
@@ -487,7 +481,7 @@ class ECKey(AsymmetricKey["ec.EllipticCurvePrivateKey", "ec.EllipticCurvePublicK
         # Map string names to curve instances
         if isinstance(curve, str):
             curve_map = {
-                # Standard curve names
+                # by curve names
                 "P-256": ec.SECP256R1(),
                 "secp256r1": ec.SECP256R1(),
                 "P-384": ec.SECP384R1(),
@@ -495,7 +489,7 @@ class ECKey(AsymmetricKey["ec.EllipticCurvePrivateKey", "ec.EllipticCurvePublicK
                 "P-521": ec.SECP521R1(),
                 "secp521r1": ec.SECP521R1(),
                 "secp256k1": ec.SECP256K1(),
-                # Algorithm names
+                # by algorithm names
                 "ES256": ec.SECP256R1(),
                 "ES256K": ec.SECP256K1(),
                 "ES384": ec.SECP384R1(),
@@ -526,12 +520,10 @@ class ECKey(AsymmetricKey["ec.EllipticCurvePrivateKey", "ec.EllipticCurvePublicK
 
     @property
     def private_key_types(self) -> tuple[type, ...]:
-        """Return tuple of valid private key types."""
         return (ec.EllipticCurvePrivateKey,)
 
     @property
     def public_key_types(self) -> tuple[type, ...]:
-        """Return tuple of valid public key types."""
         return (ec.EllipticCurvePublicKey,)
 
     @property
@@ -615,12 +607,10 @@ class OKPKey(
 
     @property
     def private_key_types(self) -> tuple[type, ...]:
-        """Return tuple of valid private key types."""
         return (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)
 
     @property
     def public_key_types(self) -> tuple[type, ...]:
-        """Return tuple of valid public key types."""
         return (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)
 
     def check_key_security(

@@ -411,7 +411,7 @@ class TestRSAAlgorithms:
         assert b"BEGIN RSA PRIVATE KEY" in pkcs1_pem
 
         # Should work with PKCS#1 format
-        rsa_key = RSAKey.import_signing_key(pkcs1_pem)
+        rsa_key = RSAKey.import_key(pkcs1_pem)
         algorithm = RS256Algorithm()
 
         signature = algorithm.sign(test_data, rsa_key)
@@ -431,7 +431,7 @@ class TestRSAAlgorithms:
         assert b"BEGIN PRIVATE KEY" in pkcs8_pem
 
         # Should work with PKCS#8 format
-        rsa_key = RSAKey.import_signing_key(pkcs8_pem)
+        rsa_key = RSAKey.import_key(pkcs8_pem)
         algorithm = RS256Algorithm()
 
         signature = algorithm.sign(test_data, rsa_key)
@@ -450,7 +450,7 @@ class TestRSAAlgorithms:
         assert b"BEGIN RSA PUBLIC KEY" in pkcs1_public_pem
 
         # Should work with PKCS#1 public format
-        public_key = RSAKey.import_verifying_key(pkcs1_public_pem)
+        public_key = RSAKey.import_public_key(pkcs1_public_pem)
 
         # Generate signature with private key
         private_pem = private_key_obj.private_bytes(
@@ -458,7 +458,7 @@ class TestRSAAlgorithms:
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption(),
         )
-        private_key = RSAKey.import_signing_key(private_pem)
+        private_key = RSAKey.import_private_key(private_pem)
 
         algorithm = RS256Algorithm()
         test_data = b"test data"
@@ -1028,7 +1028,7 @@ class TestEdDSAAlgorithms:
         ed448_algo = Ed448Algorithm()
 
         # Create a public-only key to test the public key validation path
-        ed25519_public_only = OKPKey.import_verifying_key(ed25519_key_pair.public_pem)
+        ed25519_public_only = OKPKey.import_public_key(ed25519_key_pair.public_pem)
 
         # Create a valid signature with Ed25519
         ed25519_algo = Ed25519Algorithm()
@@ -1047,7 +1047,7 @@ class TestEdDSAAlgorithms:
         ed25519_algo = Ed25519Algorithm()
 
         # Create a public-only key to test the public key validation path
-        ed448_public_only = OKPKey.import_verifying_key(ed448_key_pair.public_pem)
+        ed448_public_only = OKPKey.import_public_key(ed448_key_pair.public_pem)
 
         # Create a valid signature with Ed448
         ed448_algo = Ed448Algorithm()

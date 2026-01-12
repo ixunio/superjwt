@@ -203,8 +203,8 @@ class KeyPair(BaseModel):
             public_key_obj=key._public_key_obj,
             private_pem=key.private_key,
             public_pem=key.public_key,
-            key_instance_from_private_pem=type(key).import_signing_key(key.private_key),
-            key_instance_from_public_pem=type(key).import_verifying_key(key.public_key),
+            key_instance_from_private_pem=type(key).import_key(key.private_key),
+            key_instance_from_public_pem=type(key).import_public_key(key.public_key),
         )
 
 

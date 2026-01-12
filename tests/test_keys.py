@@ -85,17 +85,17 @@ class TestOctKey:
 
     def test_oct_key_empty_string_raises_error(self):
         """Test that empty string raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="Private key must not be empty"):
             OctKey.import_key("")
 
     def test_oct_key_empty_bytes_raises_error(self):
         """Test that empty bytes raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="Private key must not be empty"):
             OctKey.import_key(b"")
 
     def test_oct_key_none_raises_error(self):
         """Test that None raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="No key was provided"):
             OctKey.import_key(None)  # type: ignore
 
     def test_oct_key_rejects_pem_format(self):
@@ -151,7 +151,7 @@ MIIEpAIBAAKCAQEA4Z9v...
 
     def test_oct_key_empty_public_key_raises_error(self):
         """Test that empty public_key parameter raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="Public key must not be empty"):
             OctKey.import_key(None, b"")
 
     def test_oct_key_public_key_not_allowed(self):
@@ -351,12 +351,12 @@ invalid base64 data!!!
 
     def test_rsa_key_empty_string_raises_error(self):
         """Test that empty string raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="Private key must not be empty"):
             RSAKey.import_key("")
 
     def test_rsa_key_none_raises_error(self):
         """Test that None raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="No key was provided"):
             RSAKey.import_key(None)  # type: ignore
 
     def test_rsa_key_both_keys_valid_match(
@@ -390,9 +390,9 @@ invalid base64 data!!!
         key = RSAKey.import_signing_key(rsa_private_key_pkcs1)
         assert isinstance(key, RSAKey)
         assert key.private_key == rsa_private_key_pkcs1
-        assert key.public_key != b""
+        assert key.public_key == b""  # No derivation with import_signing_key
         assert key._private_key_obj is not None
-        assert key._public_key_obj is not None
+        assert key._public_key_obj is None  # Not derived
 
     def test_rsa_key_import_verifying_key(self, rsa_public_key_spki):
         """Test importing RSAKey via import_verifying_key with public key."""
@@ -451,7 +451,7 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
 
     def test_rsa_key_empty_public_key_raises_error(self):
         """Test that empty public_key parameter raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="Public key must not be empty"):
             RSAKey.import_key(None, b"")
 
     def test_rsa_key_public_keys_match_returns_true(self, rsa_private_key_pkcs1):
@@ -491,7 +491,7 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
 
     def test_rsa_key_export_public_key_pem(self, rsa_2048_key_pair):
         """Test exporting public key as PEM."""
-        key = rsa_2048_key_pair.key_instance_from_private_pem
+        key = RSAKey.import_key(rsa_2048_key_pair.private_pem)
         pem = key.export_public_key_pem()
 
         assert isinstance(pem, bytes)
@@ -630,12 +630,12 @@ invalid base64 data!!!
 
     def test_ec_key_empty_string_raises_error(self):
         """Test that empty string raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="Private key must not be empty"):
             ECKey.import_key("")
 
     def test_ec_key_none_raises_error(self):
         """Test that None raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="No key was provided"):
             ECKey.import_key(None)  # type: ignore
 
     def test_ec_key_both_keys_valid_match(self, ec_private_key_p256, ec_public_key_p256):
@@ -667,9 +667,9 @@ invalid base64 data!!!
         key = ECKey.import_signing_key(ec_private_key_p256)
         assert isinstance(key, ECKey)
         assert key.private_key == ec_private_key_p256
-        assert key.public_key != b""
+        assert key.public_key == b""  # No derivation with import_signing_key
         assert key._private_key_obj is not None
-        assert key._public_key_obj is not None
+        assert key._public_key_obj is None  # Not derived
 
     def test_ec_key_import_verifying_key(self, ec_public_key_p256):
         """Test importing ECKey via import_verifying_key with public key."""
@@ -728,7 +728,7 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
 
     def test_ec_key_empty_public_key_raises_error(self):
         """Test that empty public_key parameter raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="Public key must not be empty"):
             ECKey.import_key(None, b"")
 
     def test_ec_key_public_keys_match_returns_true(self, ec_private_key_p256):
@@ -778,7 +778,7 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
 
     def test_ec_key_export_public_key_pem(self, ec_p256_key_pair):
         """Test exporting public key as PEM."""
-        key = ec_p256_key_pair.key_instance_from_private_pem
+        key = ECKey.import_key(ec_p256_key_pair.private_pem)
         pem = key.export_public_key_pem()
 
         assert isinstance(pem, bytes)
@@ -793,6 +793,24 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         """Test getting curve key size from public-only key."""
         key = ECKey.import_key(public_key=ec_public_key_p256)
         assert key.curve_key_size == 256
+
+    def test_ec_key_curve_name_from_private_key(self, ec_private_key_p256):
+        """Test getting curve name from private key."""
+        key = ECKey.import_key(ec_private_key_p256)
+        assert key.curve_name == "secp256r1"
+
+    def test_ec_key_curve_key_size_from_private_key(self, ec_private_key_p256):
+        """Test getting curve key size from private key."""
+        key = ECKey.import_key(ec_private_key_p256)
+        assert key.curve_key_size == 256
+
+    def test_ec_key_derive_public_key_without_private_raises_error(self):
+        """Test that deriving public key without private key raises error."""
+        key = ECKey()
+        with pytest.raises(
+            SuperJWTError, match="Cannot derive public key without a private key"
+        ):
+            key._derive_public_key_from_private()
 
 
 @requires_cryptography
@@ -923,12 +941,12 @@ invalid base64 data!!!
 
     def test_okp_key_empty_string_raises_error(self):
         """Test that empty string raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="Private key must not be empty"):
             OKPKey.import_key("")
 
     def test_okp_key_none_raises_error(self):
         """Test that None raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="No key was provided"):
             OKPKey.import_key(None)  # type: ignore
 
     def test_okp_key_both_keys_valid_match(
@@ -962,9 +980,9 @@ invalid base64 data!!!
         key = OKPKey.import_signing_key(okp_private_key_ed25519)
         assert isinstance(key, OKPKey)
         assert key.private_key == okp_private_key_ed25519
-        assert key.public_key != b""
+        assert key.public_key == b""  # No derivation with import_signing_key
         assert key._private_key_obj is not None
-        assert key._public_key_obj is not None
+        assert key._public_key_obj is None  # Not derived
 
     def test_okp_key_import_verifying_key(self, okp_public_key_ed25519):
         """Test importing OKPKey via import_verifying_key with public key."""
@@ -1007,7 +1025,7 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
 
     def test_okp_key_empty_public_key_raises_error(self):
         """Test that empty public_key parameter raises ValueError."""
-        with pytest.raises(ValueError, match="Secret key must not be empty"):
+        with pytest.raises(ValueError, match="Public key must not be empty"):
             OKPKey.import_key(None, b"")
 
     def test_okp_key_public_keys_match_returns_true(self, ed25519_key_pair):
@@ -1055,7 +1073,7 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
 
     def test_okp_key_export_public_key_pem(self, ed25519_key_pair):
         """Test exporting public key as PEM."""
-        key = ed25519_key_pair.key_instance_from_private_pem
+        key = OKPKey.import_key(ed25519_key_pair.private_pem)
         pem = key.export_public_key_pem()
 
         assert isinstance(pem, bytes)
