@@ -1,4 +1,7 @@
-from pydantic_core import ErrorDetails
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+from superjwt.utils import pydantic_validation_errors_to_str
 
 
 class SecurityWarning(UserWarning):
@@ -57,16 +60,12 @@ class HeadersValidationError(InvalidHeadersError):
     def __init__(
         self,
         message: str | None = None,
-        validation_errors: list[ErrorDetails] | None = None,
+        validation_errors: Sequence[Mapping[str, Any]] | None = None,
     ):
         self.error = message or self.error
         if validation_errors is not None:
             self.error += "\n"
-            self.error += "\n".join(
-                f"header {error['loc'] if error['loc'] else ''} = {error['input']} "
-                f"-> validation failed ({error['type']}): {error['msg']}"
-                for error in validation_errors
-            )
+            self.error += pydantic_validation_errors_to_str(validation_errors)
         super().__init__(self.error)
 
 
@@ -89,16 +88,12 @@ class ClaimsValidationError(InvalidPayloadError):
     def __init__(
         self,
         message: str | None = None,
-        validation_errors: list[ErrorDetails] | None = None,
+        validation_errors: Sequence[Mapping[str, Any]] | None = None,
     ):
         self.error = message or self.error
         if validation_errors is not None:
             self.error += "\n"
-            self.error += "\n".join(
-                f"claim {error['loc'] if error['loc'] else ''} = {error['input']} "
-                f"-> validation failed ({error['type']}): {error['msg']}"
-                for error in validation_errors
-            )
+            self.error += pydantic_validation_errors_to_str(validation_errors)
         super().__init__(self.error)
 
 

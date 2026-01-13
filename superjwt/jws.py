@@ -16,7 +16,7 @@ from superjwt.exceptions import (
     SuperJWTError,
 )
 from superjwt.keys import Key
-from superjwt.utils import as_bytes, urlsafe_b64decode, urlsafe_b64encode
+from superjwt.utils import as_bytes, trim_str, urlsafe_b64decode, urlsafe_b64encode
 from superjwt.validations import (
     JOSEHeader,
     JWTBaseModel,
@@ -273,7 +273,7 @@ class JWS:
         pass_through = self.algorithm.name == "none" and self._allow_none_algorithm
         if not pass_through and headers_validated.alg != self.algorithm.name:
             raise AlgorithmMismatchError(
-                f"JWS algorithm '{headers_validated.alg}' does not match expected '{self.algorithm.name}'"
+                f"JWS algorithm '{trim_str(headers_validated.alg, 16)}' does not match expected '{self.algorithm.name}'"
             )
 
     def verify_signature(self, key: Key) -> bool:

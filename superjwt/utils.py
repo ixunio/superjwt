@@ -1,7 +1,9 @@
 import base64
 import binascii
 import re
+from collections.abc import Mapping, Sequence
 from datetime import datetime
+from typing import Any
 
 
 def check_cryptography_available(raise_error: bool = True) -> bool:
@@ -20,6 +22,23 @@ def check_cryptography_available(raise_error: bool = True) -> bool:
 
 
 CRYPTOGRAPHY_AVAILABLE = check_cryptography_available(raise_error=False)
+
+
+def trim_str(s: str, max_length: int = 200) -> str:
+    if len(s) <= max_length:
+        return s
+    return s[:max_length] + "..."
+
+
+def pydantic_validation_errors_to_str(
+    validation_errors: Sequence[Mapping[str, Any]],
+) -> str:
+    error = "\n".join(
+        f"{trim_str(str(error['loc']), 64) if error['loc'] else ''} = {trim_str(str(error['input']))} "
+        f"-> validation failed ({error['type']}): {error['msg']}"
+        for error in validation_errors
+    )
+    return error
 
 
 def as_bytes(s: str | bytes) -> bytes:

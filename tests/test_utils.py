@@ -9,6 +9,8 @@ from superjwt.utils import (
     encode_integer,
     is_pem_format,
     is_ssh_key,
+    pydantic_validation_errors_to_str,
+    trim_str,
     urlsafe_b64decode,
     urlsafe_b64encode,
 )
@@ -99,6 +101,74 @@ def test_as_bytes():
     assert as_bytes(b"foo") == b"foo"
     with pytest.raises(TypeError):
         as_bytes(123)  # type: ignore
+
+
+def test_trim_str():
+    # Shorter than max_length -> unchanged
+    s_short = "a" * 10
+    assert trim_str(s_short, max_length=20) == s_short
+
+    # Exactly at max_length -> unchanged
+    s_exact = "x" * 200
+    assert trim_str(s_exact) == s_exact
+
+    # Longer than default max_length -> truncated with ellipsis
+    s_long = "y" * 250
+    trimmed = trim_str(s_long)
+    assert trimmed.endswith("...")
+    assert len(trimmed) == 200 + 3
+
+    # Custom max_length
+    assert trim_str("abcdef", max_length=3) == "abc..."
+
+
+def test_pydantic_validation_errors_to_str():
+    """Test formatting pydantic validation errors with trimming."""
+    # Basic case with normal-sized inputs
+    err1 = {
+        "loc": ("field", "sub"),
+        "input": "test_value",
+        "type": "value_error",
+        "msg": "invalid",
+    }
+    result = pydantic_validation_errors_to_str([err1])
+    assert "('field', 'sub')" in result
+    assert "test_value" in result
+    assert "validation failed (value_error)" in result
+    assert "invalid" in result
+
+    # Empty loc
+    err2 = {"loc": (), "input": 123, "type": "type_error", "msg": "wrong type"}
+    result = pydantic_validation_errors_to_str([err2])
+    assert result.startswith(" = 123")
+    assert "validation failed (type_error): wrong type" in result
+
+    # Long input gets trimmed (250 chars -> 200 + "...")
+    long_input = "x" * 250
+    err3 = {
+        "loc": ("field",),
+        "input": long_input,
+        "type": "value_error",
+        "msg": "too long",
+    }
+    result = pydantic_validation_errors_to_str([err3])
+    assert "x" * 200 + "..." in result
+    assert "x" * 201 not in result  # Verify it was actually trimmed
+
+    # Long loc gets trimmed (max_length=64 for loc)
+    long_loc = ("a" * 100, "b" * 100)
+    err4 = {"loc": long_loc, "input": "val", "type": "value_error", "msg": "test"}
+    result = pydantic_validation_errors_to_str([err4])
+    # str(long_loc) is longer than 64, should be trimmed
+    assert "..." in result
+    assert len(result.split(" = ")[0]) == 67  # 64 chars + "..."
+
+    # Multiple errors joined by newline
+    result_multi = pydantic_validation_errors_to_str([err1, err2])
+    lines = result_multi.split("\n")
+    assert len(lines) == 2
+    assert "('field', 'sub')" in lines[0]
+    assert " = 123" in lines[1]
 
 
 def test_is_pem_format():
