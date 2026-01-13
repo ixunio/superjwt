@@ -414,9 +414,6 @@ class ValidationConfig(BaseModel):
 
 
 JWTClaimsDefaultValidation = ValidationConfig(
-    model=JWTBaseModel,
-)
-JWTClaimsStrictValidation = ValidationConfig(
     model=JWTClaims,
 )
 JWTHeadersDefaultValidation = ValidationConfig(
