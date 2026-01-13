@@ -193,31 +193,34 @@ except HeadersValidationError as e:
 ### `AlgorithmMismatchError`
 <small>*inherits from `InvalidHeadersError`*</small>
 
-Raised when the algorithm in the JWT header doesn't match the expected algorithm during decoding.
+Raised when the algorithm in the JWT header doesn't match the expected algorithm during encoding or decoding.
 
 /// details | Code Example
     type: example
 
 ```python
-from superjwt import Alg, JOSEHeader, Validation, decode, encode
+from superjwt import Alg, JOSEHeader, Validation, decode, encode, inspect
 from superjwt.exceptions import AlgorithmMismatchError
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
-compact = encode(
-    {},
-    secret_key,
-    Alg.HS256,
-    headers=JOSEHeader.model_construct(alg="HS384", typ="JWT"),
-    headers_validation=Validation.DISABLE
+compact = (
+    "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9"
+    "."
+    "eyJpc3MiOiJ1c2VyLTEyMyJ9"
+    "."
+    "Mp0Pcwsz5VECK11Kf2ZZNF_SMKu5CgBeLN9ZOP04kZo"
 )
+print(inspect(compact).headers["alg"])
+#> 'HS512'
 
 try:
-    # Decode expecting HS256 but header says HS384
+    # Decode expecting HS256 but header says HS512
+    # even with headers validation disabled, an AlgorithmMismatchError is raised
     decode(compact, secret_key, Alg.HS256, headers_validation=Validation.DISABLE)
 except AlgorithmMismatchError as e:
     print(e)
-    #> JWS algorithm 'HS384' does not match expected 'HS256'
+    #> JWS algorithm 'HS512' does not match expected 'HS256'
 ```
 ///
 

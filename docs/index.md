@@ -47,7 +47,7 @@ With powerful Pydantic validation features.
 
 ## Overview
 
-SuperJWT is a minimalist JWT library for Python 3.10+ that combines the simplicity of JWT encoding/decoding with the power of [Pydantic](https://docs.pydantic.dev/latest/) validation. It supports JWS (JSON Web Signature) format with HMAC or various asymmetric algorithms and includes advanced features like enhanced time integrity checks, compact token inspection, custom timestamp serialization, detached payload mode, time spoofing, and more.<br>*[Learn more about JWT](./jwt/basics)*.
+SuperJWT is a minimalist JWT library for Python 3.10+ that combines the simplicity of JWT encoding/decoding with the power of [Pydantic](https://docs.pydantic.dev/latest/) validation. It supports JWS (JSON Web Signature) format with HMAC or various asymmetric algorithms and includes advanced features like enhanced time integrity checks, compact token inspection, custom timestamp serialization, detached payload mode, time spoofing, and more.<br>*[Learn more about JWT](jwt/basics.md)*.
 
 ---
 
@@ -88,7 +88,7 @@ pip install superjwt[asymmetric]
 ### 🩵 Modern Codebase
 
 - SuperJWT is written for Python 3.10+ with full type hints support in your IDE. Every function, method, and Pydantic model has autocompletion.
-- Clean, modular, and lightweight codebase: thanks to Pydantic and the optional `cryptography` library, the whole library consists of less than 3,000 lines of code and is easily readable.
+- Clean, modular, and lightweight codebase: thanks to Pydantic and the optional `cryptography` library, SuperJWT is a compact library, well-structured, and easy to read.
 
 ### 🤖 Heavily Tested
 
