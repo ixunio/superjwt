@@ -64,7 +64,7 @@ compact: bytes = encode({"iss": "my-app", "sub": "John Doe"}, secret_key, Alg.HS
 #   .eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSJ9
 #   .HwnUqTLFAMzNkMrokd0aI7c-zSJJpSVXMrYIhUyWe4s'
 
-decoded: dict = decode(compact, secret_key, Alg.HS256, claims_validation=JWTClaims)
+decoded: dict = decode(compact, secret_key, Alg.HS256)
 #> {'iss': 'my-app', 'sub': 'John Doe'}
 ```
 
@@ -87,7 +87,7 @@ compact: bytes = encode(claims, secret_key, Alg.HS256)
 #   .eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzQ4MywiZXhwIjoxNzY3MDI4MzgzfQ
 #   .ZXxZT8VzL8IPTov-enslCh57S2M5fQBtqULZx5zEAm8'
 
-decoded: dict = decode(compact, secret_key, Alg.HS256, claims_validation=JWTClaims)
+decoded: dict = decode(compact, secret_key, Alg.HS256)
 #> {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767027483, 'exp': 1767028383}
 ```
 
@@ -135,7 +135,7 @@ invalid_claims = (
     .with_expiration(minutes=10)
 )
 
-# disable claims default validation to create an invalid token
+# disable claims default validation to create an "invalid" token
 invalid_compact = encode(
     invalid_claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
 )
