@@ -94,6 +94,14 @@ class JWS:
             json.dumps(headers_dict, separators=(",", ":")).encode("utf-8")
         )
 
+        # check algorithm match
+        if self.token.verified.model.headers.alg != self.algorithm.name:
+            raise AlgorithmMismatchError(
+                f"Algorithm in headers "
+                f"'{trim_str(self.token.verified.model.headers.alg, 16)}' "
+                f"does not match the encoding algorithm '{self.algorithm.name}'"
+            )
+
         # set payload data
         self.token.verified.payload = payload
         self.token.verified.encoded_payload = urlsafe_b64encode(
@@ -103,6 +111,7 @@ class JWS:
         # set signature data
         if isinstance(self.algorithm, NoneAlgorithm) and not self._allow_none_algorithm:
             raise InvalidAlgorithmError("None algorithm is not allowed")
+
         signature = self.algorithm.sign(self.token.verified.signing_input, key)
         self.token.verified.signature = signature
         self.token.verified.encoded_signature = urlsafe_b64encode(signature)

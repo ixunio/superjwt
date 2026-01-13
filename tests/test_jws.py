@@ -1,10 +1,10 @@
 import pytest
+from superjwt import inspect
 from superjwt.algorithms import NoneAlgorithm
 from superjwt.exceptions import (
     AlgorithmMismatchError,
     HeadersValidationError,
     InvalidAlgorithmError,
-    InvalidHeadersError,
     SuperJWTError,
 )
 from superjwt.jws import JWS
@@ -39,7 +39,7 @@ def test_not_reset_jws_instance(
     assert decoded_claims_after_reset.payload == claims_fixed_dt.to_dict()
 
 
-def test_wrong_header_algorithm(
+def test_encode_wrong_header_algorithm(
     jws_HS256: JWS, claims_fixed_dt: JWTCustomClaims, secret_key: str
 ):
     key = OctKey.import_key(secret_key)
@@ -54,32 +54,45 @@ def test_wrong_header_algorithm(
         )
     jws_HS256.reset()
 
-    invalid_compact = jws_HS256.encode(
-        headers=headers,
-        payload=claims_fixed_dt.to_dict(),
-        key=key,
-        headers_validation=Validation.DISABLE,
-    ).compact
+    # Even with validation disabled, we enforce consistency
+    with pytest.raises(AlgorithmMismatchError):
+        jws_HS256.encode(
+            headers=headers,
+            payload=claims_fixed_dt.to_dict(),
+            key=key,
+            headers_validation=Validation.DISABLE,
+        )
 
-    # not reset JWS instance
-    with pytest.raises(SuperJWTError):
-        jws_HS256.decode(
-            compact=invalid_compact,
+
+def test_encode_algorithm_mismatch(
+    jws_HS256: JWS, claims_fixed_dt: JWTCustomClaims, secret_key: str
+):
+    """Test that encoding with mismatched algorithm in headers raises error."""
+    key = OctKey.import_key(secret_key)
+    headers = {"alg": "HS512", "typ": "JWT"}
+
+    with pytest.raises(AlgorithmMismatchError) as exc:
+        jws_HS256.encode(
+            headers=headers,
+            payload=claims_fixed_dt.to_dict(),
             key=key,
         )
-    jws_HS256.reset()
+    assert "does not match" in str(exc.value)
 
-    # header validation error, alg is not a valid algorithm
-    with pytest.raises(InvalidHeadersError):
-        jws_HS256.decode(compact=invalid_compact, key=key)
-    jws_HS256.reset()
 
-    # algorithm mismatch error
-    with pytest.raises(AlgorithmMismatchError):
-        jws_HS256.decode(
-            compact=invalid_compact, key=key, headers_validation=Validation.DISABLE
-        )
-    jws_HS256.reset()
+def test_decode_algorithm_mismatch(jws_HS256: JWS, secret_key: str):
+    """Test that decoding with mismatched algorithm in headers raises error."""
+    compact = (
+        "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9"
+        "."
+        "eyJpc3MiOiJ1c2VyLTEyMyJ9"
+        "."
+        "Mp0Pcwsz5VECK11Kf2ZZNF_SMKu5CgBeLN9ZOP04kZo"
+    )
+    assert inspect(compact).headers["alg"] == "HS512"
+    with pytest.raises(AlgorithmMismatchError) as exc:
+        jws_HS256.decode(compact, secret_key)
+    assert "does not match" in str(exc.value)
 
 
 def test_none_algorithm_not_allowed_decode():
