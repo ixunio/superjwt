@@ -22,13 +22,14 @@ With powerful Pydantic validation features.
 <a href="https://pypi.org/project/superjwt/#history"><img alt="Supported Python versions" src="https://img.shields.io/pypi/pyversions/superjwt.svg?logo=python&logoColor=white"></a>
 
 <br />
+<br />
 
-<a href="https://github.com/ixunio/superjwt"><strong><em>See documentation</em></strong></a>
+<a href="https://ixunio.github.io/superjwt/"><strong><em>See documentation</em></strong></a>
 </div>
 
 ## Overview & Installation
 
-SuperJWT is a minimalist JWT library for Python 3.10+ that combines the simplicity of JWT encoding/decoding with the power of [Pydantic](https://docs.pydantic.dev/latest/) validation. It supports JWS (JSON Web Signature) format with HMAC-SHA2 algorithms and includes advanced features like enhanced time integrity checks, compact token inspection, custom timestamp serialization, detached payload mode, time spoofing and more.
+SuperJWT is a minimalist JWT library for Python 3.10+ that combines the simplicity of JWT encoding/decoding with the power of [Pydantic](https://docs.pydantic.dev/latest/) validation. It supports JWS (JSON Web Signature) format, HMAC and asymmetric algorithms (RSA, ECDSA, EdDSA). SuperJWT includes advanced features like enhanced time integrity checks, compact token inspection, custom timestamp serialization, detached payload mode, time spoofing and more.
 
 **Key Features:**
 
@@ -62,6 +63,7 @@ compact: bytes = encode({"iss": "my-app", "sub": "John Doe"}, secret_key, Alg.HS
 #> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
 #   .eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSJ9
 #   .HwnUqTLFAMzNkMrokd0aI7c-zSJJpSVXMrYIhUyWe4s'
+
 decoded: dict = decode(compact, secret_key, Alg.HS256, claims_validation=JWTClaims)
 #> {'iss': 'my-app', 'sub': 'John Doe'}
 ```
@@ -84,6 +86,7 @@ compact: bytes = encode(claims, secret_key, Alg.HS256)
 #> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
 #   .eyJpc3MiOiJteS1hcHAiLCJzdWIiOiJKb2huIERvZSIsImlhdCI6MTc2NzAyNzQ4MywiZXhwIjoxNzY3MDI4MzgzfQ
 #   .ZXxZT8VzL8IPTov-enslCh57S2M5fQBtqULZx5zEAm8'
+
 decoded: dict = decode(compact, secret_key, Alg.HS256, claims_validation=JWTClaims)
 #> {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767027483, 'exp': 1767028383}
 ```
@@ -140,17 +143,17 @@ try:
     decode(invalid_compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)
 except ClaimsValidationError as e:
     print("Claims validation error:", e)
-#> Claims validation error: Claims validation failed
-#    claim ('sub',) = John Doe -> validation failed (int_parsing): 
-#      Input should be a valid integer, unable to parse string as an integer
-#    claim ('user_id',) = invalid-uuid-string -> validation failed (value_error):
-#      Value error, badly formed hexadecimal UUID string
+    #> Claims validation error: Claims validation failed
+    #    claim ('sub',) = John Doe -> validation failed (int_parsing): 
+    #      Input should be a valid integer, unable to parse string as an integer
+    #    claim ('user_id',) = invalid-uuid-string -> validation failed (value_error):
+    #      Value error, badly formed hexadecimal UUID string
 ```
 
 ### Compact Token Inspection
 
 > [!CAUTION]
-> When using `inspect()`, the JWT is not verified! Never trust the embedded data until it is at least verified by `decode()`.
+> When using `inspect()`, the JWT is not verified! Never trust the data until it is verified by `decode()`.
 
 ```python
 from superjwt import JWSToken, inspect
@@ -165,18 +168,14 @@ compact = (
 
 token: JWSToken = inspect(compact)
 
-token.payload
+print(token.payload)
 #> {'can_I_trust_you': 'no'}
 
-token.headers
+print(token.headers)
 #> {'alg': 'NoNe', 'typ': 'JWT'}
 ```
 
-
-
-## Documentation
-
-<a href="https://github.com/ixunio/superjwt"><strong><em>See full documentation</em></strong></a>
+<a href="https://ixunio.github.io/superjwt/"><strong><em>See full documentation</em></strong></a>
 
 ## Test
 
@@ -184,7 +183,7 @@ token.headers
 
 2. Install dependencies
     ```bash
-    pip install -e . --group test
+    pip install -e .[asymmetric] --group test
     ```
 3. Run tests
     ```bash
