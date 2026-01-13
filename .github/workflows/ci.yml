@@ -178,3 +178,39 @@ jobs:
             ${{ needs.validate-release.outputs.changelog_content }}
           draft: false
           prerelease: false
+  
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [code-quality, test]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      
+      - name: Configure Git Credentials
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      
+      - name: Set cache ID
+        run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
+      
+      - uses: actions/cache@v4
+        with:
+          key: mkdocs-material-${{ env.cache_id }}
+          path: ~/.cache
+          restore-keys: |
+            mkdocs-material-
+      
+      - name: Install MkDocs Material
+        run: pip install --group docs
+      
+      - name: Deploy to GitHub Pages
+        run: mkdocs gh-deploy --force
