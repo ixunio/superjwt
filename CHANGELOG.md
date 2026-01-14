@@ -5,11 +5,13 @@
 ### New (✨)
 
 *Misc*
+
 - Comprehensive and versioned documentation hosted on GitHub Pages with automated CI ([#84])
 
 ### Changes (♻️)
 
 *JWT & Validation*
+
 - **(breaking)** :boom: Stricter default behavior: use `JWTClaims` as default claims validation when decoding (and when encoding claims data is a raw dict) ([#83])
 - `AlgorithmMismatchError` is now also raised during encoding when `'alg'` is valid but not matching the JWS instance (even when headers validation is disabled) ([#82])
 - Trim exceptions message from uncontrolled string size ([#80])
@@ -19,6 +21,7 @@
 ### New (✨)
 
 *Algorithm*
+
 - Asymmetric JWS signature algorithms support ([#68]) ([#69]) ([#71])
     - RSA PKCS1 v1.5 (`RS256`, `RS384`, `RS512`)
     - RSA PSS (`PS256`, `PS384`, `PS512`)
@@ -27,6 +30,7 @@
 - Pick algorithm from `Alg` str Enum ([#57])
 
 *Key*
+
 - Key generation ([#72])
 - Asymmetric keys support ([#67]) ([#70])
     - RSA key pair 
@@ -34,6 +38,7 @@
     - OKP (Octet Key Pair) for EdDSA
 
 *JWT & Validation*
+
 - Validation can be configured via `ValidationConfig` and supports internal params (leeway, now,allow_future_iat) ([#62]) ([#75])
 - Time integrity validation update ([#55])
     - add leeway support for `'iat'`, `'exp'`, and `'nbf'` comparison against *now*
@@ -44,12 +49,14 @@
 - Time spoofing for validation and testing purposes ([#51])
 
 *Misc*
+
 - CI: run tests with and without `cryptography` installed
 - CI: documentation deployment
 
 ### Changes (♻️)
 
 *JWT & Validation*
+
 - `.with_issued_at()` and `.with_expiration()` now preserve time delta with `'iat'` ([#49])
 
 ## v0.4.1 (2026-01-03)
@@ -57,6 +64,7 @@
 ### Fixes (🐛)
 
 *JWT & Validation*
+
 - `'exp'` and `'nbf'` incorrect validation when `'iat'` was present ([#47])
 
 ## v0.4.0 (2026-01-02)
@@ -64,6 +72,7 @@
 ### New (✨)
 
 *JWT & Validation*
+
 - `JWTClaims` now raises `TokenNotYetValidError` if `'nbf'` > `'iat'` (or present time) ([#41])
 - `JWT` can receive a `max_token_bytes` parameter to control the allowed max token size ([#40])
 - `Validation` flag can be passed to choose between two modes: ([#39])
@@ -73,12 +82,14 @@
 ### Changes (♻️)
 
 *JWT & Validation*
+
 - **(breaking)** :boom: Refactoring of public and private interfaces ([#39])
     - module-level `encode()`, `decode()` and `inspect()` are now thread safe and written as   functions instead of a local stateful `JWT` instance
     - `token` param in `decode()` is renamed `compact`
     - `JWT` methods now always return a `JWSToken`
 
 *Misc*
+
 - **(breaking)** :boom: Refactoring of exception handling ([#40])
     - base exception is now `SuperJWTError`
     - improved exceptions hierarchy
@@ -88,6 +99,7 @@
 ### New (✨)
 
 *JWT & Validation*
+
 - Validate claims or headers with custom pydantic models for `decode()` ([#34])
 - New exception `AlgorithmMismatchError` is raised during decoding when `'alg'` is valid but not declared as processable by the JWS instance ([#31])
 - Expired token now raises `TokenExpiredError` upon claims validation ([#24])
@@ -95,6 +107,7 @@
 ### Changes (♻️)
 
 *JWT & Validation*
+
 - **(breaking)** :boom: Refactoring of claims and headers validation ([#34])
     - `encode()` new validation default behavior:
         - when `claims` is passed as a pydantic instance, validate against it automatically
@@ -114,17 +127,20 @@
 ### Changes (♻️)
 
 *JWT & Validation*
+
 - State, data integrity and consistency of JWT and JWS instances improved ([#15])
 - b64=false in header will raise an `InvalidHeaderError` as this is not a supported feature ([#13])
 - **(breaking)** :boom: `SecondDatetime` renamed to `JWTDatetime` ([#6])
 - Better tests for datetime claims
 
 *Misc*
+
 - Add compatibility for python 3.10 & 3.11, was working only for python 3.12-3.14 previously
 
 ### Fixes (🐛)
 
 *JWT & Validation*
+
 - `inspect()` now works with detached payload
 - `HeadersValidationError` exception no longer throws `IndexError` ([#14])
 - Validation for custom datetime claims is now working properly ([#7])
@@ -134,14 +150,17 @@
 ### New (✨)
 
 *Algorithm*
+
 - HMAC with SHA256/384/512 signature
 
 *JWT & Validation*
+
 - JWT/JWS encode + decode + inspect features
 - Automatic claims validation with Pydantic
 - Custom claims definition with Pydantic
 
 *Misc*
+
 - CI (tests, linter, release)
 
 
