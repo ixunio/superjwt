@@ -2,9 +2,10 @@
   font-size: 1.38rem;
 }
 
-/* .md-nav__list {
-  font-size: 0.5rem;
-} */
+:root  > * {
+  --md-primary-fg-color: #193862;
+  --md-accent-fg-color: #2c76aa;
+}
 
 .md-ellipsis {
   margin-bottom: 0.08rem;
