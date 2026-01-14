@@ -60,6 +60,7 @@ dev = [
 docs = [
     "mkdocs-material",
     "mkdocs-mermaid2-plugin",
+    "mike",
 ]
 lint = [
     "ruff",
