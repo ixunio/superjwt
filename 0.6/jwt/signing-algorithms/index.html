@@ -1,0 +1,1918 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://ixunio.github.io/superjwt/0.6/jwt/signing-algorithms/">
+      
+      
+        <link rel="prev" href="../content/">
+      
+      
+        <link rel="next" href="../../integrations/fastapi/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/logo-icon-superjwt.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Signing Algorithms - SuperJWT</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CConsolas:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Consolas"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#signing-algorithms" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="SuperJWT" class="md-header__button md-logo" aria-label="SuperJWT" data-md-component="logo">
+      
+  <img src="../../assets/logo-icon-superjwt.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SuperJWT
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Signing Algorithms
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ixunio/superjwt" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ixunio/superjwt
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../.." class="md-tabs__link">
+          
+  
+  
+  Get Started
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/fastapi/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../development/changelog/" class="md-tabs__link">
+          
+  
+  
+  Dev & Changelog
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="SuperJWT" class="md-nav__button md-logo" aria-label="SuperJWT" data-md-component="logo">
+      
+  <img src="../../assets/logo-icon-superjwt.png" alt="logo">
+
+    </a>
+    SuperJWT
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ixunio/superjwt" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ixunio/superjwt
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_1" id="__nav_1_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🙋 Documentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🙋 Documentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Welcome
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../algorithms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Algorithms & Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1_2" id="__nav_1_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🔏 What is JWT?
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🔏 What is JWT?
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../basics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Basics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../content/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JWT Content
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signing Algorithms
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Signing Algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#symmetric-algorithms-hmac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symmetric Algorithms (HMAC)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Symmetric Algorithms (HMAC)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pros-cons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pros &amp; Cons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#asymmetric-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asymmetric Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Asymmetric Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-rsa-rivestshamiradleman" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. RSA (Rivest–Shamir–Adleman)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-ecdsa-elliptic-curve-digital-signature-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. ECDSA (Elliptic Curve Digital Signature Algorithm)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-eddsa-edwards-curve-digital-signature-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. EdDSA (Edwards-curve Digital Signature Algorithm)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rsa-vs-ecdsa-vs-eddsa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RSA vs ECDSA vs EdDSA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pros-cons-asymmetric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pros &amp; Cons (Asymmetric)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-best-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is best, and why?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#qualitative-benchmark-rules-of-thumb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qualitative benchmark (rules of thumb)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Qualitative benchmark (rules of thumb)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#picking-an-algorithm-by-scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Picking an algorithm by scenario
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/fastapi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastAPI Basic Example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/flask/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flask Basic Example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/oauth2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OAuth2.0 Basic Example
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev & Changelog
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dev & Changelog
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    📝 Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🔢 About Versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#symmetric-algorithms-hmac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symmetric Algorithms (HMAC)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Symmetric Algorithms (HMAC)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pros-cons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pros &amp; Cons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#asymmetric-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asymmetric Algorithms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Asymmetric Algorithms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-rsa-rivestshamiradleman" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. RSA (Rivest–Shamir–Adleman)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-ecdsa-elliptic-curve-digital-signature-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. ECDSA (Elliptic Curve Digital Signature Algorithm)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-eddsa-edwards-curve-digital-signature-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. EdDSA (Edwards-curve Digital Signature Algorithm)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rsa-vs-ecdsa-vs-eddsa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RSA vs ECDSA vs EdDSA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pros-cons-asymmetric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pros &amp; Cons (Asymmetric)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-best-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is best, and why?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#qualitative-benchmark-rules-of-thumb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Qualitative benchmark (rules of thumb)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Qualitative benchmark (rules of thumb)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#picking-an-algorithm-by-scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Picking an algorithm by scenario
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security Best Practices
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="signing-algorithms">Signing Algorithms<a class="headerlink" href="#signing-algorithms" title="Permanent link">&para;</a></h1>
+<p>The security of a JWT depends heavily on the signing algorithm used. The <code>alg</code> header parameter specifies which algorithm was used to sign the token.</p>
+<p>There are two main categories of signing algorithms: <strong>Symmetric</strong> (HMAC) and <strong>Asymmetric</strong> (RSA, ECDSA, Ed25519/Ed448).</p>
+<div class="admonition tip">
+<p class="admonition-title">Quick recommendations</p>
+<ul>
+<li>Single service / monolith: start with <code>HS256</code> using a strong random secret.</li>
+<li>Multiple independent verifiers (microservices, third parties): prefer <code>Ed25519</code> (or <code>Ed448</code>) when available; otherwise <code>ES256</code>; otherwise <code>RS256</code>.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">SuperJWT dependency note</p>
+<p>Asymmetric algorithms require the optional <code>cryptography</code> dependency.</p>
+</div>
+<p>See also: <a href="../content/">JWT Content</a> for how <code>alg</code>, <code>kid</code>, and related headers fit into the token.</p>
+<hr />
+<h2 id="symmetric-algorithms-hmac">Symmetric Algorithms (HMAC)<a class="headerlink" href="#symmetric-algorithms-hmac" title="Permanent link">&para;</a></h2>
+<p><strong>HMAC (Hash-based Message Authentication Code)</strong> algorithms use a <strong>single shared secret key</strong> for both signing and verification.</p>
+<ul>
+<li><strong>Signing</strong>: The issuer signs the token using the secret key.</li>
+<li><strong>Verification</strong>: The receiver verifies the token using the <strong>same</strong> secret key.</li>
+</ul>
+<h3 id="common-algorithms">Common Algorithms<a class="headerlink" href="#common-algorithms" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Description</th>
+<th>Key Type</th>
+<th>Security Level</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HS256</strong></td>
+<td>HMAC using SHA-256</td>
+<td>Octet Sequence (Shared Secret)</td>
+<td>Good (Standard)</td>
+</tr>
+<tr>
+<td><strong>HS384</strong></td>
+<td>HMAC using SHA-384</td>
+<td>Octet Sequence (Shared Secret)</td>
+<td>Better</td>
+</tr>
+<tr>
+<td><strong>HS512</strong></td>
+<td>HMAC using SHA-512</td>
+<td>Octet Sequence (Shared Secret)</td>
+<td>Best</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pros-cons">Pros &amp; Cons<a class="headerlink" href="#pros-cons" title="Permanent link">&para;</a></h3>
+<p><strong>✅ Pros:</strong></p>
+<ul>
+<li>Faster computation (signing and verifying are very fast)</li>
+<li>Smaller token size (signature is shorter)</li>
+<li>Simple to implement</li>
+</ul>
+<p><strong>❌ Cons:</strong></p>
+<ul>
+<li><strong>Key Distribution</strong>: The secret key must be shared with every service that needs to verify the token. If one service is compromised, the key is compromised for everyone.</li>
+<li><strong>No Non-repudiation</strong>: Since multiple parties have the key, you can't prove <em>who</em> created the token (any party with the key could have created it).</li>
+</ul>
+<h3 id="when-to-use">When to use<a class="headerlink" href="#when-to-use" title="Permanent link">&para;</a></h3>
+<p>Use HMAC when the token issuer and verifier are the same application, or when you have a trusted internal network where sharing the secret key is safe.</p>
+<div class="admonition warning">
+<p class="admonition-title">Shared secret blast radius</p>
+<p>With HMAC, every verifier must know the same secret. If any verifier is compromised, an attacker can <strong>forge</strong> tokens.</p>
+</div>
+<hr />
+<h2 id="asymmetric-algorithms">Asymmetric Algorithms<a class="headerlink" href="#asymmetric-algorithms" title="Permanent link">&para;</a></h2>
+<p>Asymmetric algorithms use a <strong>key pair</strong>: a <strong>Private Key</strong> for signing and a <strong>Public Key</strong> for verification.</p>
+<ul>
+<li><strong>Signing</strong>: The issuer signs the token using the <strong>Private Key</strong> (kept secret).</li>
+<li><strong>Verification</strong>: The receiver verifies the token using the <strong>Public Key</strong> (can be shared openly).</li>
+</ul>
+<h3 id="1-rsa-rivestshamiradleman">1. RSA (Rivest–Shamir–Adleman)<a class="headerlink" href="#1-rsa-rivestshamiradleman" title="Permanent link">&para;</a></h3>
+<p>RSA is the most widely used asymmetric algorithm.</p>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Description</th>
+<th>Key Type</th>
+<th>Security Level</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>RS256</strong></td>
+<td>RSASSA-PKCS1-v1_5 using SHA-256</td>
+<td>RSA Key Pair</td>
+<td>Good (Standard)</td>
+</tr>
+<tr>
+<td><strong>RS384</strong></td>
+<td>RSASSA-PKCS1-v1_5 using SHA-384</td>
+<td>RSA Key Pair</td>
+<td>Better</td>
+</tr>
+<tr>
+<td><strong>RS512</strong></td>
+<td>RSASSA-PKCS1-v1_5 using SHA-512</td>
+<td>RSA Key Pair</td>
+<td>Best</td>
+</tr>
+<tr>
+<td><strong>PS256</strong></td>
+<td>RSASSA-PSS using SHA-256</td>
+<td>RSA Key Pair</td>
+<td>Stronger than RS256</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">RSA choice</p>
+<p>Prefer RSA-PSS (<code>PS256</code>) over PKCS#1 v1.5 (<code>RS256</code>) when your ecosystem supports it.</p>
+</div>
+<h3 id="2-ecdsa-elliptic-curve-digital-signature-algorithm">2. ECDSA (Elliptic Curve Digital Signature Algorithm)<a class="headerlink" href="#2-ecdsa-elliptic-curve-digital-signature-algorithm" title="Permanent link">&para;</a></h3>
+<p>ECDSA offers the same security level as RSA but with <strong>much smaller key sizes</strong>, resulting in faster computations and smaller signatures.</p>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Description</th>
+<th>Key Type</th>
+<th>Curve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ES256</strong></td>
+<td>ECDSA using P-256 and SHA-256</td>
+<td>EC Key Pair</td>
+<td>P-256</td>
+</tr>
+<tr>
+<td><strong>ES256K</strong></td>
+<td>ECDSA using secp256k1 and SHA-256</td>
+<td>EC Key Pair</td>
+<td>secp256k1</td>
+</tr>
+<tr>
+<td><strong>ES384</strong></td>
+<td>ECDSA using P-384 and SHA-384</td>
+<td>EC Key Pair</td>
+<td>P-384</td>
+</tr>
+<tr>
+<td><strong>ES512</strong></td>
+<td>ECDSA using P-521 and SHA-512</td>
+<td>EC Key Pair</td>
+<td>P-521</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-eddsa-edwards-curve-digital-signature-algorithm">3. EdDSA (Edwards-curve Digital Signature Algorithm)<a class="headerlink" href="#3-eddsa-edwards-curve-digital-signature-algorithm" title="Permanent link">&para;</a></h3>
+<p>EdDSA is a modern, high-performance signature scheme. In JOSE/JWT, you typically select a specific curve with <code>alg = Ed25519</code> or <code>alg = Ed448</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Algorithm</th>
+<th>Description</th>
+<th>Key Type</th>
+<th>Curve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ed25519</strong></td>
+<td>EdDSA using Ed25519 curve</td>
+<td>OKP (Octet Key Pair)</td>
+<td>Ed25519</td>
+</tr>
+<tr>
+<td><strong>Ed448</strong></td>
+<td>EdDSA using Ed448 curve</td>
+<td>OKP (Octet Key Pair)</td>
+<td>Ed448</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rsa-vs-ecdsa-vs-eddsa">RSA vs ECDSA vs EdDSA<a class="headerlink" href="#rsa-vs-ecdsa-vs-eddsa" title="Permanent link">&para;</a></h3>
+<p><strong>RSA (<code>RS256</code>/<code>PS256</code>)</strong></p>
+<ul>
+<li>✅ Very widely supported; often the safest choice for interoperability.</li>
+<li>✅ Verification is commonly fast (useful because tokens are usually verified far more often than they’re signed).</li>
+<li>❌ Signatures are large compared to ECDSA/EdDSA.</li>
+<li>❌ Prefer <code>PS256</code> over <code>RS256</code> for new systems when possible; PSS is generally considered more robust and easier to implement correctly.</li>
+</ul>
+<p><strong>ECDSA (<code>ES256</code>/<code>ES384</code>/<code>ES512</code>)</strong></p>
+<ul>
+<li>✅ Smaller keys and signatures than RSA for comparable security.</li>
+<li>✅ Often faster at signing than RSA.</li>
+<li>❌ Requires high-quality per-signature randomness (a nonce). Bugs or nonce reuse can leak the private key.</li>
+<li>❌ Verification speed is not necessarily better than RSA, so verify-heavy workloads may not benefit.</li>
+</ul>
+<p><strong>EdDSA (<code>Ed25519</code>/<code>Ed448</code>)</strong> 👍👍👍</p>
+<ul>
+<li>✅ Deterministic signatures (avoids the ECDSA nonce-generation footgun).</li>
+<li>✅ Fast signing and verification with compact signatures.</li>
+<li>❌ Support can be uneven in older JWT libraries and SaaS identity products (though it keeps improving).</li>
+</ul>
+<p>Reference: https://www.scottbrady.io/jose/jwts-which-signing-algorithm-should-i-use</p>
+<h3 id="pros-cons-asymmetric">Pros &amp; Cons (Asymmetric)<a class="headerlink" href="#pros-cons-asymmetric" title="Permanent link">&para;</a></h3>
+<p><strong>✅ Pros:</strong></p>
+<ul>
+<li><strong>Secure Key Distribution</strong>: The private key never leaves the issuer. Verifiers only need the public key.</li>
+<li><strong>Non-repudiation</strong>: Only the holder of the private key could have signed the token.</li>
+<li><strong>Scalability</strong>: Perfect for microservices or third-party clients where you don't want to share secrets.</li>
+</ul>
+<p><strong>❌ Cons:</strong></p>
+<ul>
+<li>Slower computation than HMAC (especially RSA).</li>
+<li>Larger token size (signatures are longer).</li>
+<li>More complex key management (key rotation, JWKS endpoints).</li>
+</ul>
+<h3 id="when-to-use_1">When to use<a class="headerlink" href="#when-to-use_1" title="Permanent link">&para;</a></h3>
+<p>Use Asymmetric algorithms when:</p>
+<ul>
+<li>You have multiple services verifying tokens (microservices).</li>
+<li>You are issuing tokens to third-party clients (OAuth2/OIDC).</li>
+<li>You cannot trust the verifier with a secret key.</li>
+</ul>
+<hr />
+<h2 id="what-is-best-and-why">What is best, and why?<a class="headerlink" href="#what-is-best-and-why" title="Permanent link">&para;</a></h2>
+<p>There is no single best algorithm for every deployment, but these are strong defaults:</p>
+<ul>
+<li><strong>Best default asymmetric</strong>: <code>Ed25519</code> - fast, compact signatures, strong modern design.</li>
+<li><strong>Best asymmetric for broad enterprise interoperability</strong>: <code>RS256</code> (or <code>PS256</code> if supported) - widely supported, but larger and slower.</li>
+<li><strong>Best symmetric</strong>: <code>HS256</code> - simplest and fastest, but only appropriate when sharing a secret across verifiers is acceptable.</li>
+</ul>
+<p>Your best choice depends on:</p>
+<ul>
+<li><strong>Who verifies</strong> (one service vs many services).</li>
+<li><strong>Interoperability constraints</strong> (legacy clients, language runtimes).</li>
+<li><strong>Performance and token size</strong> requirements.</li>
+</ul>
+<hr />
+<h2 id="qualitative-benchmark-rules-of-thumb">Qualitative benchmark (rules of thumb)<a class="headerlink" href="#qualitative-benchmark-rules-of-thumb" title="Permanent link">&para;</a></h2>
+<p>Real performance depends on hardware and crypto backends, but this table captures typical trade-offs.</p>
+<table>
+<thead>
+<tr>
+<th>Algorithm family</th>
+<th>Sign speed</th>
+<th>Verify speed</th>
+<th>Signature size</th>
+<th>Interop</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HMAC (<code>HS256/384/512</code>)</td>
+<td>Fastest</td>
+<td>Fastest</td>
+<td>Small</td>
+<td>Excellent</td>
+</tr>
+<tr>
+<td>EdDSA (<code>Ed25519</code>/<code>Ed448</code>)</td>
+<td>Fast</td>
+<td>Fast</td>
+<td>Small</td>
+<td>Good (improving)</td>
+</tr>
+<tr>
+<td>ECDSA (<code>ES256/384/512</code>)</td>
+<td>Medium</td>
+<td>Medium</td>
+<td>Small</td>
+<td>Good</td>
+</tr>
+<tr>
+<td>RSA-PSS (<code>PS256/384/512</code>)</td>
+<td>Slow</td>
+<td>Medium</td>
+<td>Large</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>RSA v1.5 (<code>RS256/384/512</code>)</td>
+<td>Slow</td>
+<td>Medium</td>
+<td>Large</td>
+<td>Excellent</td>
+</tr>
+</tbody>
+</table>
+<h3 id="picking-an-algorithm-by-scenario">Picking an algorithm by scenario<a class="headerlink" href="#picking-an-algorithm-by-scenario" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Single API + single verifier</strong>: <code>HS256</code></li>
+<li><strong>Microservices (many verifiers)</strong>: <code>Ed25519</code> (or <code>ES256</code>)</li>
+<li><strong>OAuth2/OIDC-style ecosystems / maximum compatibility</strong>: <code>RS256</code> (or <code>PS256</code>)</li>
+<li><strong>Constrained bandwidth (cookies, mobile)</strong>: prefer <code>HS256</code> or <code>Ed25519</code> over RSA</li>
+</ul>
+<hr />
+<h2 id="summary-comparison">Summary Comparison<a class="headerlink" href="#summary-comparison" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>HMAC (Symmetric)</th>
+<th>RSA/ECDSA/EdDSA (Asymmetric)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Keys</strong></td>
+<td>Single Shared Secret</td>
+<td>Private (Sign) + Public (Verify)</td>
+</tr>
+<tr>
+<td><strong>Speed</strong></td>
+<td>Very Fast</td>
+<td>Slower</td>
+</tr>
+<tr>
+<td><strong>Signature Size</strong></td>
+<td>Small</td>
+<td>Larger</td>
+</tr>
+<tr>
+<td><strong>Key Management</strong></td>
+<td>Simple (but risky distribution)</td>
+<td>Complex (but secure distribution)</td>
+</tr>
+<tr>
+<td><strong>Best For</strong></td>
+<td>Internal Monoliths, Trusted Services</td>
+<td>Microservices, Public APIs, OAuth2</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="security-best-practices">Security Best Practices<a class="headerlink" href="#security-best-practices" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Don't use <code>none</code></strong>: The <code>none</code> algorithm allows tokens without signatures. Always disable this in production (SuperJWT disables it by default).</li>
+<li>
+<p><strong>Use Strong Keys</strong>:</p>
+<ul>
+<li>HMAC: Minimum 256-bit random key (32 bytes).</li>
+<li>RSA: Minimum 2048-bit key length.</li>
+</ul>
+</li>
+<li>
+<p><strong>Protect Private Keys</strong>: Never share or commit private keys. Use environment variables or secret managers (Vault, AWS Secrets Manager, ...etc).</p>
+</li>
+<li><strong>Rotate Keys</strong>: Regularly rotate keys to minimize impact if a key is compromised. Use <code>kid</code> (Key ID) in the header to manage rotation.</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Rotation and <code>kid</code></p>
+<p>If you rotate signing keys, publish (or distribute) the current set of verification keys and use <code>kid</code> to let verifiers select the correct key.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.expand", "search.highlight", "search.suggest", "content.code.annotate", "content.code.copy", "content.code.fold", "content.tooltips"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
