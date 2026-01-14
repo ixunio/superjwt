@@ -544,15 +544,7 @@ class ECKey(AsymmetricKey["ec.EllipticCurvePrivateKey", "ec.EllipticCurvePublicK
 
     def check_key_security(
         self, key: ec.EllipticCurvePrivateKey | ec.EllipticCurvePublicKey
-    ) -> None:
-        curve_name = key.curve.name
-        if curve_name in ("secp192r1", "secp224r1"):
-            warnings.warn(
-                f"EC curve {curve_name} has weak security. "
-                "Consider using P-256, P-384, or P-521 curves",
-                KeyLengthSecurityWarning,
-                stacklevel=5,
-            )
+    ) -> None: ...
 
     def public_keys_match(
         self, key1: ec.EllipticCurvePublicKey, key2: ec.EllipticCurvePublicKey
@@ -619,9 +611,7 @@ class OKPKey(
         | ed448.Ed448PrivateKey
         | ed25519.Ed25519PublicKey
         | ed448.Ed448PublicKey,
-    ) -> None:
-        # OKP keys (Ed25519, Ed448) are considered secure by design
-        pass
+    ) -> None: ...
 
     def public_keys_match(
         self,

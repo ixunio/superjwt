@@ -710,22 +710,6 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         with pytest.raises(InvalidKeyError, match=r"Key must be an EC public key"):
             ECKey.import_key(public_key=rsa_public_key_pem)
 
-    def test_ec_key_small_curve_warning_private(self, ec_p192_weak_key):
-        """Test that small EC curve private key triggers security warning."""
-        with pytest.warns(
-            KeyLengthSecurityWarning,
-            match=r"EC curve.*has weak security",
-        ):
-            ECKey.import_key(ec_p192_weak_key["private_pem"])
-
-    def test_ec_key_small_curve_warning_public(self, ec_p224_weak_key):
-        """Test that small EC curve public key triggers security warning."""
-        with pytest.warns(
-            KeyLengthSecurityWarning,
-            match=r"EC curve.*has weak security",
-        ):
-            ECKey.import_key(public_key=ec_p224_weak_key["public_pem"])
-
     def test_ec_key_empty_public_key_raises_error(self):
         """Test that empty public_key parameter raises ValueError."""
         with pytest.raises(ValueError, match="Public key must not be empty"):

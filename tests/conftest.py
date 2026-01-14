@@ -160,7 +160,7 @@ requires_cryptography = pytest.mark.skipif(
 if CRYPTOGRAPHY_AVAILABLE:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import ec, rsa
+    from cryptography.hazmat.primitives.asymmetric import rsa
 
 
 class KeyPair(BaseModel):
@@ -317,32 +317,3 @@ def rsa_1024_weak_key():
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
     return {"private_pem": private_pem, "public_pem": public_pem}
-
-
-@pytest.fixture(scope="session")
-def ec_p192_weak_key():
-    """Generate weak EC P-192 key pair once per session for warning tests."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
-
-    private_key = ec.generate_private_key(ec.SECP192R1(), default_backend())
-    private_pem = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-    return {"private_pem": private_pem}
-
-
-@pytest.fixture(scope="session")
-def ec_p224_weak_key():
-    """Generate weak EC P-224 key pair once per session for warning tests."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
-
-    private_key = ec.generate_private_key(ec.SECP224R1(), default_backend())
-    public_pem = private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    return {"public_pem": public_pem}
