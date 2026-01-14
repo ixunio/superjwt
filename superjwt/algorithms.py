@@ -44,6 +44,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 KeyType = TypeVar("KeyType", bound=Key)
+AsymmetricKeyType = TypeVar("AsymmetricKeyType", RSAKey, ECKey, OKPKey)
 
 
 class BaseJWSAlgorithm(ABC, Generic[KeyType]):
@@ -53,6 +54,9 @@ class BaseJWSAlgorithm(ABC, Generic[KeyType]):
     requires_cryptography: ClassVar[bool] = True
 
     @abstractmethod
+    def generate_key(self, *args: Any, **kwargs: Any) -> KeyType: ...
+
+    @abstractmethod
     def check_key(self, key: KeyType) -> None: ...
 
     @abstractmethod
@@ -60,6 +64,28 @@ class BaseJWSAlgorithm(ABC, Generic[KeyType]):
 
     @abstractmethod
     def verify(self, data: bytes, signature: bytes, key: KeyType) -> bool: ...
+
+
+class NoneAlgorithm(BaseJWSAlgorithm[NoneKey]):
+    """No digital signature performed. Disabled by default for security reasons."""
+
+    name = "none"
+    description = "No signature"
+    key_type = NoneKey
+    requires_cryptography = False
+
+    def generate_key(self) -> NoneKey:
+        return self.key_type()
+
+    def check_key(self, key: NoneKey) -> None:
+        if not isinstance(key, NoneKey):
+            raise SuperJWTError("Key must be a NoneKey for 'none' algorithm")
+
+    def sign(self, _: bytes, __: NoneKey) -> bytes:
+        return b"no-signature"
+
+    def verify(self, _: bytes, __: bytes, ___: NoneKey) -> bool:
+        return True
 
 
 class HMACAlgorithm(BaseJWSAlgorithm[OctKey]):
@@ -99,7 +125,17 @@ class HMACAlgorithm(BaseJWSAlgorithm[OctKey]):
         return hmac.compare_digest(signature, self.sign(data, key))
 
 
-class RSAAlgorithm(BaseJWSAlgorithm[RSAKey]):
+class AsymmetricJWSAlgorithm(BaseJWSAlgorithm[AsymmetricKeyType], ABC):
+    """Base class for asymmetric JWS algorithms"""
+
+    def check_key(self, key: AsymmetricKeyType) -> None:
+        if not isinstance(key, self.key_type):
+            raise SuperJWTError(
+                f"Key must be a {self.key_type.__name__} for algorithm {self.name}"
+            )
+
+
+class RSAAlgorithm(AsymmetricJWSAlgorithm[RSAKey]):
     """Base class for RSA using SHA algorithms"""
 
     key_type = RSAKey
@@ -118,10 +154,6 @@ class RSAAlgorithm(BaseJWSAlgorithm[RSAKey]):
         """
 
         return self.key_type.generate(key_size)
-
-    def check_key(self, key: RSAKey) -> None:
-        if not isinstance(key, RSAKey):
-            raise SuperJWTError("Key must be an RSAKey for RSA algorithms")
 
     def sign(self, data: bytes, key: RSAKey) -> bytes:
         """Sign data using RSA private key."""
@@ -159,7 +191,7 @@ class RSAPSSAlgorithm(RSAAlgorithm):
         )
 
 
-class ECDSAAlgorithm(BaseJWSAlgorithm[ECKey]):
+class ECDSAAlgorithm(AsymmetricJWSAlgorithm[ECKey]):
     """Base class for ECDSA (Elliptic Curve Digital Signature Algorithm)"""
 
     key_type = ECKey
@@ -175,14 +207,22 @@ class ECDSAAlgorithm(BaseJWSAlgorithm[ECKey]):
         return self.key_type.generate(self.curve())
 
     def check_key(self, key: ECKey) -> None:
-        if not isinstance(key, ECKey):
-            raise SuperJWTError("Key must be an ECKey for ECDSA algorithms")
+        super().check_key(key)
 
         # Validate that the key's curve matches the algorithm's expected curve
-        if key.curve_name != self.curve_name:
-            raise SuperJWTError(
-                f"Key curve '{key.curve_name}' does not match algorithm's expected curve '{self.curve_name}'"
-            )
+        for key_obj, key_component in [
+            (key._private_key_obj, "private"),
+            (key._public_key_obj, "public"),
+        ]:
+            if key_obj is not None:
+                if not isinstance(key_obj.curve, self.curve):
+                    key_curve_name = key_obj.curve.name
+                    expected_curve_name = self.curve.name
+                    raise SuperJWTError(
+                        f"Curve {key_curve_name} in {key_component} key "
+                        f"does not match algorithm's expected curve "
+                        f"{expected_curve_name}"
+                    )
 
     def sign(self, data: bytes, key: ECKey) -> bytes:
         self.check_key(key)
@@ -219,7 +259,7 @@ class ECDSAAlgorithm(BaseJWSAlgorithm[ECKey]):
             return False
 
 
-class EdDSAAlgorithm(BaseJWSAlgorithm[OKPKey]):
+class EdDSAAlgorithm(AsymmetricJWSAlgorithm[OKPKey]):
     """Base class for EdDSA (Edwards-curve Digital Signature Algorithm)"""
 
     key_type = OKPKey
@@ -238,29 +278,22 @@ class EdDSAAlgorithm(BaseJWSAlgorithm[OKPKey]):
         return self.key_type.generate(cast("Literal['Ed25519', 'Ed448']", self.name))
 
     def check_key(self, key: OKPKey) -> None:
-        if not isinstance(key, OKPKey):
-            raise SuperJWTError("Key must be an OKPKey for EdDSA algorithms")
+        super().check_key(key)
 
         # Validate that the key's curve matches the algorithm's expected curve
-        private_key_obj = key._private_key_obj
-        public_key_obj = key._public_key_obj
-
-        # Check if either private or public key matches the expected curve
-        if private_key_obj is not None:
-            if not isinstance(private_key_obj, self.curve_type_private):
-                key_curve_name = type(private_key_obj).__name__
-                expected_curve_name = self.curve_type_private.__name__
-                raise SuperJWTError(
-                    f"Key curve {key_curve_name} does not match algorithm's expected curve {expected_curve_name}"
-                )
-
-        if public_key_obj is not None:
-            if not isinstance(public_key_obj, self.curve_type_public):
-                key_curve_name = type(public_key_obj).__name__
-                expected_curve_name = self.curve_type_public.__name__
-                raise SuperJWTError(
-                    f"Key curve {key_curve_name} does not match algorithm's expected curve {expected_curve_name}"
-                )
+        for key_obj, curve in [
+            (key._private_key_obj, self.curve_type_private),
+            (key._public_key_obj, self.curve_type_public),
+        ]:
+            if key_obj is not None:
+                if not isinstance(key_obj, curve):
+                    key_curve_name = type(key_obj).__name__
+                    expected_curve_name = curve.__name__
+                    raise SuperJWTError(
+                        f"Curve {key_curve_name} "
+                        f"does not match algorithm's expected curve "
+                        f"{expected_curve_name}"
+                    )
 
     def sign(self, data: bytes, key: OKPKey) -> bytes:
         self.check_key(key)
@@ -278,25 +311,6 @@ class EdDSAAlgorithm(BaseJWSAlgorithm[OKPKey]):
 
 
 ####################################################################
-
-
-class NoneAlgorithm(BaseJWSAlgorithm[NoneKey]):
-    """No digital signature performed. Disabled by default for security reasons."""
-
-    name = "none"
-    description = "No signature"
-    key_type = NoneKey
-    requires_cryptography = False
-
-    def check_key(self, key: NoneKey) -> None:
-        if not isinstance(key, NoneKey):
-            raise SuperJWTError("Key must be a NoneKey for 'none' algorithm")
-
-    def sign(self, _: bytes, __: NoneKey) -> bytes:
-        return b"no-signature"
-
-    def verify(self, _: bytes, __: bytes, ___: NoneKey) -> bool:
-        return True
 
 
 class HS256Algorithm(HMACAlgorithm):

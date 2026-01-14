@@ -178,6 +178,15 @@ class TestNoneAlgorithm:
         with pytest.raises(SuperJWTError, match="must be a NoneKey"):
             algorithm.check_key(oct_key)  # type: ignore
 
+    def test_none_algorithm_generate_key(self):
+        """Test that generate_key returns a NoneKey."""
+        algorithm = NoneAlgorithm()
+        key = algorithm.generate_key()
+
+        assert isinstance(key, NoneKey)
+        assert key.private_key == b""
+        assert key.public_key == b""
+
 
 class TestHMACAlgorithms:
     @pytest.fixture
@@ -383,7 +392,7 @@ class TestRSAAlgorithms:
 
         # Try with wrong key type
         oct_key = OctKey.import_key(b"test-secret")
-        with pytest.raises(SuperJWTError, match="must be an RSAKey"):
+        with pytest.raises(SuperJWTError, match="Key must be a RSAKey for algorithm"):
             algorithm.check_key(oct_key)  # type: ignore
 
     def test_rsa_algorithm_names(self):
@@ -624,11 +633,11 @@ class TestRSAPSSAlgorithms:
         algo = PS256Algorithm()
 
         none_key = NoneKey()
-        with pytest.raises(SuperJWTError, match="Key must be an RSAKey"):
+        with pytest.raises(SuperJWTError, match="Key must be a RSAKey for algorithm"):
             algo.check_key(none_key)  # type: ignore
 
         oct_key = OctKey.import_key(b"test-secret")
-        with pytest.raises(SuperJWTError, match="Key must be an RSAKey"):
+        with pytest.raises(SuperJWTError, match="Key must be a RSAKey for algorithm"):
             algo.check_key(oct_key)  # type: ignore
 
     def test_ps_algorithm_names(self):
@@ -799,7 +808,7 @@ class TestECDSAAlgorithms:
         algorithm.check_key(ec_key)
 
         # Should raise for wrong key type
-        with pytest.raises(SuperJWTError, match="Key must be an ECKey"):
+        with pytest.raises(SuperJWTError, match="Key must be a ECKey for algorithm"):
             algorithm.check_key(oct_key)  # type: ignore
 
     def test_ecdsa_algorithm_names(self):
@@ -849,7 +858,9 @@ class TestECDSAAlgorithms:
         es384 = ES384Algorithm()
 
         # Should raise error due to curve mismatch (P-256 key with ES384 which expects P-384)
-        with pytest.raises(SuperJWTError, match="curve"):
+        with pytest.raises(
+            SuperJWTError, match="does not match algorithm's expected curve"
+        ):
             es384.sign(test_data, ec_p256_key_pair.key_instance_from_private_pem)
 
     def test_ecdsa_curve_mismatch_p384_key_with_es256_algo(
@@ -859,7 +870,9 @@ class TestECDSAAlgorithms:
         es256 = ES256Algorithm()
 
         # Should raise error due to curve mismatch (P-384 key with ES256 which expects P-256)
-        with pytest.raises(SuperJWTError, match="curve"):
+        with pytest.raises(
+            SuperJWTError, match="does not match algorithm's expected curve"
+        ):
             es256.sign(test_data, ec_p384_key_pair.key_instance_from_private_pem)
 
 
@@ -958,7 +971,7 @@ class TestEdDSAAlgorithms:
         algorithm.check_key(okp_key)
 
         # Should raise for wrong key type
-        with pytest.raises(SuperJWTError, match="Key must be an OKPKey"):
+        with pytest.raises(SuperJWTError, match="Key must be a OKPKey for algorithm"):
             algorithm.check_key(oct_key)  # type: ignore
 
     def test_eddsa_algorithm_names(self):
@@ -1007,7 +1020,9 @@ class TestEdDSAAlgorithms:
         ed25519_key = ed25519_key_pair.key_instance_from_private_pem
 
         # Should raise error due to curve mismatch
-        with pytest.raises(SuperJWTError, match=r"Key curve .* does not match"):
+        with pytest.raises(
+            SuperJWTError, match="does not match algorithm's expected curve"
+        ):
             ed448_algo.sign(test_data, ed25519_key)
 
     def test_eddsa_curve_mismatch_ed448_key_with_ed25519_algo(
@@ -1018,7 +1033,9 @@ class TestEdDSAAlgorithms:
         ed448_key = ed448_key_pair.key_instance_from_private_pem
 
         # Should raise error due to curve mismatch
-        with pytest.raises(SuperJWTError, match=r"Key curve .* does not match"):
+        with pytest.raises(
+            SuperJWTError, match="does not match algorithm's expected curve"
+        ):
             ed25519_algo.sign(test_data, ed448_key)
 
     def test_eddsa_curve_mismatch_public_key_ed25519_with_ed448_algo(
@@ -1037,7 +1054,9 @@ class TestEdDSAAlgorithms:
         )
 
         # Should raise error when trying to verify with Ed448 algorithm (wrong curve)
-        with pytest.raises(SuperJWTError, match=r"Key curve .* does not match"):
+        with pytest.raises(
+            SuperJWTError, match="does not match algorithm's expected curve"
+        ):
             ed448_algo.verify(test_data, signature, ed25519_public_only)
 
     def test_eddsa_curve_mismatch_public_key_ed448_with_ed25519_algo(
@@ -1056,7 +1075,9 @@ class TestEdDSAAlgorithms:
         )
 
         # Should raise error when trying to verify with Ed25519 algorithm (wrong curve)
-        with pytest.raises(SuperJWTError, match=r"Key curve .* does not match"):
+        with pytest.raises(
+            SuperJWTError, match="does not match algorithm's expected curve"
+        ):
             ed25519_algo.verify(test_data, signature, ed448_public_only)
 
 
