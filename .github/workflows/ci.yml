@@ -74,12 +74,14 @@ jobs:
   validate-release:
     name: Validate Release
     runs-on: ubuntu-latest
+    needs: [code-quality, test]
+    if: github.event_name == 'push'
     outputs:
       version: ${{ steps.current_version.outputs.version }}
       release_date: ${{ steps.changelog.outputs.release_date }}
       changelog_content: ${{ steps.changelog.outputs.content }}
       tag_exists: ${{ steps.check_tag.outputs.exists }}
-      is_valid: ${{ steps.check_repo.outputs.is_valid }}
+      is_valid_release: ${{ steps.check_repo.outputs.is_valid_release }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -132,20 +134,20 @@ jobs:
           fi
       
       - name: Check repository
-        if: steps.check_tag.outputs.exists == 'false' && steps.check_branch.outputs.is_release_branch == 'true'
+        if: steps.check_branch.outputs.is_release_branch == 'true'
         id: check_repo
         run: |
           if [[ "${{ github.repository }}" == "ixunio/superjwt" ]]; then
-            echo "is_valid=true" >> $GITHUB_OUTPUT
+            echo "is_valid_release=true" >> $GITHUB_OUTPUT
             echo "✅ Running in main repository: ${{ github.repository }}"
           else
-            echo "is_valid=false" >> $GITHUB_OUTPUT
+            echo "is_valid_release=false" >> $GITHUB_OUTPUT
             echo "ℹ️  Not main repository: ${{ github.repository }}"
             echo "ℹ️  Releases only from ixunio/superjwt"
           fi
       
       - name: Validation summary
-        if: steps.check_tag.outputs.exists == 'false' && steps.check_repo.outputs.is_valid == 'true'
+        if: steps.check_repo.outputs.is_valid_release == 'true'
         run: |
           echo "✅ Version: ${{ steps.current_version.outputs.version }}"
           echo "✅ Changelog date: ${{ steps.changelog.outputs.release_date }}"
@@ -155,8 +157,8 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [code-quality, test, validate-release]
-    if: github.event_name == 'push' && needs.validate-release.outputs.tag_exists == 'false' && needs.validate-release.outputs.is_valid == 'true'
+    needs: [validate-release]
+    if: needs.validate-release.outputs.is_valid_release == 'true'
     permissions:
       contents: write
     steps:
@@ -182,14 +184,16 @@ jobs:
   deploy-docs:
     name: Deploy Documentation
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [code-quality, test]
+    needs: [validate-release]
+    if: github.ref == 'refs/heads/main' || needs.validate-release.outputs.is_valid_release == 'true'
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       
-      - name: Configure Git Credentials
+      - name: Configure git credentials
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
@@ -202,15 +206,30 @@ jobs:
       - name: Set cache ID
         run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
       
-      - uses: actions/cache@v4
+      - name: Cache documentation dependencies
+        uses: actions/cache@v4
         with:
           key: mkdocs-material-${{ env.cache_id }}
           path: ~/.cache
           restore-keys: |
             mkdocs-material-
       
-      - name: Install MkDocs Material
+      - name: Install documentation dependencies
         run: pip install --group docs
       
-      - name: Deploy to GitHub Pages
-        run: mkdocs gh-deploy --force
+      - name: Deploy 'dev' documentation
+        if: github.ref == 'refs/heads/main'
+        run: mike deploy --push --update-aliases dev
+      
+      - name: Extract major.minor version
+        if: needs.validate-release.outputs.is_valid_release == 'true'
+        id: version
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          MAJOR_MINOR=$(echo "$VERSION" | grep -oP '^\d+\.\d+')
+          echo "major_minor=$MAJOR_MINOR" >> $GITHUB_OUTPUT
+          echo "📦 Deploying docs for version: $MAJOR_MINOR"
+      
+      - name: Deploy 'X.Y' documentation
+        if: needs.validate-release.outputs.is_valid_release == 'true'
+        run: mike deploy ${{ steps.version.outputs.major_minor }} latest --push --update-aliases
