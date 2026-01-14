@@ -84,7 +84,7 @@ class JWT:
         claims_validation = self.get_claims_validation(claims, claims_validation)
 
         try:
-            claims_dict = claims_validation.run(claims)
+            claims_pydantic, claims_dict = claims_validation.run(claims)
         except ValidationError as e:
             raise ClaimsValidationError(validation_errors=e.errors()) from e
 
@@ -97,9 +97,7 @@ class JWT:
         )
 
         # set claims model data
-        self.jws.token.verified.model.claims = (
-            claims_validation.data_model.model_construct(**claims_dict)
-        )
+        self.jws.token.verified.model.claims = claims_pydantic
 
         return self.jws.token.verified
 
@@ -166,9 +164,11 @@ class JWT:
                 with_detached_payload, claims_validation
             )
 
-            # prepare detached claims data and perform validation
+            # prepare detached claims data and validate
             try:
-                claims_dict = claims_validation.run(with_detached_payload)
+                claims_pydantic, claims_dict = claims_validation.run(
+                    with_detached_payload
+                )
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
 
@@ -183,24 +183,18 @@ class JWT:
         # CASE 2: normal mode
         else:
             # JWS decode
-            self.jws.decode(
-                compact,
-                key,
-                headers_validation=headers_validation,
-            )
-            claims = self.jws.token.verified.payload
-            claims_validation = self.get_claims_validation(claims, claims_validation)
+            self.jws.decode(compact, key, headers_validation=headers_validation)
+            claims_dict = self.jws.token.verified.payload
+            claims_validation = self.get_claims_validation(claims_dict, claims_validation)
 
             # validate claims
             try:
-                claims_dict = claims_validation.run(claims)
+                claims_pydantic, _ = claims_validation.run(claims_dict)
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
 
         # set claims model data
-        self.jws.token.verified.model.claims = (
-            claims_validation.data_model.model_construct(**claims_dict)
-        )
+        self.jws.token.verified.model.claims = claims_pydantic
 
         return self.jws.token.verified
 
@@ -239,9 +233,4 @@ class JWT:
         data: JWTBaseModel | dict[str, Any],
         validation: type[JWTBaseModel] | ValidationConfig | Validation | None,
     ) -> ValidationConfig:
-        return get_validation_config(
-            data,
-            validation,
-            self.default_claims_validation,
-            fallback_data_model=JWTBaseModel,
-        )
+        return get_validation_config(data, validation, self.default_claims_validation)

@@ -9,7 +9,7 @@ from superjwt.jws import JWS
 from superjwt.jwt import JWT
 from superjwt.keys import AsymmetricKey, ECKey, OKPKey, RSAKey
 from superjwt.utils import CRYPTOGRAPHY_AVAILABLE
-from superjwt.validations import JWTClaims, JWTDatetime
+from superjwt.validations import JWTClaims, JWTDatetimeFloat, JWTDatetimeInt
 
 
 try:
@@ -34,46 +34,47 @@ class JWTCustomClaims(JWTClaims):
     # add new custom claims
     user_id: str
     optional_id: int | None = None
-    past_date: JWTDatetime | None = None
-    future_date: JWTDatetime | None = None
+    past_date: JWTDatetimeInt | None = None
+    future_date: JWTDatetimeFloat | None = None
 
 
 def check_claims_instance(
     claim_before: JWTCustomClaims,
     claim_after: JWTCustomClaims,
-    jwtdatetime_force_int: bool = True,
 ) -> None:
+    """Check that two JWTCustomClaims instances match."""
     assert claim_after.iss == claim_before.iss
     assert claim_after.sub == claim_before.sub
     assert claim_after.aud is None
 
-    # Compare timestamps based on serialization mode
-    if jwtdatetime_force_int is False:
-        # Float mode: microseconds must be preserved exactly
-        if claim_after.iat is not None and claim_before.iat is not None:
-            assert float(claim_after.iat.timestamp()) == float(
-                claim_before.iat.timestamp()
-            )
-        if claim_after.nbf is not None and claim_before.nbf is not None:
-            assert float(claim_after.nbf.timestamp()) == float(
-                claim_before.nbf.timestamp()
-            )
-        if claim_after.exp is not None and claim_before.exp is not None:
-            assert float(claim_after.exp.timestamp()) == float(
-                claim_before.exp.timestamp()
-            )
-    else:
-        # Int mode: compare at second-level precision (microseconds truncated)
-        if claim_after.iat is not None and claim_before.iat is not None:
-            assert int(claim_after.iat.timestamp()) == int(claim_before.iat.timestamp())
-        if claim_after.nbf is not None and claim_before.nbf is not None:
-            assert int(claim_after.nbf.timestamp()) == int(claim_before.nbf.timestamp())
-        if claim_after.exp is not None and claim_before.exp is not None:
-            assert int(claim_after.exp.timestamp()) == int(claim_before.exp.timestamp())
+    # Standard timestamp fields (JWTDatetimeInt by default in JWTClaims)
+    # Compare at second-level precision (microseconds truncated)
+    if claim_after.iat is not None and claim_before.iat is not None:
+        assert int(claim_after.iat.timestamp()) == int(claim_before.iat.timestamp())
+    if claim_after.nbf is not None and claim_before.nbf is not None:
+        assert int(claim_after.nbf.timestamp()) == int(claim_before.nbf.timestamp())
+    if claim_after.exp is not None and claim_before.exp is not None:
+        assert int(claim_after.exp.timestamp()) == int(claim_before.exp.timestamp())
 
+    # Custom fields
     assert claim_after.jti is None
     assert claim_after.user_id == claim_before.user_id
     assert claim_after.optional_id is None
+
+    # past_date is JWTDatetimeInt - compare at second precision
+    if claim_after.past_date is not None and claim_before.past_date is not None:
+        assert int(claim_after.past_date.timestamp()) == int(
+            claim_before.past_date.timestamp()
+        )
+
+    # future_date is JWTDatetimeFloat - compare with float precision
+    if claim_after.future_date is not None and claim_before.future_date is not None:
+        assert (
+            abs(
+                claim_after.future_date.timestamp() - claim_before.future_date.timestamp()
+            )
+            < 1e-6
+        )
 
 
 @pytest.fixture

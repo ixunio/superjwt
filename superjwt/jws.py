@@ -80,15 +80,12 @@ class JWS:
         headers_validation = self.get_headers_validation(headers, headers_validation)
 
         try:
-            headers_dict = headers_validation.run(headers)
+            headers_pydantic, headers_dict = headers_validation.run(headers)
         except ValidationError as e:
             raise HeadersValidationError(validation_errors=e.errors()) from e
 
         # set headers data
-        self.token.verified.model.headers = cast(
-            "JOSEHeader",
-            headers_validation.data_model.model_construct(**headers_dict),
-        )
+        self.token.verified.model.headers = cast("JOSEHeader", headers_pydantic)
         self.token.verified.headers = headers_dict
         self.token.verified.encoded_headers = urlsafe_b64encode(
             json.dumps(headers_dict, separators=(",", ":")).encode("utf-8")
@@ -160,7 +157,8 @@ class JWS:
     ) -> None:
         if len(compact) > self.max_token_bytes:
             raise SizeExceededError(
-                f"Token size ({len(compact)} bytes) exceeds maximum of {self.max_token_bytes} bytes"
+                f"Token size ({len(compact)} bytes) "
+                f"exceeds maximum of {self.max_token_bytes} bytes"
             )
 
         if compact is not None:
@@ -268,21 +266,22 @@ class JWS:
     ) -> None:
         # validate headers
         try:
-            headers_validation.run(self.token.unsafe.headers)
+            headers_pydantic, _ = headers_validation.run(
+                self.token.unsafe.headers, fallback_model=JOSEHeader
+            )
         except ValidationError as e:
             raise HeadersValidationError(validation_errors=e.errors()) from e
 
         # set headers model data
-        headers_dict = self.token.unsafe.headers
-        self.token.unsafe.model.headers = headers_validated = cast(
-            "JOSEHeader", headers_validation.data_model.model_construct(**headers_dict)
-        )
+        headers_pydantic = cast("JOSEHeader", headers_pydantic)
+        self.token.unsafe.model.headers = headers_pydantic
 
         # check algorithm match
         pass_through = self.algorithm.name == "none" and self._allow_none_algorithm
-        if not pass_through and headers_validated.alg != self.algorithm.name:
+        if not pass_through and headers_pydantic.alg != self.algorithm.name:
             raise AlgorithmMismatchError(
-                f"JWS algorithm '{trim_str(headers_validated.alg, 16)}' does not match expected '{self.algorithm.name}'"
+                f"JWS algorithm '{trim_str(headers_pydantic.alg, 16)}' "
+                f"does not match expected '{self.algorithm.name}'"
             )
 
     def verify_signature(self, key: Key) -> bool:
@@ -308,17 +307,12 @@ class JWS:
         data: JOSEHeader | dict[str, Any],
         validation: type[JOSEHeader] | ValidationConfig | Validation | None,
     ) -> ValidationConfig:
-        return get_validation_config(
-            data,
-            validation,
-            self.default_headers_validation,
-            fallback_data_model=JOSEHeader,
-        )
+        return get_validation_config(data, validation, self.default_headers_validation)
 
 
 class JWSTokenModel(BaseModel):
-    headers: JOSEHeader | None = None
-    claims: JWTBaseModel | None = None
+    headers: JOSEHeader = JOSEHeader.model_construct()
+    claims: JWTBaseModel = JWTBaseModel()
 
 
 class JWSToken(BaseModel):

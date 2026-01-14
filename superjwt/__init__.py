@@ -9,7 +9,6 @@ from superjwt.validations import (
     JOSEHeader,
     JWTBaseModel,
     JWTClaims,
-    JWTDatetime,
     JWTDatetimeFloat,
     JWTDatetimeInt,
     Validation,
@@ -25,7 +24,6 @@ __all__ = [
     "JWSToken",
     "JWTBaseModel",
     "JWTClaims",
-    "JWTDatetime",
     "JWTDatetimeFloat",
     "JWTDatetimeInt",
     "OKPKey",
@@ -99,7 +97,7 @@ def decode(
     key: Key | bytes | str,
     algorithm: Alg | str,
     *,
-    with_detached_payload: JWTClaims | dict[str, Any] | None = None,
+    with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
     claims_validation: type[JWTBaseModel]
     | ValidationConfig
     | Validation
@@ -108,14 +106,14 @@ def decode(
     | ValidationConfig
     | Validation
     | None = Validation.DEFAULT,
-) -> dict[str, Any]:
+) -> JWTBaseModel:
     """Decode the JWT token with signature verification.
 
     Args:
         token (bytes | str): The JWT compact token to decode.
         key (Key | bytes | str): The key instance to verify the JWT signature.
         algorithm (Algorithm): The algorithm to use for verifying the JWT.
-        with_detached_payload (JWTClaims | dict[str, Any] | None, opt.):
+        with_detached_payload (JWTBaseModel | dict[str, Any] | None, opt.):
             Detached payload to use for signature verification, if any.
         claims_validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
             Validation configuration for claims. Can be a pydantic model class, a ValidationConfig
@@ -140,7 +138,7 @@ def decode(
         headers_validation=headers_validation,
     )
 
-    return jws_token.payload
+    return jws_token.model.claims
 
 
 def inspect(

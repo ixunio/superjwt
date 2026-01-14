@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changes (♻️)
+
+*JWT & Validation*
+
+- **(breaking)** :boom: decode() now returns a Pydantic instance, matching the claims validation model (default `JWTClaims`)
+- **(breaking)** :boom:  `JWTDatetime` is removed, `'exp'`, `'nbf'`, `'iat'` are now typed as `JWTDatetimeInt` in `JWTClaims` model and still serialize as int.
+
 ## v0.6.0 (2026-01-14)
 
 ### New (✨)
@@ -20,7 +29,7 @@
 
 ### New (✨)
 
-*Algorithm*
+*Algorithm & Key*
 
 - Asymmetric JWS signature algorithms support ([#68]) ([#69]) ([#71])
     - RSA PKCS1 v1.5 (`RS256`, `RS384`, `RS512`)
@@ -28,14 +37,11 @@
     - ECDSA (`ES256`, `ES256K`, `ES384`, `ES512`)
     - EdDSA (`Ed25519`, `Ed448`)
 - Pick algorithm from `Alg` str Enum ([#57])
-
-*Key*
-
-- Key generation ([#72])
 - Asymmetric keys support ([#67]) ([#70])
     - RSA key pair 
     - EC (Elliptic Curve) key pair for ECDSA 
     - OKP (Octet Key Pair) for EdDSA
+- Key generation ([#72])
 
 *JWT & Validation*
 
@@ -149,7 +155,7 @@
 
 ### New (✨)
 
-*Algorithm*
+*Algorithm & Key*
 
 - HMAC with SHA256/384/512 signature
 

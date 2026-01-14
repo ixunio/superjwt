@@ -2,8 +2,8 @@ import json
 from datetime import datetime, timedelta
 from typing import Any
 
-import pydantic
 import pytest
+from pydantic import Field, ValidationError
 from superjwt import decode, encode, inspect
 from superjwt.algorithms import Alg
 from superjwt.exceptions import (
@@ -25,9 +25,7 @@ from superjwt.validations import (
     JOSEHeader,
     JWTBaseModel,
     JWTClaims,
-    JWTDatetime,
     JWTDatetimeFloat,
-    JWTDatetimeInt,
     Validation,
     ValidationConfig,
 )
@@ -47,13 +45,119 @@ except ImportError:
 def test_encode_decode_default_claims(secret_key):
     # Test with string for backward compatibility
     compact = encode(None, secret_key, "HS256")
-    decoded_claims = decode(compact, secret_key, "HS256")
-    assert decoded_claims == {}
+    decoded_claims_pydantic = decode(compact, secret_key, "HS256")
+
+    # Verify decode() returns a pydantic instance
+    assert isinstance(decoded_claims_pydantic, JWTBaseModel)
+    assert decoded_claims_pydantic.to_dict() == {}
+
+
+def test_decode_returns_pydantic_instance_consistent_with_payload(
+    jwt: JWT, claims_dict: dict[str, Any], secret_key: str
+):
+    """Verify that decode() returns pydantic instance and understand payload vs model relationship."""
+
+    # Test 1: Dict claims with default validation
+    compact = encode(claims_dict, secret_key, Alg.HS256)
+
+    # Module-level decode returns pydantic instance
+    decoded_pydantic = decode(compact, secret_key, Alg.HS256)
+    assert isinstance(decoded_pydantic, JWTBaseModel)
+
+    # JWT.decode returns JWSToken with the pydantic instance (model.claims) and payload
+    jws_token = jwt.decode(compact, secret_key, Alg.HS256)
+
+    # Verify module-level decode() returns an equivalent Pydantic instance
+    assert decoded_pydantic == jws_token.model.claims
+    assert decoded_pydantic.to_dict() == jws_token.model.claims.to_dict()
+
+    # The payload contains serialized data (dict input had floats, but JWTDatetimeInt serialized them to int)
+    assert isinstance(jws_token.payload["iat"], int)
+    assert isinstance(jws_token.payload["exp"], int)
+
+    # Model.claims has deserialized datetime objects
+    if isinstance(decoded_pydantic, JWTClaims):
+        assert isinstance(decoded_pydantic.iat, datetime)
+        assert isinstance(decoded_pydantic.exp, datetime)
+
+    # Verify the invariant: payload matches model.claims.to_dict()
+    assert jws_token.payload == jws_token.model.claims.to_dict()
+
+    # Test 2: Pydantic claims with custom model
+    claims_pydantic = JWTCustomClaims(**claims_dict)
+    compact2 = encode(
+        claims_pydantic, secret_key, Alg.HS256, claims_validation=JWTCustomClaims
+    )
+
+    decoded_pydantic2 = decode(
+        compact2, secret_key, Alg.HS256, claims_validation=JWTCustomClaims
+    )
+    assert isinstance(decoded_pydantic2, JWTCustomClaims)
+
+    jws_token2 = jwt.decode(
+        compact2, secret_key, Alg.HS256, claims_validation=JWTCustomClaims
+    )
+
+    # Module-level decode returns an equivalent model.claims instance
+    assert decoded_pydantic2 == jws_token2.model.claims
+    assert decoded_pydantic2.to_dict() == jws_token2.model.claims.to_dict()
+
+    # Test 3: With validation disabled
+    compact3 = encode(
+        claims_dict, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    )
+
+    decoded_pydantic3 = decode(
+        compact3, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    )
+    assert isinstance(decoded_pydantic3, JWTBaseModel)
+
+    jws_token3 = jwt.decode(
+        compact3, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    )
+
+    # Module-level decode returns an equivalent model.claims instance
+    assert decoded_pydantic3 == jws_token3.model.claims
+    assert decoded_pydantic3.to_dict() == jws_token3.model.claims.to_dict()
+
+
+def test_payload_vs_model_claims_relationship(jwt: JWT, secret_key: str):
+    """Document and test the relationship between payload dict and model.claims pydantic instance."""
+    now = datetime.now(UTC)
+
+    claims = JWTClaims(sub="user123", iat=now, exp=now + timedelta(hours=1), nbf=now)
+
+    compact = jwt.encode(claims, secret_key, Alg.HS256).compact
+    jws_token = jwt.decode(compact, secret_key, Alg.HS256)
+
+    # Standard claims (iat, exp, nbf) are stored as int timestamps
+    assert isinstance(jws_token.payload["iat"], int)
+    assert isinstance(jws_token.payload["exp"], int)
+    assert isinstance(jws_token.payload["nbf"], int)
+
+    # The model.claims is a validated Pydantic instance
+    assert isinstance(jws_token.model.claims, JWTClaims)
+    assert jws_token.model.claims.sub == "user123"
+    assert isinstance(jws_token.model.claims.iat, datetime)
+    assert isinstance(jws_token.model.claims.exp, datetime)
+    assert isinstance(jws_token.model.claims.nbf, datetime)
+
+    model_dict = jws_token.model.claims.to_dict()
+
+    assert model_dict["sub"] == jws_token.payload["sub"]
+    assert model_dict["iat"] == jws_token.payload["iat"]
+    assert model_dict["exp"] == jws_token.payload["exp"]
+    assert model_dict["nbf"] == jws_token.payload["nbf"]
+
+    decoded = decode(compact, secret_key, Alg.HS256)
+    assert decoded == jws_token.model.claims
+    assert decoded.to_dict() == jws_token.model.claims.to_dict()
+    assert decoded.to_dict() == model_dict
 
 
 def test_encode_decode_dict_claims(claims_dict, secret_key):
     compact = encode(claims_dict, secret_key, Alg.HS256)
-    decoded_claims_dict = decode(compact, secret_key, Alg.HS256)
+    decoded_claims_dict = decode(compact, secret_key, Alg.HS256).to_dict()
 
     # standard claims
     assert decoded_claims_dict["iss"] == claims_dict["iss"]
@@ -63,9 +167,9 @@ def test_encode_decode_dict_claims(claims_dict, secret_key):
 
     # standard claims (datetime data with various input types)
     # they will be serialized uniformly as int (timestamp) thanks to JWTClaims validation
-    assert decoded_claims_dict["iat"] == claims_dict["iat"]
-    assert decoded_claims_dict["nbf"] == claims_dict["nbf"]
-    assert decoded_claims_dict["exp"] == claims_dict["exp"]
+    assert decoded_claims_dict["iat"] == int(claims_dict["iat"])
+    assert decoded_claims_dict.get("nbf") is None
+    assert decoded_claims_dict["exp"] == int(claims_dict["exp"])
 
     # custom claims
     # won't be any type conversion here, nor validation
@@ -98,12 +202,12 @@ def test_encode_decode_dict_custom_datetime_claim(secret_key):
     # can encode serializable datetime string, this will not be serialized as a timestamp
     # unlike the standard datetime claims (iat, nbf, exp)
     compact = encode({"custom_date": custom_dt_serializable_str}, secret_key, Alg.HS256)
-    decoded = decode(compact, secret_key, Alg.HS256)
+    decoded = decode(compact, secret_key, Alg.HS256).to_dict()
     assert decoded["custom_date"] == custom_dt_serializable_str
 
     # can encode integer timestamp
     compact = encode({"custom_date": custom_dt_correct}, secret_key, Alg.HS256)
-    decoded = decode(compact, secret_key, Alg.HS256)
+    decoded = decode(compact, secret_key, Alg.HS256).to_dict()
     assert decoded["custom_date"] == custom_dt_correct
 
 
@@ -111,7 +215,7 @@ def test_add_iat_add_exp(secret_key):
     # custom datetime claim set to None should be handled correctly
     claims = JWTClaims().with_issued_at().with_expiration(minutes=30)
     compact = encode(claims, secret_key, Alg.HS256)
-    decoded = decode(compact, secret_key, Alg.HS256)
+    decoded = decode(compact, secret_key, Alg.HS256).to_dict()
     assert "iat" in decoded
     assert "exp" in decoded
 
@@ -125,7 +229,7 @@ def test_empty_iat_with_exp(secret_key):
         ),
     )
     compact = encode(claims, secret_key, Alg.HS256)
-    decoded = decode(compact, secret_key, Alg.HS256)
+    decoded = decode(compact, secret_key, Alg.HS256).to_dict()
     assert "iat" not in decoded
 
 
@@ -137,9 +241,9 @@ def test_with_expiration_negative():
 
 def test_rewrite_incorrect_exp_type():
     class JWTIncorrectExpClaim(JWTClaims):
-        exp: JWTDatetime  # type: ignore
+        exp: JWTDatetimeFloat = Field(default=...)
 
-    with pytest.raises(pydantic.ValidationError):
+    with pytest.raises(ValidationError):
         JWTIncorrectExpClaim(exp=True)  # type: ignore
 
 
@@ -313,7 +417,7 @@ def test_custom_claims_validation(jwt: JWT, claims: JWTCustomClaims, secret_key:
     decoded_claims = jwt.decode(
         compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
     ).payload
-    with pytest.raises(pydantic.ValidationError):
+    with pytest.raises(ValidationError):
         JWTCustomClaims(**decoded_claims)
 
     # test detached payload
@@ -478,6 +582,72 @@ def test_detached_payload(jwt: JWT, claims_fixed_dt, secret_key):
 def test_detached_payload_no_jws_instance(jwt: JWT):
     with pytest.raises(SuperJWTError):
         jwt.detach_payload()
+
+
+def test_payload_model_claims_consistency_detached(jwt: JWT, claims_fixed_dt, secret_key):
+    """Verify module-level decode() works correctly with detached payload."""
+    compact_detached = encode(claims_fixed_dt, secret_key, Alg.HS256, detach_payload=True)
+
+    jws_token = jwt.decode(
+        compact_detached, secret_key, Alg.HS256, with_detached_payload=claims_fixed_dt
+    )
+
+    decoded_pydantic = decode(
+        compact_detached, secret_key, Alg.HS256, with_detached_payload=claims_fixed_dt
+    )
+
+    # Verify module-level decode() returns an equivalent model.claims pydantic instance
+    assert isinstance(decoded_pydantic, JWTBaseModel)
+    assert decoded_pydantic == jws_token.model.claims
+    assert decoded_pydantic.to_dict() == jws_token.model.claims.to_dict()
+
+    assert jws_token.payload == claims_fixed_dt.to_dict()
+
+
+def test_payload_model_claims_consistency_with_timestamp_fields(jwt: JWT, secret_key):
+    """Verify timestamp serialization works correctly with JWTDatetimeInt vs JWTDatetimeFloat."""
+
+    now = datetime.now(UTC)
+    claims_int = JWTClaims(sub="user123", iat=now, exp=now + timedelta(hours=1))
+
+    compact = jwt.encode(claims_int, secret_key, Alg.HS256).compact
+    jws_token = jwt.decode(compact, secret_key, Alg.HS256)
+
+    # Payload contains int timestamps (JWTDatetimeInt)
+    assert isinstance(jws_token.payload["iat"], int)
+    assert isinstance(jws_token.payload["exp"], int)
+
+    # Module-level decode returns equivalent pydantic instance
+    decoded = decode(compact, secret_key, Alg.HS256)
+    assert decoded == jws_token.model.claims
+    assert decoded.to_dict() == jws_token.model.claims.to_dict()
+    assert isinstance(decoded, JWTClaims)
+    assert isinstance(decoded.iat, datetime)
+    assert isinstance(decoded.exp, datetime)
+
+    # Test with custom JWTDatetimeFloat field
+    class FloatClaims(JWTClaims):
+        exp: JWTDatetimeFloat = Field(default=...)  # type: ignore
+
+    claims_float = FloatClaims(sub="user456", iat=now, exp=now + timedelta(hours=2))
+
+    compact2 = jwt.encode(
+        claims_float, secret_key, Alg.HS256, claims_validation=FloatClaims
+    ).compact
+    jws_token2 = jwt.decode(
+        compact2, secret_key, Alg.HS256, claims_validation=FloatClaims
+    )
+
+    # Payload has mixed int/float timestamps
+    assert isinstance(jws_token2.payload["iat"], int)  # JWTDatetimeInt
+    assert isinstance(jws_token2.payload["exp"], float)  # JWTDatetimeFloat
+
+    # Module-level decode returns equivalent pydantic instance
+    decoded2 = decode(compact2, secret_key, Alg.HS256, claims_validation=FloatClaims)
+    assert decoded2 == jws_token2.model.claims
+    assert isinstance(decoded2, FloatClaims)
+    assert isinstance(decoded2.iat, datetime)
+    assert isinstance(decoded2.exp, datetime)
 
 
 def test_expired_token(jwt: JWT, secret_key: str):
@@ -785,7 +955,6 @@ def test_custom_default_headers_validation_policy(secret_key: str):
     # Create JWT instance with custom headers validation by default
     custom_validation_config = ValidationConfig(
         model=CustomHeader,
-        data_model=CustomHeader,
     )
     jwt_custom = JWT(default_headers_validation=custom_validation_config)
 
@@ -832,7 +1001,6 @@ def test_custom_default_claims_validation_policy_no_force_pydantic(
     custom_validation_config = ValidationConfig(
         model=JWTClaims,  # Validate against JWTClaims
         forward_pydantic_model=False,  # Don't force Pydantic model type
-        data_model=JWTBaseModel,
     )
     jwt_custom = JWT(default_claims_validation=custom_validation_config)
 
@@ -966,111 +1134,6 @@ def test_detached_payload_conflict(jwt: JWT, secret_key: str):
             Alg.HS256,
             with_detached_payload={"sub": "test", "user_id": "123"},
         )
-
-
-def test_timestamp_switching_modes(jwt, secret_key):
-    """Test that switching serialization mode works correctly."""
-    now = datetime.now(UTC)
-    claims = JWTClaims(iat=now)
-
-    # Encode with int mode
-    claims.force_jwtdatetime_to_int()
-    token_int = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded_int = jwt.decode(token_int.compact, secret_key, Alg.HS256)
-    assert isinstance(decoded_int.payload["iat"], int)
-    assert decoded_int.payload["iat"] == int(now.timestamp())
-
-    # Encode with float mode
-    claims.force_jwtdatetime_to_float()
-    token_float = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded_float = jwt.decode(token_float.compact, secret_key, Alg.HS256)
-    assert isinstance(decoded_float.payload["iat"], float)
-    assert decoded_float.payload["iat"] == now.timestamp()
-
-    # Invalid mode
-    claims.internal__jwtdatetime_force_int = "invalid"  # type: ignore
-    with pytest.raises(ValueError, match="Invalid timestamp config type"):
-        jwt.encode(claims, secret_key, Alg.HS256)
-
-
-def test_mixed_datetime_serialization_types(jwt, secret_key):
-    """Test custom claims with mixed JWTDatetime, JWTDatetimeInt, and JWTDatetimeFloat."""
-
-    class CustomMixedClaims(JWTClaims):
-        # exp redefined as required
-        exp: JWTDatetime = pydantic.Field(default=...)
-
-        # nbf redefined as a required JWTDatetimeInt (always int)
-        nbf: JWTDatetimeInt = pydantic.Field(default=...)
-
-        # custom field with JWTDatetimeFloat (always float)
-        custom_time: JWTDatetimeFloat = pydantic.Field(default=...)
-
-    now = datetime.now(UTC)
-
-    # Create instance with specific microseconds to test precision
-    exp_time = now + timedelta(hours=10, minutes=30, seconds=15, microseconds=123456)
-    nbf_time = now
-    custom_time = datetime(2026, 3, 15, 8, 45, 22, 987654, tzinfo=UTC)
-
-    claims = CustomMixedClaims(
-        iat=now - timedelta(hours=1),
-        exp=exp_time,
-        nbf=nbf_time,
-        custom_time=custom_time,
-    )
-    assert claims.internal__jwtdatetime_force_int is True
-
-    token = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
-
-    # exp should be int (because flag is True and it's JWTDatetime)
-    assert isinstance(decoded.payload["exp"], int)
-    assert decoded.payload["exp"] == int(exp_time.timestamp())
-
-    # nbf should ALWAYS be int (JWTDatetimeInt ignores flag)
-    assert isinstance(decoded.payload["nbf"], int)
-    assert decoded.payload["nbf"] == int(nbf_time.timestamp())
-
-    # custom_time should ALWAYS be float (JWTDatetimeFloat ignores flag)
-    assert isinstance(decoded.payload["custom_time"], float)
-    assert abs(decoded.payload["custom_time"] - custom_time.timestamp()) < 1e-6
-
-    # Now switch to float mode
-    claims.force_jwtdatetime_to_float()
-    assert claims.internal__jwtdatetime_force_int is False
-
-    # Encode and decode again
-    token2 = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded2 = jwt.decode(token2.compact, secret_key, Alg.HS256)
-
-    # exp should now be float (because flag is False and it's JWTDatetime)
-    assert isinstance(decoded2.payload["exp"], float)
-    assert abs(decoded2.payload["exp"] - exp_time.timestamp()) < 1e-6
-
-    # nbf should STILL be int (JWTDatetimeInt always ignores flag)
-    assert isinstance(decoded2.payload["nbf"], int)
-    assert decoded2.payload["nbf"] == int(nbf_time.timestamp())
-
-    # custom_time should STILL be float (JWTDatetimeFloat always ignores flag)
-    assert isinstance(decoded2.payload["custom_time"], float)
-    assert abs(decoded2.payload["custom_time"] - custom_time.timestamp()) < 1e-6
-
-    # Switch back to int mode
-    claims.force_jwtdatetime_to_int()
-    assert claims.internal__jwtdatetime_force_int is True
-
-    # Encode and decode one more time
-    token3 = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded3 = jwt.decode(token3.compact, secret_key, Alg.HS256)
-
-    # exp should be back to int
-    assert isinstance(decoded3.payload["exp"], int)
-    assert decoded3.payload["exp"] == int(exp_time.timestamp())
-
-    # nbf and custom_time behavior unchanged
-    assert isinstance(decoded3.payload["nbf"], int)
-    assert isinstance(decoded3.payload["custom_time"], float)
 
 
 def test_hmac_algorithms(jwt: JWT, claims: JWTCustomClaims, secret_key: str):

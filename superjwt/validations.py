@@ -33,34 +33,18 @@ except ImportError:  # pragma: no cover
 
     UTC = timezone.utc
 
-DEFAULT_JWTDATETIME_FORCE_INT: bool = True
-
 
 class JWTBaseModel(BaseModel):
     model_config = {"extra": "allow", "revalidate_instances": "always"}
 
     internal__now: Annotated[datetime | None, Field(exclude=True, repr=False)] = None
-    internal__jwtdatetime_force_int: Annotated[bool, Field(exclude=True, repr=False)] = (
-        DEFAULT_JWTDATETIME_FORCE_INT
-    )
 
     def revalidate(self) -> None:
         """Re-validate the pydantic instance against its own model."""
         self.model_validate(self)
 
     def to_dict(self) -> dict[str, Any]:
-        return self.model_dump(
-            exclude_none=True,
-            context={"jwtdatetime_force_int": self.internal__jwtdatetime_force_int},
-        )
-
-    def force_jwtdatetime_to_int(self) -> None:
-        """Force JWTDatetime fields to be serialized as integers (seconds since epoch)."""
-        self.internal__jwtdatetime_force_int = True
-
-    def force_jwtdatetime_to_float(self) -> None:
-        """Force JWTDatetime fields to be serialized as floats (seconds since epoch with microseconds)."""
-        self.internal__jwtdatetime_force_int = False
+        return self.model_dump(exclude_none=True)
 
     def spoof_time(self, set_now: datetime | None) -> None:
         """Spoof the current time for testing purposes. Set to None to disable spoofing."""
@@ -168,23 +152,6 @@ def serialize_jwtdatetime_timestamp_to_float(value: datetime | int | float) -> f
         return value.timestamp()
 
 
-def serialize_jwtdatetime_timestamp(
-    value: datetime | int | float, info: ValidationInfo
-) -> int | float:
-    jwtdatetime_force_int = getattr(info, "context", {}).get(
-        "jwtdatetime_force_int", DEFAULT_JWTDATETIME_FORCE_INT
-    )
-    if jwtdatetime_force_int is True:
-        return serialize_jwtdatetime_timestamp_to_int(value)
-    elif jwtdatetime_force_int is False:
-        return serialize_jwtdatetime_timestamp_to_float(value)
-    raise ValueError("Invalid timestamp config type")
-
-
-JWTDatetime = Annotated[
-    datetime,
-    PlainSerializer(serialize_jwtdatetime_timestamp),
-]
 JWTDatetimeInt = Annotated[
     datetime,
     PlainSerializer(serialize_jwtdatetime_timestamp_to_int),
@@ -209,17 +176,17 @@ class JWTClaimsModel(JWTBaseModel):
         Field(description="audience - the recipient for which the JWT is intended"),
     ] = None
     iat: Annotated[
-        JWTDatetime | None,
+        JWTDatetimeInt | None,
         Field(description="issued at time - the time at which the JWT was issued"),
     ] = None
     nbf: Annotated[
-        JWTDatetime | None,
+        JWTDatetimeInt | None,
         Field(
             description="not before time - the time before which the JWT must not be accepted"
         ),
     ] = None
     exp: Annotated[
-        JWTDatetime | None,
+        JWTDatetimeInt | None,
         Field(description="expiration time - the time after which the JWT expires"),
     ] = None
     jti: Annotated[
@@ -347,9 +314,6 @@ class ValidationConfig(BaseModel):
     """Forward the data pydantic model to validation config (and its internal config)."""
     forward_pydantic_model: bool = True
 
-    """The default pydantic model to use for data storage when data is a dict."""
-    data_model: type[JWTBaseModel] = Field(default_factory=lambda data: data["model"])
-
     # ------------- JWTBaseModel specific internal config -------------
     """Spoofed 'now' datetime."""
     now: datetime | None = None
@@ -388,29 +352,31 @@ class ValidationConfig(BaseModel):
                 elif model is None:
                     setattr(self, param, default)
 
-    def run(self, data: JWTBaseModel | dict[str, Any]) -> dict[str, Any]:
+    def run(
+        self,
+        data: JWTBaseModel | dict[str, Any],
+        fallback_model: type[JWTBaseModel] = JWTBaseModel,
+    ) -> tuple[JWTBaseModel, dict[str, Any]]:
+        # case pydantic model
+        if isinstance(data, JWTBaseModel):
+            data_dict = data.to_dict()
+        # case dict
+        elif isinstance(data, dict):
+            data_dict = deepcopy(data)
+        else:
+            raise TypeError("Wrong type during data preparation and validation")
+
         if self.enabled is False:
-            return data.to_dict() if isinstance(data, JWTBaseModel) else data
+            return fallback_model.model_construct(**data_dict), data_dict
 
         if self.model is None:
             raise ValueError("Validation model is not set in ValidationConfig")
 
-        # case pydantic model
-        if isinstance(data, JWTBaseModel):
-            data_dict = data.to_dict()
-
-        # case dict
-        elif isinstance(data, dict):
-            data_dict = deepcopy(data)
-
-        else:
-            raise TypeError("Wrong type during data preparation and validation")
-
         ##### BEGIN VALIDATION #####
-        self.model.model_validate(data_dict | self._get_internal_cfg())
+        data_pydantic = self.model.model_validate(data_dict | self._get_internal_cfg())
         ##### END VALIDATION #####
 
-        return data_dict
+        return data_pydantic, data_pydantic.to_dict()
 
 
 JWTClaimsDefaultValidation = ValidationConfig(
@@ -428,37 +394,11 @@ class Validation(Enum):
     DISABLE = "disable"
 
 
-def get_data_model(
-    data: JWTBaseModel | dict[str, Any],
-    validation: type[JWTBaseModel] | ValidationConfig | Validation | None,
-    default_validation: ValidationConfig,
-    fallback_model: type[JWTBaseModel],
-) -> type[JWTBaseModel]:
-    if validation is Validation.DEFAULT and isinstance(data, dict):
-        return default_validation.data_model
-    elif isinstance(validation, ValidationConfig):
-        if validation.data_model is None:
-            return fallback_model
-        return validation.data_model
-    elif (
-        isclass(validation)
-        and issubclass(validation, JWTBaseModel)
-        and isinstance(data, dict)
-    ):
-        return validation
-    elif isinstance(data, JWTBaseModel):
-        return type(data)
-    return fallback_model
-
-
 def get_validation_config(
     data: JWTBaseModel | dict[str, Any],
     validation: type[JWTBaseModel] | ValidationConfig | Validation | None,
     default_validation: ValidationConfig,
-    fallback_data_model: type[JWTBaseModel],
 ) -> ValidationConfig:
-    data_model = get_data_model(data, validation, default_validation, fallback_data_model)
-
     ##############################
     # case validation is DISABLED
     if (
@@ -466,7 +406,7 @@ def get_validation_config(
         or validation is None
         or (isinstance(validation, ValidationConfig) and validation.enabled is False)
     ):
-        return ValidationConfig(enabled=False, data_model=data_model)
+        return ValidationConfig(enabled=False)
 
     ##############################
     # case validation is ENABLED
@@ -512,8 +452,5 @@ def get_validation_config(
         # set default values for unset internal config
         # --> data is a dict and carries no config
         validation_cfg.apply_internal_cfg()
-
-    # add data model
-    validation_cfg.data_model = data_model
 
     return validation_cfg
