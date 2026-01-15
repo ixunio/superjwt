@@ -6,8 +6,14 @@
 
 *JWT & Validation*
 
-- **(breaking)** :boom: decode() now returns a Pydantic instance, matching the claims validation model (default `JWTClaims`)
-- **(breaking)** :boom:  `JWTDatetime` is removed, `'exp'`, `'nbf'`, `'iat'` are now typed as `JWTDatetimeInt` in `JWTClaims` model and still serialize as int.
+- **(breaking)** :boom: `decode()` now returns a Pydantic instance, matching the claims validation model (default `JWTClaims`)  ([#91])
+- **(breaking)** :boom:  `JWTDatetime` is removed, `'exp'`, `'nbf'`, `'iat'` are now typed as `JWTDatetimeInt` in `JWTClaims` model and still serialize as int. ([#91])
+
+### Fixes (🐛)
+
+*JWT & Validation*
+
+- `nbf` validation to be triggered only during decoding to allow for token creation with a Not Before claim. ([#94])
 
 ## v0.6.0 (2026-01-14)
 
@@ -170,6 +176,8 @@
 - CI (tests, linter, release)
 
 
+[#94]: https://github.com/ixunio/superjwt/issues/94
+[#91]: https://github.com/ixunio/superjwt/issues/91
 [#84]: https://github.com/ixunio/superjwt/issues/84
 [#83]: https://github.com/ixunio/superjwt/issues/83
 [#82]: https://github.com/ixunio/superjwt/issues/82

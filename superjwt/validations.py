@@ -39,9 +39,9 @@ class JWTBaseModel(BaseModel):
 
     internal__now: Annotated[datetime | None, Field(exclude=True, repr=False)] = None
 
-    def revalidate(self) -> None:
+    def revalidate(self, context: dict[str, Any] | None = None) -> None:
         """Re-validate the pydantic instance against its own model."""
-        self.model_validate(self)
+        self.model_validate(self, context=context)
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)
@@ -49,6 +49,13 @@ class JWTBaseModel(BaseModel):
     def spoof_time(self, set_now: datetime | None) -> None:
         """Spoof the current time for testing purposes. Set to None to disable spoofing."""
         self.internal__now = set_now
+
+
+class Operation(str, Enum):
+    """Flags to indicate the operation type for validation context."""
+
+    ENCODE = "encode"
+    DECODE = "decode"
 
 
 class HttpsUrl(HttpUrl):
@@ -233,7 +240,9 @@ class JWTClaims(JWTClaimsModel):
         self.internal__allow_future_iat = False
 
     @model_validator(mode="after")
-    def validate_time_integrity(self) -> Self:
+    def validate_time_integrity(self, info: ValidationInfo) -> Self:
+        operation = info.context.get("operation") if info.context else None
+
         # check nbf >= iat
         if self.nbf is not None and self.iat is not None:
             if self.nbf < self.iat:
@@ -241,15 +250,21 @@ class JWTClaims(JWTClaimsModel):
                     "'nbf' claim must be greater than or equal to 'iat' claim"
                 )
 
+        # check nbf < exp (token must be valid for some period)
+        if self.nbf is not None and self.exp is not None:
+            if self.nbf >= self.exp:
+                raise ValueError("'nbf' claim must be less than or equal to 'exp' claim")
+
         # check iat <= now, modulo leeway
         if self.iat is not None and not self.internal__allow_future_iat:
             if delta_datetime_timestamp(self.iat, self.now) > self.internal__leeway:
                 raise ValueError("'iat' claim must not be in the future")
 
         # check nbf <= now, modulo leeway
-        if self.nbf is not None:
-            if delta_datetime_timestamp(self.nbf, self.now) > self.internal__leeway:
-                raise TokenNotYetValidError()
+        if operation == Operation.DECODE:
+            if self.nbf is not None:
+                if delta_datetime_timestamp(self.nbf, self.now) > self.internal__leeway:
+                    raise TokenNotYetValidError()
 
         # check exp > now, modulo leeway
         if self.exp is not None:
@@ -359,6 +374,7 @@ class ValidationConfig(BaseModel):
         self,
         data: JWTBaseModel | dict[str, Any],
         fallback_model: type[JWTBaseModel] = JWTBaseModel,
+        operation: Operation | None = None,
     ) -> tuple[JWTBaseModel, dict[str, Any]]:
         # case pydantic model
         if isinstance(data, JWTBaseModel):
@@ -376,7 +392,10 @@ class ValidationConfig(BaseModel):
             raise ValueError("Validation model is not set in ValidationConfig")
 
         ##### BEGIN VALIDATION #####
-        data_pydantic = self.model.model_validate(data_dict | self._get_internal_cfg())
+        data_pydantic = self.model.model_validate(
+            data_dict | self._get_internal_cfg(),
+            context={"operation": operation},
+        )
         ##### END VALIDATION #####
 
         return data_pydantic, data_pydantic.to_dict()
@@ -390,7 +409,7 @@ JWTHeadersDefaultValidation = ValidationConfig(
 )
 
 
-class Validation(Enum):
+class Validation(str, Enum):
     """Flags to control validation behavior in JWT operations."""
 
     DEFAULT = "default"

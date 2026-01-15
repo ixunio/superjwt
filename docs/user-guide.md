@@ -636,7 +636,7 @@ Properties:
     - `'nbf'` < *now*
     - `'exp'` > *now*
 - **Token Time Validity**<br>
-    Raises `TokenExpiredError` if the token has expired (given `'exp'` claim timestamp) or `TokenNotYetValidError` if it is not yet valid (given `'nbf'` claim timestamp).
+    Raises `TokenExpiredError` if the token has expired (given `'exp'` claim timestamp) or `TokenNotYetValidError` if it is not yet valid (given `'nbf'` claim timestamp during decoding only).
 - **Time Leeway**<br>
     Allows leeway (default: 5 seconds) during decoding to account for clock skew. Can be configured in a [Validation Config](#validation-config).
 - **Time Claim Methods**<br>

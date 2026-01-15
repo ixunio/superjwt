@@ -125,10 +125,23 @@ def test_payload_vs_model_claims_relationship(jwt: JWT, secret_key: str):
     """Document and test the relationship between payload dict and model.claims pydantic instance."""
     now = datetime.now(UTC)
 
-    claims = JWTClaims(sub="user123", iat=now, exp=now + timedelta(hours=1), nbf=now)
+    claims = JWTClaims(
+        sub="user123",
+        iat=now,
+        exp=now + timedelta(hours=1),
+        nbf=now + timedelta(minutes=5),
+    )
 
     compact = jwt.encode(claims, secret_key, Alg.HS256).compact
-    jws_token = jwt.decode(compact, secret_key, Alg.HS256)
+
+    # Spoof time to after nbf to allow decoding
+    spoofed_now = now + timedelta(minutes=10)
+    jws_token = jwt.decode(
+        compact,
+        secret_key,
+        Alg.HS256,
+        claims_validation=ValidationConfig(model=JWTClaims, now=spoofed_now),
+    )
 
     # Standard claims (iat, exp, nbf) are stored as int timestamps
     assert isinstance(jws_token.payload["iat"], int)
@@ -149,7 +162,12 @@ def test_payload_vs_model_claims_relationship(jwt: JWT, secret_key: str):
     assert model_dict["exp"] == jws_token.payload["exp"]
     assert model_dict["nbf"] == jws_token.payload["nbf"]
 
-    decoded = decode(compact, secret_key, Alg.HS256)
+    decoded = decode(
+        compact,
+        secret_key,
+        Alg.HS256,
+        claims_validation=ValidationConfig(model=JWTClaims, now=spoofed_now),
+    )
     assert decoded == jws_token.model.claims
     assert decoded.to_dict() == jws_token.model.claims.to_dict()
     assert decoded.to_dict() == model_dict
@@ -493,7 +511,7 @@ def test_invalid_claims_future_dates(jwt: JWT, secret_key: str):
     with pytest.raises(ClaimsValidationError):
         jwt.encode(claims_dict, secret_key, Alg.HS256, claims_validation=JWTClaims)
 
-    # nbf >= exp is invalid
+    # nbf >= exp is forbidden (token would never be valid)
     claims_dict = {
         "sub": "user123",
         "iat": now.timestamp(),
@@ -683,8 +701,8 @@ def test_not_yet_valid_token(jwt: JWT, secret_key: str):
     compact = jwt.encode(
         claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
     ).compact
-    with pytest.raises(TokenNotYetValidError):
-        jwt.encode(claims, secret_key, Alg.HS256)
+    # nbf validation only happens during decode, not encode
+    jwt.encode(claims, secret_key, Alg.HS256)
     with pytest.raises(TokenNotYetValidError):
         jwt.decode(compact, secret_key, Alg.HS256)  # fails (default JWTClaims validation)
     decoded_claims = jwt.decode(

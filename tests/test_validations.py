@@ -10,6 +10,7 @@ from superjwt.validations import (
     DEFAULT_LEEWAY_SECONDS,
     JWTBaseModel,
     JWTClaims,
+    Operation,
     Validation,
     ValidationConfig,
     get_validation_config,
@@ -115,35 +116,50 @@ class TestTimeIntegrityValidation:
         assert claims.nbf == now - timedelta(hours=1)
 
     def test_nbf_in_future_raises_error(self):
-        """Test that nbf in the future raises TokenNotYetValidError."""
+        """Test that nbf in the future raises TokenNotYetValidError during decode."""
         now = datetime.now(UTC)
+        # nbf validation only happens during decode operation
         with pytest.raises(TokenNotYetValidError):
-            JWTClaims(nbf=now + timedelta(hours=1))
+            JWTClaims.model_validate(
+                {"nbf": now + timedelta(hours=1)}, context={"operation": Operation.DECODE}
+            )
+
+        # Without decode context, nbf in the future should be allowed (no error)
+        claims = JWTClaims.model_construct(nbf=now + timedelta(hours=1))
+        claims.spoof_time(now)
+        claims.revalidate()  # Should NOT raise - no decode context
+        assert claims.nbf == now + timedelta(hours=1)
+
+        # But with decode context, it should raise
+        with pytest.raises(TokenNotYetValidError):
+            claims.revalidate(context={"operation": Operation.DECODE})
 
     def test_nbf_equal_to_now_valid(self):
-        """Test that nbf equal to now is valid (within leeway)."""
+        """Test that nbf equal to now is valid (within leeway) during decode."""
         fixed_time = datetime(2025, 6, 1, 12, 0, 0, tzinfo=UTC)
         claims = JWTClaims.model_construct(nbf=fixed_time)
         claims.spoof_time(fixed_time)
-        claims.revalidate()
+        # nbf validation only happens during decode
+        claims.revalidate(context={"operation": Operation.DECODE})
         assert claims.nbf == fixed_time
 
     def test_nbf_with_leeway(self):
-        """Test that nbf validation respects leeway."""
+        """Test that nbf validation respects leeway during decode."""
         fixed_time = datetime(2025, 6, 1, 12, 0, 0, tzinfo=UTC)
 
         # nbf is 3 seconds in the future, but leeway is 5 seconds (default)
+        # nbf validation only happens during decode
         nbf_time = fixed_time + timedelta(seconds=3)
         claims = JWTClaims.model_construct(nbf=nbf_time)
         claims.spoof_time(fixed_time)
-        claims.revalidate()
+        claims.revalidate(context={"operation": Operation.DECODE})
         assert claims.nbf == nbf_time
 
         # nbf is exactly at leeway boundary (should pass, > check)
         nbf_at_leeway = fixed_time + timedelta(seconds=5)
         claims2 = JWTClaims.model_construct(nbf=nbf_at_leeway)
         claims2.spoof_time(fixed_time)
-        claims2.revalidate()
+        claims2.revalidate(context={"operation": Operation.DECODE})
         assert claims2.nbf == nbf_at_leeway
 
         # nbf is beyond leeway boundary (should fail)
@@ -151,7 +167,7 @@ class TestTimeIntegrityValidation:
         claims3 = JWTClaims.model_construct(nbf=nbf_beyond_leeway)
         claims3.spoof_time(fixed_time)
         with pytest.raises(TokenNotYetValidError):
-            claims3.revalidate()
+            claims3.revalidate(context={"operation": Operation.DECODE})
 
     def test_iat_in_past_valid(self):
         """Test that iat in the past is valid."""

@@ -12,6 +12,7 @@ from superjwt.validations import (
     JWTBaseModel,
     JWTClaimsDefaultValidation,
     JWTHeadersDefaultValidation,
+    Operation,
     Validation,
     ValidationConfig,
     get_validation_config,
@@ -84,7 +85,9 @@ class JWT:
         claims_validation = self.get_claims_validation(claims, claims_validation)
 
         try:
-            claims_pydantic, claims_dict = claims_validation.run(claims)
+            claims_pydantic, claims_dict = claims_validation.run(
+                claims, operation=Operation.ENCODE
+            )
         except ValidationError as e:
             raise ClaimsValidationError(validation_errors=e.errors()) from e
 
@@ -167,7 +170,7 @@ class JWT:
             # prepare detached claims data and validate
             try:
                 claims_pydantic, claims_dict = claims_validation.run(
-                    with_detached_payload
+                    with_detached_payload, operation=Operation.DECODE
                 )
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
@@ -189,7 +192,9 @@ class JWT:
 
             # validate claims
             try:
-                claims_pydantic, _ = claims_validation.run(claims_dict)
+                claims_pydantic, _ = claims_validation.run(
+                    claims_dict, operation=Operation.DECODE
+                )
             except ValidationError as e:
                 raise ClaimsValidationError(validation_errors=e.errors()) from e
 
