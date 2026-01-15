@@ -262,9 +262,11 @@ class JWTClaims(JWTClaimsModel):
         """Return a new JWTClaims instance with the 'iat' claim set to current time."""
 
         # case iat AND exp were set
-        if self.exp is not None and self.iat is not None:
+        iat = getattr(self, "iat", None)
+        exp = getattr(self, "exp", None)
+        if exp is not None and iat is not None:
             # preserve original delta between iat and exp
-            delta = self.exp - self.iat
+            delta = exp - iat
             return self.model_copy(update={"iat": self.now, "exp": self.now + delta})
 
         return self.model_copy(update={"iat": self.now})
@@ -292,7 +294,8 @@ class JWTClaims(JWTClaimsModel):
         )
 
         # case iat was already set
-        if self.iat is not None:
+        iat = getattr(self, "iat", None)
+        if iat is not None:
             # rewrite iat value
             return self.model_copy(update={"iat": self.now, "exp": exp_time})
 
