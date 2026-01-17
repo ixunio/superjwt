@@ -122,7 +122,7 @@ See [Custom Models](#custom-models) for more information about custom Pydantic m
 ```python
 from datetime import datetime
 from pydantic import AfterValidator, Field
-from superjwt import Alg, JWTClaims, JWTDatetime, encode, inspect
+from superjwt import Alg, JWTClaims, JWTDatetimeInt, encode, inspect
 from typing import Annotated
 from uuid import UUID
 
@@ -131,7 +131,7 @@ secret_key = "your-secret-key-of-len-32-bytes!"
 class MyJWTClaims(JWTClaims):
     sub: int = Field(default=...)  # 'sub' is redefined as a required integer
     user_id: Annotated[str, AfterValidator(lambda x: str(UUID(x, version=4)))]  # must be UUIDv4
-    custom_date: JWTDatetime  # must be a datetime/timestamp
+    custom_date: JWTDatetimeInt  # must be a datetime/timestamp
 
 claims = MyJWTClaims(
     sub=1234,
@@ -249,7 +249,7 @@ print(inspect(compact).payload)
 
 ## Decoding a JWT ⏬
 
-The function `decode()` decodes and verifies a compact (three-part) signed JWT/JWS. It can optionally perform [validation](#validation) on JWT content.
+The function `decode()` decodes and verifies a compact (three-part) signed JWT/JWS. It also performs [validation](#validation) on JWT content unless disabled. It returns the claims data as a Pydantic instance from the model that ran the validation (default is [JWTClaims](#jwtclaims)).
 
 /// details | See `decode()` parameters
 | &nbsp;Function&nbsp;Parameters&nbsp; | Type | Description |
@@ -273,7 +273,7 @@ When using the `decode()` function, the JWT compact token is automatically verif
 During decoding, compact token are automatically verified and validated against [JWTClaims](#jwtclaims) Pydantic model.
 
 ```python
-from superjwt import Alg, decode, inspect
+from superjwt import Alg, JWTClaims, decode, inspect
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
@@ -285,9 +285,15 @@ compact = (
 print(inspect(compact).payload)  # (1)
 #> {'iss': 'my-app', 'sub': 'John Doe'}
 
-decoded: dict = decode(compact, secret_key, Alg.HS256)  # (2)
+decoded: JWTClaims = decode(compact, secret_key, Alg.HS256)  # (2)
 print(decoded)
+#> iss='my-app' sub='John Doe' aud=None iat=None nbf=None exp=None jti=None
+
+print(decoded.to_dict())
 #> {'iss': 'my-app', 'sub': 'John Doe'}
+
+print(decoded.sub)
+#> 'John Doe'
 ```
 
 1.  /// danger | Unverified JWT
@@ -328,7 +334,7 @@ except SignatureVerificationError as e:
 /// tab | Invalid Token -<br>Validation Failed
 When claims validation fails, a `ClaimsValidationError` is raised. This does not change the fact that the token has been verified and is authentic. See [Validation](#validation).
 ```python
-from superjwt import Alg, Validation, decode, inspect
+from superjwt import Alg, JWTBaseModel, Validation, decode, inspect
 from superjwt.exceptions import ClaimsValidationError
 
 secret_key = "your-secret-key-of-len-32-bytes!"
@@ -348,10 +354,10 @@ except ClaimsValidationError as e:
     #> Claims validation failed
     #> claim ('iss',) = True -> validation failed (string_type): Input should be a valid string
     
-    decoded = decode(
+    decoded: JWTBaseModel = decode(
         compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
         )  # --> 🤔 passes (3)
-    print(decoded)
+    print(decoded.to_dict())
     #> {'iss': True}
 
 ```
@@ -361,7 +367,7 @@ except ClaimsValidationError as e:
     Token inspection DOES NOT verify the signature! Never trust information from an unverified JWT.
     ///
 2. By default, `decode()` validates claims against `JWTClaims`. Since `'iss'` must be a string, validation fails.
-3. To decode without validation, explicitly use `Validation.DISABLE`. The JWT is still verified, proving its authenticity.
+3. To decode without validation, explicitly use `Validation.DISABLE`. The JWT is still verified, proving its authenticity. The returning Pydantic instance is a `JWTBaseModel`, a base model with no validation or defined fields. See [Pydantic Models](#pydantic-models).
 
 ///
 
@@ -385,8 +391,8 @@ compact = (
 print(inspect(compact).payload)  # (1)
 #> {'sub': 'user', 'custom_field': 42}
 
-decoded = decode(compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)
-print(decoded)
+decoded: MyJWTClaims = decode(compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)
+print(decoded.to_dict())
 #> {'sub': 'user', 'custom_field': 42}
 ```
 
@@ -411,21 +417,25 @@ class MyJWTClaims(JWTClaims):
     custom_field: int = Field(default=...)
 
 validation = ValidationConfig(
-    validation_model=MyJWTClaims,
+    model=MyJWTClaims,
     leeway=30.0,  # (1)
 )
 
 compact = (
     b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    b"eyJzdWIiOiJ1c2VyIiwiaWF0IjoxNzY3ODQ1OTM4LCJleHAiOjE3Njc4NDY4MzgsImN1c3RvbV9maWVsZCI6NDJ9."
-    b"EGNJ2bGmuhTlQa45xMs1HG2gnGNDoy632mgAx-rhk6g"
+    b"eyJzdWIiOiJ1c2VyIiwiaWF0IjoxNzY3ODQ1OTM4LCJleHAiOjIxOTk3NTY0NzUsImN1c3RvbV9maWVsZCI6NDJ9."
+    b"U8qku24iP0PVTfqmU_PqaCTVu62Kz-gf6h9jjVwRt_k"
 )
 print(inspect(compact).payload)  # (2)
-#> {'sub': 'user', 'iat': 1767845938, 'exp': 1767846838, 'custom_field': 42}
+#> {'sub': 'user', 'iat': 1767845938, 'exp': 2199756475, 'custom_field': 42}
 
-decoded = decode(compact, secret_key, Alg.HS256, claims_validation=validation)
-print(decoded)
-#> {'sub': 'user', 'iat': 1767845938, 'exp': 1767846838, 'custom_field': 42}
+decoded: MyJWTClaims = decode(compact, secret_key, Alg.HS256, claims_validation=validation)
+print(decoded) # (3)
+#> iss=None sub='user' aud=None iat=datetime.datetime(2026, 1, 8, 4, 18, 58, tzinfo=TzInfo(0)) nbf=None 
+#  exp=datetime.datetime(2039, 9, 16, 3, 27, 55, tzinfo=TzInfo(0)) jti=None custom_field=42
+
+print(decoded.to_dict())
+#> {'sub': 'user', 'iat': 1767845938, 'exp': 2199756475, 'custom_field': 42}
 ```
 
 1. By creating a `ValidationConfig` instance to be passed to `claims_validation` parameter, you can change other behaviors like the leeway when decoding `'iat'`, `'exp'`, `'nbf'` claims.
@@ -433,6 +443,7 @@ print(decoded)
 
     A compact token inspection DOES NOT verify the signature! Never trust the information from an unverified JWT. Only the `decode()` function will prove the JWT integrity.
     ///
+3. The `'iat'` and `'exp'` claims are stored as a Python `datetime` object. See [Datetime Fields](#datetime-fields).
 
 ///
 
@@ -468,8 +479,8 @@ except TokenExpiredError:
     decoded = decode(
         compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
         )  # --> 🤔 passes (3)
-    print(decoded)
-    #> {'exp': 1766960212}
+    print(decoded.exp)
+    #> 1766960212
 ```
 
 1. `.model_construct()` creates a Pydantic instance without running validation.
@@ -500,10 +511,10 @@ compact = (
 
 token: JWSToken = inspect(compact)
 
-token.payload
+print(token.payload)
 #> {'can_I_trust_you': 'no'}
 
-token.headers
+print(token.headers)
 #> {'alg': 'NoNe', 'typ': 'JWT'}
 ```
 
@@ -592,7 +603,8 @@ Properties:
         #> sub
         #>   Input should be a valid string [type=string_type, input_value=1234, input_type=int]
     except ValidationError:
-        claims_dict = JWTClaims(sub="1234", user_id=1234).to_dict()
+        claims = JWTClaims(sub="1234", user_id=1234)
+        print(claims.to_dict())
         #> {'sub': '1234', 'user_id': 1234}
     ```
     ///
@@ -609,7 +621,8 @@ Properties:
         #> iss
         #>   Input should be a valid string [type=string_type, input_value=123, input_type=int]
     except ValidationError:
-        claims_dict = JWTClaims.model_construct(**claims).to_dict()  # do not validate model
+        claims = JWTClaims.model_construct(**claims).to_dict()  # do not validate model
+        print(claims.to_dict())
         #> {'iss': 123, 'sub': 'user_123', 'custom_claim': 'hello'}
     ```
     ///
@@ -677,7 +690,7 @@ You can create custom Pydantic models by extending `JWTClaims` or `JWTBaseModel`
 
 ```python
 from pydantic import AfterValidator, Field, ValidationError
-from superjwt import Alg, JWTClaims, JWTDatetime
+from superjwt import Alg, JWTClaims, JWTDatetimeInt
 from superjwt.exceptions import ClaimsValidationError
 from typing import Annotated
 from uuid import UUID
@@ -686,7 +699,7 @@ secret_key = "your-secret-key-of-len-32-bytes!"
 
 class MyJWTClaims(JWTClaims):
     # 'exp' is required
-    exp: JWTDatetime  # (1)
+    exp: JWTDatetimeInt  # (1)
 
     # 'sub' is required and its type is changed to integer
     sub: int = Field(default=...)  # (2)
@@ -705,11 +718,11 @@ except ValidationError:
     claims.user_id = "d4dc7b96-36cc-4ab5-846e-17e4fc85bf6d"
     claims.revalidate()  # --> ✅ passes
 
-claims.to_dict()
+print(claims.to_dict())
 #> {'sub': 12345, 'user_id': 'd4dc7b96-36cc-4ab5-846e-17e4fc85bf6d', 'exp': 1767652061}
 ```
 
-1. This syntax may trigger your python linter (`"iss" overrides a field of the same name but is missing a default value`), see [this](https://github.com/microsoft/pyright/issues/8766) pyright GitHub issue.<br><br>Note that `JWTDatetime` is the standard internal type for date/time data in SuperJWT. Internally, it is stored as a Python `datetime` (UTC) and serialized as a UNIX timestamp (integer by default). See [Datetime Fields](#datetime-fields).
+1. This syntax may trigger your python linter (`"iss" overrides a field of the same name but is missing a default value`), see [this](https://github.com/microsoft/pyright/issues/8766) pyright GitHub issue.<br><br>Note that `JWTDatetimeInt` is the standard internal type for date/time data in SuperJWT. Internally, it is stored as a Python `datetime` (UTC) and serialized as a UNIX timestamp integer. See [Datetime Fields](#datetime-fields).
 
 2. This syntax redefines a field while maintaining linter compatibility.
 
@@ -750,6 +763,7 @@ except ClaimsValidationError:
     compact = encode(claims, secret_key, Alg.HS256)  # --> ✅ passes (3)
 
 decoded = decode(compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)  # --> ✅ passes
+print(decoded.to_dict())
 #> {'nbf': 1767225599.987654, 'items_id': ['banana', 'apple', 'orange']} (4)
 ```
 
@@ -785,7 +799,7 @@ except ValidationError:
     headers.revalidate()  # --> ✅ passes
 ```
 
-1. Because `headers` is a Pydantic instance, headers validation runs against its own Pydantic model. Here, `session_id` is `int` and not `str`, thus failing.
+1. Because `headers` is a `CustomHeaders` Pydantic instance, headers validation runs against its own model. Here, `session_id` is `int` and not `str`, thus failing.
 
 ///
 
@@ -879,14 +893,14 @@ except ClaimsValidationError:
 
 ```python
 from pydantic import Field, ValidationError
-from superjwt import Alg, JWTClaims, JWTDatetime, decode, inspect
+from superjwt import Alg, JWTClaims, JWTDatetimeInt, decode, inspect
 from typing import Literal
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
 class MyJWTClaims(JWTClaims):
     # redefine 'exp' as required
-    exp: JWTDatetime = Field(default=...)
+    exp: JWTDatetimeInt = Field(default=...)
 
     # 'permissions' is required and must be a list of string among 3 choices
     permissions: list[Literal["user", "dev", "admin"]]
@@ -898,7 +912,7 @@ inspect(invalid_compact).payload
 decoded = decode(invalid_compact, secret_key, Alg.HS256)  # --> 🤔 passes (2)
 #> {'permissions': ['dev', 'analyst'], 'exp': 2113267250}
 
-decoded_claims = MyJWTClaims.model_construct(**decoded)
+decoded_claims = MyJWTClaims.model_construct(**decoded.to_dict())
 
 try:
     decoded_claims.revalidate()  # --> ❌ fails (3)
@@ -924,7 +938,6 @@ Use a `ValidationConfig` to specify both a Pydantic model and additional paramet
 from pydantic import Field
 from superjwt import Alg, JWTClaims, ValidationConfig, decode, encode
 from superjwt.exceptions import ClaimsValidationError
-from typing import Literal
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
@@ -947,15 +960,15 @@ claims = JWTClaims(iss="my-app")
 compact = encode(claims, secret_key, Alg.HS256)
 
 try:
-    decoded = decode(compact, secret_key, Alg.HS256, claims_validation=strict)
+    decode(compact, secret_key, Alg.HS256, claims_validation=strict)
 except ClaimsValidationError as e:
     print(e)
     #> Claims validation failed
     #> claim ('sub',) -> validation failed (missing): Field required
 
 decoded = decode(compact, secret_key, Alg.HS256, claims_validation=lenient)
-print(decoded)
-#> {'iss': 'my-app'}
+print(decoded.iss)
+#> 'my-app'
 
 ```
 ///
@@ -981,7 +994,9 @@ class MyJWTClaims(JWTClaims):
     # 'permissions' is required and must be a list of string
     permissions: list[str]
 
-valid_claims = MyJWTClaims.model_construct(**{"permissions": ["user", "admin"]})  # (1)
+valid_claims = MyJWTClaims.model_construct(
+    **{"permissions": ["user", "admin"], "iss": 1234}
+    )  # (1)
 
 try:
     encode(
@@ -989,12 +1004,11 @@ try:
     )
 except:
     compact = encode(valid_claims, secret_key, Alg.HS256)  # --> ✅ passes (3)
-
 ```
 
 1. `.model_construct()` allows the creation of a Pydantic instance without running validation.
 2. By using `JWTClaims` as the validation model, the claims are no longer compliant because `'iss'` is an integer instead of a string.
-3. Even though `claims_validation` is not specified, if the input is a Pydantic instance, it is automatically validated against its own model.
+3. Even though `claims_validation` is not specified, if the input is a Pydantic instance, it is automatically validated against its own model, here `MyJWTClaims`.
 
 ///
 
@@ -1020,24 +1034,11 @@ except ClaimsValidationError:
     compact = encode(
         {"permissions": [1, "admin"]}, secret_key, Alg.HS256  # --> 🤔 passes (3)
     )
-
-try:
-    encode(
-        {"permissions": [1, "admin"]},
-        secret_key,
-        Alg.HS256,
-        claims_validation=MyJWTClaims
-    )  # --> ❌ fails (4)
-except ClaimsValidationError:
-    ...
-
-
 ```
 
 1. `.model_construct()` creates a Pydantic instance without running validation.
-2. Even without `claims_validation` specified, Pydantic instances are automatically validated against their own model.
-3. During encoding, if claims are passed as a raw `dict`, claims validation runs against `JWTClaims`. The `permissions` extra field is allowed and has no validation rule, so the encoding is successful.
-4. Here, we explicitly request validation using `MyJWTClaims`, so it fails.
+2. Even without `claims_validation` specified, Pydantic instances are automatically validated against their own model, here `MyJWTClaims`.
+3. During encoding, if claims are passed as a raw `dict`, claims validation runs by default against `JWTClaims`. The `permissions` extra field is allowed and has no validation rule, so the encoding is successful.
 
 ///
 
@@ -1047,28 +1048,28 @@ You can manually validate your claims before encoding your JWT.
 
 ```python
 from pydantic import AfterValidator, Field, ValidationError
-from superjwt import Alg, JWTClaims, JWTDatetime, encode
+from superjwt import Alg, JWTClaims, JWTDatetimeFloat, encode
 from typing import Annotated
 from uuid import UUID
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
 class MyJWTClaims(JWTClaims):
-    # 'exp' is required
-    exp: JWTDatetime = Field(default=...)
+    # 'exp' is required (and will be serialized as float)
+    exp: JWTDatetimeFloat = Field(default=...)
 
     # 'user_id' is required and must be a valid UUIDv4 string
     user_id: Annotated[str, AfterValidator(lambda x: str(UUID(x, version=4)))]
 
 try:
     claims = MyJWTClaims.model_construct(**{"user_id": "not-a-uuid-v4"})
-    claims.with_expiration(minutes=15)
+    claims = claims.with_expiration(minutes=15)
     claims.revalidate()  # --> ❌ fails (1)
 except ValidationError:
     claims = MyJWTClaims.model_construct(
         **{"user_id":"ce78b813-244a-4bdf-a36c-a79b919b2968"}
     )
-    claims.with_expiration(minutes=15)
+    claims = claims.with_expiration(minutes=15)
     claims.revalidate()  # --> ✅ passes
 
 compact = encode(claims, secret_key, Alg.HS256)
@@ -1082,10 +1083,10 @@ compact = encode(claims, secret_key, Alg.HS256)
 
 ### Disable Validation
 
-You can disable claims validation entirely during encoding or decoding.
+You can disable claims validation entirely during encoding or decoding. In this scenario, an expired token will not raise an error. When validation is disabled, `decode()` returns an instance of [JWTBaseModel](#jwtbasemodel).
 
 ```python
-from superjwt import Alg, JWTClaims, Validation, decode, encode
+from superjwt import Alg, JWTBaseModel, JWTClaims, Validation, decode, encode
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
@@ -1097,7 +1098,9 @@ compact = encode(claims, secret_key, Alg.HS256, claims_validation=Validation.DIS
 compact = encode(claims_dict, secret_key, Alg.HS256, claims_validation=Validation.DISABLE)  # (2)
 
 # Decode without validation
-decoded = decode(compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE)  # (3)
+decoded: JWTBaseModel = decode(
+    compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    )  # (3)
 ```
 
 1. By default, encoding validates Pydantic claims against its own Pydantic model. Use `Validation.DISABLE` to skip validation.
@@ -1140,58 +1143,89 @@ decoded = decode(
 
 ## Datetime Fields ⌚
 
-### `JWTDatetime`
+### JWT Datetime Types
 
-In your Pydantic models, fields defined with the `JWTDatetime` type represent date/time objects. They are stored internally as Python `datetime` and serialized as UNIX timestamps.
+In your Pydantic models, fields defined with the type `JWTDatetimeInt` or `JWTDatetimeFloat` represent date/time objects and are serialized as UNIX timestamps. They are stored internally as Python `datetime` and have the following properties:
 
 - Accepts Python `datetime` objects (with or without timezone).
 - Accepts `int` or `float` UNIX timestamps.
 - Values are converted to `datetime` objects when appropriate.
-- Serializes as integer timestamps by default (can be changed to float using `JWTBaseModel.force_jwtdatetime_to_float()`).
+- Timestamps are either serialized to an `int` (with `JWTDatetimeInt`) or a `float` (with `JWTDatetimeFloat`).
 
-`JWTDatetimeInt`
+/// note
+All date/time registered claims (`'iat'`, `'exp'` and `'nbf'`) are defined as `JWTDatetimeInt` type in `JWTClaims` Pydantic model. They can be redefined as `JWTDatetimeFloat` with a custom model.
+///
 
-Similar to `JWTDatetime`, but always serializes as an `int`.
-
-`JWTDatetimeFloat`
-
-Similar to `JWTDatetime`, but always serializes as a `float`.
-
-```python title="Code example"
+```python
 from datetime import datetime
 from pydantic import Field
-from superjwt import Alg, JWTClaims, JWTDatetime, JWTDatetimeInt, encode, inspect
+from superjwt import Alg, JWTClaims, JWTDatetimeInt, JWTDatetimeFloat, encode, inspect
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
 class MyJWTClaims(JWTClaims):
-    # 'exp' is required
-    exp: JWTDatetime = Field(default=...)
+    exp: JWTDatetimeFloat = Field(default=...)
     custom_time: JWTDatetimeInt
 
 claims = MyJWTClaims.model_construct(
     custom_time=datetime(2025, 12, 31, 23, 59, 59, 987654)
     ).with_expiration(days=1)
 
-claims.force_jwtdatetime_to_float()
 compact = encode(claims, secret_key, Alg.HS256)
 print(inspect(compact).payload)
-#> {'custom_time': 1767225599, 'exp': 1768257699.998604} (1)
-
-claims.force_jwtdatetime_to_int()
-compact = encode(claims, secret_key, Alg.HS256)
-print(inspect(compact).payload)
-#> {'custom_time': 1767225599, 'exp': 1768257699} (2)
+#> {'exp': 1768257699.998604, 'custom_time': 1767225599} (1)
 ```
 
-1. `'exp'` is serialized as a `float` because `.force_jwtdatetime_to_float()` was called.<br><br>`'custom_time'` remains an `int` because of its `JWTDatetimeInt` type.
-2. `'exp'` is serialized back to an `int`.
+1. `'exp'` timestamp is serialized as a `float` because it was redefined as `JWTDatetimeFloat`.<br><br>`'custom_time'` timestamp is an `int` because it is defined as `JWTDatetimeInt`.
 
 ### Spoof Time
 
-You can override the current time with a custom `datetime` object for testing purposes. All time integrity and validity checks will account for the new spoofed "present time".
+You can override the current time with a custom `datetime` object for testing purposes. All time integrity and validity checks will account for the new spoofed "present time". Spoofing is especially useful to test `'nbf'` claim during decoding.
 
-/// tab | with a Pydantic<br>instance
+/// tab | `'nbf'` Decoding Example<br>with Validation Config
+```python
+from datetime import datetime
+from superjwt import Alg, JWTClaims, ValidationConfig, decode, inspect
+from superjwt.exceptions import TokenNotYetValidError
+
+secret_key = "your-secret-key-of-len-32-bytes!"
+
+compact = (
+    b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    b"eyJzdWIiOiJ1c2VyLTEyMyIsIm5iZiI6MTk4NzY1NDMyMX0."
+    b"6GIisgWqqeiIMslavC51QYGWqIrxnKXKVrhIlV7W8XA"
+)
+print(inspect(compact).payload)
+#> {'sub': 'user-123', 'nbf': 1987654321}  --> Not valid before December 26, 2032
+
+validation_spoof_before = ValidationConfig(
+    model=JWTClaims, 
+    now=datetime(2032, 12, 21)
+)
+
+validation_spoof_after = ValidationConfig(
+    model=JWTClaims, 
+    now=datetime(2032, 12, 29)
+)
+
+try:
+    decode(
+        compact, secret_key, Alg.HS256, claims_validation=validation_spoof_before
+    )  # --> ❌ fails (1)
+except TokenNotYetValidError as e:
+    print(e)
+    #> Token is no yet valid
+    decoded = decode(
+        compact, secret_key, Alg.HS256, claims_validation=validation_spoof_after
+    )  # --> ✅ passes (2)
+```
+
+1. The "present time" is five days before `'nbf'`, the token is not yet valid.
+2. The "present time" is three days after `'nbf'`, the token is valid.
+
+///
+
+/// tab | `'exp'` Encoding Example<br>with a Pydantic instance
 ```python
 from datetime import datetime
 from superjwt import Alg, JWTClaims, encode
@@ -1200,6 +1234,7 @@ from superjwt.exceptions import TokenExpiredError
 secret_key = "your-secret-key-of-len-32-bytes!"
 
 claims = JWTClaims(sub="user-123").with_expiration(days=7)
+
 # Set current time to a future date
 claims.spoof_time(
     datetime(2046, 12, 31, 23, 59, 59)
@@ -1207,35 +1242,6 @@ claims.spoof_time(
 
 try:
     encode(claims, secret_key, Alg.HS256)
-except TokenExpiredError as e:
-    print(e)
-    #> Token has expired
-```
-///
-
-/// tab | with a Validation<br>Config
-```python
-from datetime import datetime
-from superjwt import Alg, JWTClaims, ValidationConfig, decode, inspect
-from superjwt.exceptions import TokenExpiredError
-
-secret_key = "your-secret-key-of-len-32-bytes!"
-
-compact = (
-    b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    b"eyJzdWIiOiJ1c2VyLTEyMyIsImV4cCI6MjI0MzQ2NTE5NX0."
-    b"tHxnTwpkkxOBK2oZ0O2rq7ObV96DgcgjDGwQ__cH8LA"
-)
-print(inspect(compact).payload)
-#> {'sub': 'user-123', 'exp': 2243465195}  exp = Feb 3, 2041
-
-validation = ValidationConfig(
-    model=JWTClaims, 
-    now=datetime(2046, 12, 31, 23, 59, 59)
-)
-
-try:
-    decode(compact, secret_key, Alg.HS256, claims_validation=validation)
 except TokenExpiredError as e:
     print(e)
     #> Token has expired

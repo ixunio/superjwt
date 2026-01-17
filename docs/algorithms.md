@@ -30,7 +30,7 @@ pip install superjwt[asymmetric]
 
 Which algorithm to choose? [See What is best, and why?](./jwt/signing-algorithms.md#what-is-best-and-why)
 
-TLDR; use `Ed25519`!
+TL;DR: use `Ed25519` for asymmetric, `HS256` for symmetric!
 
 ---
 
