@@ -4,7 +4,7 @@ on:
   release:
     types: [published]
 
-run-name: Publish to PyPI release ${{ github.event.release.tag_name }}
+run-name: Publish ${{ github.event.release.tag_name }} PyPI Package and Documentation
 
 permissions:
   contents: read
@@ -52,7 +52,7 @@ jobs:
 
   publish-on-pypi:
     runs-on: ubuntu-latest
-    needs: [build-package, publish-on-testpypi]
+    needs: [publish-on-testpypi]
     permissions:
       id-token: write
     environment:
@@ -69,3 +69,49 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://upload.pypi.org/legacy/
+
+  deploy-docs:
+    name: Deploy Versioned Documentation
+    runs-on: ubuntu-latest
+    needs: [publish-on-pypi]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      
+      - name: Configure git credentials
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      
+      - name: Set cache ID
+        run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
+      
+      - name: Cache documentation dependencies
+        uses: actions/cache@v4
+        with:
+          key: mkdocs-material-${{ env.cache_id }}
+          path: ~/.cache
+          restore-keys: |
+            mkdocs-material-
+      
+      - name: Install documentation dependencies
+        run: pip install --group docs
+      
+      - name: Extract 'major.minor' version
+        id: version
+        run: |
+          MAJOR_MINOR=$(echo "${{ github.event.release.tag_name }}" | grep -oP '^(?:v)?\K\d+\.\d+')
+          echo "major_minor=$MAJOR_MINOR" >> $GITHUB_OUTPUT
+          echo "📦 Deploying docs for version: $MAJOR_MINOR"
+      
+      - name: Deploy 'major.minor' documentation
+        run: mike deploy ${{ steps.version.outputs.major_minor }} latest --push --update-aliases
+

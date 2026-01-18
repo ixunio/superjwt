@@ -154,38 +154,11 @@ jobs:
           echo "✅ Changelog content validated"
           echo "✅ Tag v${{ steps.current_version.outputs.version }} does not exist - release will be created on merge"
 
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [validate-release]
-    if: needs.validate-release.outputs.is_valid_release == 'true'
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      
-      - name: Create and push tag
-        run: bash .github/scripts/create_tag.sh "${{ needs.validate-release.outputs.version }}"
-      
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_CI_TOKEN }}
-        with:
-          tag_name: v${{ needs.validate-release.outputs.version }}
-          name: ${{ needs.validate-release.outputs.version }} (${{ needs.validate-release.outputs.release_date }})
-          body: |
-            ${{ needs.validate-release.outputs.changelog_content }}
-          draft: false
-          prerelease: false
-  
   deploy-docs:
-    name: Deploy Documentation
+    name: Deploy Documentation on 'dev'
     runs-on: ubuntu-latest
     needs: [validate-release]
-    if: (github.ref == 'refs/heads/main' && needs.validate-release.outputs.is_valid_repo == 'true') || needs.validate-release.outputs.is_valid_release == 'true'
+    if: github.ref == 'refs/heads/main' && needs.validate-release.outputs.is_valid_repo == 'true'
     permissions:
       contents: write
     steps:
@@ -218,18 +191,31 @@ jobs:
         run: pip install --group docs
       
       - name: Deploy 'dev' documentation
-        if: github.ref == 'refs/heads/main' && needs.validate-release.outputs.is_valid_repo == 'true'
         run: mike deploy --push --update-aliases dev
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [validate-release]
+    if: needs.validate-release.outputs.is_valid_release == 'true'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       
-      - name: Extract 'major.minor' version
-        if: needs.validate-release.outputs.is_valid_release == 'true'
-        id: version
-        run: |
-          VERSION="${{ needs.validate-release.outputs.version }}"
-          MAJOR_MINOR=$(echo "$VERSION" | grep -oP '^\d+\.\d+')
-          echo "major_minor=$MAJOR_MINOR" >> $GITHUB_OUTPUT
-          echo "📦 Deploying docs for version: $MAJOR_MINOR"
+      - name: Create and push tag
+        run: bash .github/scripts/create_tag.sh "${{ needs.validate-release.outputs.version }}"
       
-      - name: Deploy 'major.minor' documentation
-        if: needs.validate-release.outputs.is_valid_release == 'true'
-        run: mike deploy ${{ steps.version.outputs.major_minor }} latest --push --update-aliases
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_CI_TOKEN }}
+        with:
+          tag_name: v${{ needs.validate-release.outputs.version }}
+          name: ${{ needs.validate-release.outputs.version }} (${{ needs.validate-release.outputs.release_date }})
+          body: |
+            ${{ needs.validate-release.outputs.changelog_content }}
+          draft: false
+          prerelease: false
