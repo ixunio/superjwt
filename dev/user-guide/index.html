@@ -1640,7 +1640,7 @@
 </ul>
 </li>
 <li><strong>Token Time Validity</strong><br/>
-    Raises <code>TokenExpiredError</code> if the token has expired (given <code>'exp'</code> claim timestamp) or <code>TokenNotYetValidError</code> if it is not yet valid (given <code>'nbf'</code> claim timestamp).</li>
+    Raises <code>TokenExpiredError</code> if the token has expired (given <code>'exp'</code> claim timestamp) or <code>TokenNotYetValidError</code> if it is not yet valid (given <code>'nbf'</code> claim timestamp during decoding only).</li>
 <li><strong>Time Leeway</strong><br/>
     Allows leeway (default: 5 seconds) during decoding to account for clock skew. Can be configured in a <a href="#validation-config">Validation Config</a>.</li>
 <li><strong>Time Claim Methods</strong><br/>

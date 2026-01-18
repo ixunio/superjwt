@@ -1040,6 +1040,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixes (🐛)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1136,7 +1147,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixes" class="md-nav__link">
+  <a href="#fixes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixes (🐛)
@@ -1253,7 +1264,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_1" class="md-nav__link">
+  <a href="#fixes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixes (🐛)
@@ -1389,6 +1400,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixes (🐛)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1485,7 +1507,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixes" class="md-nav__link">
+  <a href="#fixes_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixes (🐛)
@@ -1602,7 +1624,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_1" class="md-nav__link">
+  <a href="#fixes_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fixes (🐛)
@@ -1670,8 +1692,13 @@
 <h3 id="changes">Changes (♻️)<a class="headerlink" href="#changes" title="Permanent link">&para;</a></h3>
 <p><em>JWT &amp; Validation</em></p>
 <ul>
-<li><strong>(breaking)</strong> <img alt="💥" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@16.0.1/assets/svg/1f4a5.svg" title=":boom:" /> decode() now returns a Pydantic instance, matching the claims validation model (default <code>JWTClaims</code>)</li>
-<li><strong>(breaking)</strong> <img alt="💥" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@16.0.1/assets/svg/1f4a5.svg" title=":boom:" />  <code>JWTDatetime</code> is removed, <code>'exp'</code>, <code>'nbf'</code>, <code>'iat'</code> are now typed as <code>JWTDatetimeInt</code> in <code>JWTClaims</code> model and still serialize as int.</li>
+<li><strong>(breaking)</strong> <img alt="💥" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@16.0.1/assets/svg/1f4a5.svg" title=":boom:" /> <code>decode()</code> now returns a Pydantic instance, matching the claims validation model (default <code>JWTClaims</code>)  (<a href="https://github.com/ixunio/superjwt/issues/91">#91</a>)</li>
+<li><strong>(breaking)</strong> <img alt="💥" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@16.0.1/assets/svg/1f4a5.svg" title=":boom:" />  <code>JWTDatetime</code> is removed, <code>'exp'</code>, <code>'nbf'</code>, <code>'iat'</code> are now typed as <code>JWTDatetimeInt</code> in <code>JWTClaims</code> model and still serialize as int. (<a href="https://github.com/ixunio/superjwt/issues/91">#91</a>)</li>
+</ul>
+<h3 id="fixes">Fixes (🐛)<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
+<p><em>JWT &amp; Validation</em></p>
+<ul>
+<li><code>nbf</code> validation to be triggered only during decoding to allow for token creation with a Not Before claim. (<a href="https://github.com/ixunio/superjwt/issues/94">#94</a>)</li>
 </ul>
 <h2 id="v060-2026-01-14">v0.6.0 (2026-01-14)<a class="headerlink" href="#v060-2026-01-14" title="Permanent link">&para;</a></h2>
 <h3 id="new">New (✨)<a class="headerlink" href="#new" title="Permanent link">&para;</a></h3>
@@ -1732,7 +1759,7 @@
 <li><code>.with_issued_at()</code> and <code>.with_expiration()</code> now preserve time delta with <code>'iat'</code> (<a href="https://github.com/ixunio/superjwt/issues/49">#49</a>)</li>
 </ul>
 <h2 id="v041-2026-01-03">v0.4.1 (2026-01-03)<a class="headerlink" href="#v041-2026-01-03" title="Permanent link">&para;</a></h2>
-<h3 id="fixes">Fixes (🐛)<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
+<h3 id="fixes_1">Fixes (🐛)<a class="headerlink" href="#fixes_1" title="Permanent link">&para;</a></h3>
 <p><em>JWT &amp; Validation</em></p>
 <ul>
 <li><code>'exp'</code> and <code>'nbf'</code> incorrect validation when <code>'iat'</code> was present (<a href="https://github.com/ixunio/superjwt/issues/47">#47</a>)</li>
@@ -1813,7 +1840,7 @@
 <ul>
 <li>Add compatibility for python 3.10 &amp; 3.11, was working only for python 3.12-3.14 previously</li>
 </ul>
-<h3 id="fixes_1">Fixes (🐛)<a class="headerlink" href="#fixes_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixes_2">Fixes (🐛)<a class="headerlink" href="#fixes_2" title="Permanent link">&para;</a></h3>
 <p><em>JWT &amp; Validation</em></p>
 <ul>
 <li><code>inspect()</code> now works with detached payload</li>
