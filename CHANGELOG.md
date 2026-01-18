@@ -1,13 +1,13 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 (2026-01-18)
 
 ### Changes (♻️)
 
 *JWT & Validation*
 
 - **(breaking)** :boom: `decode()` now returns a Pydantic instance, matching the claims validation model (default `JWTClaims`)  ([#91])
-- **(breaking)** :boom:  `JWTDatetime` is removed, `'exp'`, `'nbf'`, `'iat'` are now typed as `JWTDatetimeInt` in `JWTClaims` model and still serialize as int. ([#91])
+- **(breaking)** :boom:  `JWTDatetime` is removed, `'exp'`, `'nbf'`, `'iat'` are now typed as `JWTDatetimeInt` in `JWTClaims` model and still serialize to `int`. ([#91])
 - **(breaking)** :boom: `encode()` / `decode()` claims validation parameter renamed to `validation` ([#96])
 
 ### Fixes (🐛)

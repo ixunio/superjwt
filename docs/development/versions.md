@@ -8,8 +8,8 @@ While we are working towards a stable `v1.0.0` release, the library is already r
 
 However, we are committed to minimizing disruption:
 
-- **Patch versions** (e.g., `0.6.0` -> `0.6.1`) contain only bug fixes and are safe to upgrade.
-- **Minor versions** (e.g., `0.6.x` -> `0.7.x`) may contain new features or breaking changes.<br>We will document these clearly in the [Changelog](changelog.md).
+- **Patch versions** (e.g., `0.7.0` -> `0.7.1`) contain only bug fixes and are safe to upgrade.
+- **Minor versions** (e.g., `0.7.x` -> `0.8.x`) may contain new features or breaking changes.<br>We will document these clearly in the [Changelog](changelog.md).
 
 ## Pinning Strategy
 
@@ -18,20 +18,20 @@ To ensure stability in your application, we strongly recommend pinning your depe
 If you are using a `pyproject.toml` or `requirements.txt` file, `uv`, `poetry`, or `pip`, you should restrict the version range to the current minor version.
 
 **Example:**
-If you start using SuperJWT at version `0.6.0`, pin it like this:
+If you start using SuperJWT at version `0.7.0`, pin it like this:
 
 ```txt
-superjwt>=0.6.0,<0.7.0
+superjwt>=0.7.0,<0.8.0
 ```
 
-This configuration allows you to automatically receive bug fixes (e.g., `0.6.1`, `0.6.2`) but prevents upgrading to `0.7.0`, which might require code changes on your end.
+This configuration allows you to automatically receive bug fixes (e.g., `0.7.1`, `0.7.2`) but prevents upgrading to `0.8.0`, which might require code changes on your end.
 
 ## How to Upgrade
 
-When you decide to upgrade to a new minor version (e.g., from `0.6.x` to `0.7.x`):
+When you decide to upgrade to a new minor version (e.g., from `0.7.x` to `0.8.x`):
 
 1.  **Check the [Changelog](changelog.md)** for any breaking changes or migration guides.
-2.  **Update your dependency pin** (e.g., change `superjwt>=0.6.0,<0.7.0` to `superjwt>=0.7.0,<0.8.0`).
+2.  **Update your dependency pin** (e.g., change `superjwt>=0.7.0,<0.8.0` to `superjwt>=0.8.0,<0.9.0`).
 3.  **Run your test suite**. SuperJWT has extensive test coverage, and we recommend you do the same for your integration code.
 4.  If tests pass, you are good to go!
 
