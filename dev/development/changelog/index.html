@@ -1694,6 +1694,7 @@
 <ul>
 <li><strong>(breaking)</strong> <img alt="💥" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@16.0.1/assets/svg/1f4a5.svg" title=":boom:" /> <code>decode()</code> now returns a Pydantic instance, matching the claims validation model (default <code>JWTClaims</code>)  (<a href="https://github.com/ixunio/superjwt/issues/91">#91</a>)</li>
 <li><strong>(breaking)</strong> <img alt="💥" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@16.0.1/assets/svg/1f4a5.svg" title=":boom:" />  <code>JWTDatetime</code> is removed, <code>'exp'</code>, <code>'nbf'</code>, <code>'iat'</code> are now typed as <code>JWTDatetimeInt</code> in <code>JWTClaims</code> model and still serialize as int. (<a href="https://github.com/ixunio/superjwt/issues/91">#91</a>)</li>
+<li><strong>(breaking)</strong> <img alt="💥" class="twemoji" src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@16.0.1/assets/svg/1f4a5.svg" title=":boom:" /> <code>encode()</code> / <code>decode()</code> claims validation parameter renamed to <code>validation</code> (<a href="https://github.com/ixunio/superjwt/issues/96">#96</a>)</li>
 </ul>
 <h3 id="fixes">Fixes (🐛)<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
 <p><em>JWT &amp; Validation</em></p>

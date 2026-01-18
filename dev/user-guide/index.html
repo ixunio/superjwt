@@ -1018,7 +1018,7 @@
 <td style="text-align: left;"><em>(optional)</em> If <code>True</code>, produces a detached payload JWT.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>claims_validation</code></td>
+<td style="text-align: left;"><code>validation</code></td>
 <td style="text-align: left;"><code>type[JWTBaseModel]</code><br/>   | <code>ValidationConfig</code><br/>   | <code>Validation</code></td>
 <td style="text-align: left;"><em>(optional)</em> Validation settings for claims. If <code>claims</code> is a Pydantic model it is validated automatically.</td>
 </tr>
@@ -1265,7 +1265,7 @@
 <td style="text-align: left;"><em>(optional)</em> The detached payload data, if the token was encoded with a detached payload.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>claims_validation</code></td>
+<td style="text-align: left;"><code>validation</code></td>
 <td style="text-align: left;"><code>type[JWTBaseModel]</code><br/>   | <code>ValidationConfig</code><br/>   | <code>Validation</code></td>
 <td style="text-align: left;"><em>(optional)</em> Validation settings for claims. See <a href="#validation">Validation</a>.</td>
 </tr>
@@ -1316,7 +1316,7 @@
 </div>
 </li>
 <li>
-<p>The token was successfully verified and validated against the <code>JWTClaims</code> Pydantic model. Use the <code>claims_validation</code> parameter to validate against your own custom models. See <a href="#validation">Validation</a>.</p>
+<p>The token was successfully verified and validated against the <code>JWTClaims</code> Pydantic model. Use the <code>validation</code> parameter to validate against your own custom models. See <a href="#validation">Validation</a>.</p>
 </li>
 </ol>
 </div>
@@ -1368,7 +1368,7 @@
 </span><span id="__span-11-19"><a href="#__codelineno-11-19" id="__codelineno-11-19" name="__codelineno-11-19"></a>    <span class="c1">#&gt; claim ('iss',) = True -&gt; validation failed (string_type): Input should be a valid string</span>
 </span><span id="__span-11-20"><a href="#__codelineno-11-20" id="__codelineno-11-20" name="__codelineno-11-20"></a>
 </span><span id="__span-11-21"><a href="#__codelineno-11-21" id="__codelineno-11-21" name="__codelineno-11-21"></a>    <span class="n">decoded</span><span class="p">:</span> <span class="n">JWTBaseModel</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span>
-</span><span id="__span-11-22"><a href="#__codelineno-11-22" id="__codelineno-11-22" name="__codelineno-11-22"></a>        <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span>
+</span><span id="__span-11-22"><a href="#__codelineno-11-22" id="__codelineno-11-22" name="__codelineno-11-22"></a>        <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span>
 </span><span id="__span-11-23"><a href="#__codelineno-11-23" id="__codelineno-11-23" name="__codelineno-11-23"></a>        <span class="p">)</span>  <span class="c1"># --&gt; 🤔 passes (3)</span>
 </span><span id="__span-11-24"><a href="#__codelineno-11-24" id="__codelineno-11-24" name="__codelineno-11-24"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">decoded</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
 </span><span id="__span-11-25"><a href="#__codelineno-11-25" id="__codelineno-11-25" name="__codelineno-11-25"></a>    <span class="c1">#&gt; {'iss': True}</span>
@@ -1404,7 +1404,7 @@
 </span><span id="__span-12-14"><a href="#__codelineno-12-14" id="__codelineno-12-14" name="__codelineno-12-14"></a><span class="nb">print</span><span class="p">(</span><span class="n">inspect</span><span class="p">(</span><span class="n">compact</span><span class="p">)</span><span class="o">.</span><span class="n">payload</span><span class="p">)</span>  <span class="c1"># (1)</span>
 </span><span id="__span-12-15"><a href="#__codelineno-12-15" id="__codelineno-12-15" name="__codelineno-12-15"></a><span class="c1">#&gt; {'sub': 'user', 'custom_field': 42}</span>
 </span><span id="__span-12-16"><a href="#__codelineno-12-16" id="__codelineno-12-16" name="__codelineno-12-16"></a>
-</span><span id="__span-12-17"><a href="#__codelineno-12-17" id="__codelineno-12-17" name="__codelineno-12-17"></a><span class="n">decoded</span><span class="p">:</span> <span class="n">MyJWTClaims</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">MyJWTClaims</span><span class="p">)</span>
+</span><span id="__span-12-17"><a href="#__codelineno-12-17" id="__codelineno-12-17" name="__codelineno-12-17"></a><span class="n">decoded</span><span class="p">:</span> <span class="n">MyJWTClaims</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">MyJWTClaims</span><span class="p">)</span>
 </span><span id="__span-12-18"><a href="#__codelineno-12-18" id="__codelineno-12-18" name="__codelineno-12-18"></a><span class="nb">print</span><span class="p">(</span><span class="n">decoded</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
 </span><span id="__span-12-19"><a href="#__codelineno-12-19" id="__codelineno-12-19" name="__codelineno-12-19"></a><span class="c1">#&gt; {'sub': 'user', 'custom_field': 42}</span>
 </span></code></pre></div>
@@ -1440,7 +1440,7 @@
 </span><span id="__span-13-19"><a href="#__codelineno-13-19" id="__codelineno-13-19" name="__codelineno-13-19"></a><span class="nb">print</span><span class="p">(</span><span class="n">inspect</span><span class="p">(</span><span class="n">compact</span><span class="p">)</span><span class="o">.</span><span class="n">payload</span><span class="p">)</span>  <span class="c1"># (2)</span>
 </span><span id="__span-13-20"><a href="#__codelineno-13-20" id="__codelineno-13-20" name="__codelineno-13-20"></a><span class="c1">#&gt; {'sub': 'user', 'iat': 1767845938, 'exp': 2199756475, 'custom_field': 42}</span>
 </span><span id="__span-13-21"><a href="#__codelineno-13-21" id="__codelineno-13-21" name="__codelineno-13-21"></a>
-</span><span id="__span-13-22"><a href="#__codelineno-13-22" id="__codelineno-13-22" name="__codelineno-13-22"></a><span class="n">decoded</span><span class="p">:</span> <span class="n">MyJWTClaims</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">validation</span><span class="p">)</span>
+</span><span id="__span-13-22"><a href="#__codelineno-13-22" id="__codelineno-13-22" name="__codelineno-13-22"></a><span class="n">decoded</span><span class="p">:</span> <span class="n">MyJWTClaims</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">validation</span><span class="p">)</span>
 </span><span id="__span-13-23"><a href="#__codelineno-13-23" id="__codelineno-13-23" name="__codelineno-13-23"></a><span class="nb">print</span><span class="p">(</span><span class="n">decoded</span><span class="p">)</span> <span class="c1"># (3)</span>
 </span><span id="__span-13-24"><a href="#__codelineno-13-24" id="__codelineno-13-24" name="__codelineno-13-24"></a><span class="c1">#&gt; iss=None sub='user' aud=None iat=datetime.datetime(2026, 1, 8, 4, 18, 58, tzinfo=TzInfo(0)) nbf=None </span>
 </span><span id="__span-13-25"><a href="#__codelineno-13-25" id="__codelineno-13-25" name="__codelineno-13-25"></a><span class="c1">#  exp=datetime.datetime(2039, 9, 16, 3, 27, 55, tzinfo=TzInfo(0)) jti=None custom_field=42</span>
@@ -1449,7 +1449,7 @@
 </span><span id="__span-13-28"><a href="#__codelineno-13-28" id="__codelineno-13-28" name="__codelineno-13-28"></a><span class="c1">#&gt; {'sub': 'user', 'iat': 1767845938, 'exp': 2199756475, 'custom_field': 42}</span>
 </span></code></pre></div>
 <ol>
-<li>By creating a <code>ValidationConfig</code> instance to be passed to <code>claims_validation</code> parameter, you can change other behaviors like the leeway when decoding <code>'iat'</code>, <code>'exp'</code>, <code>'nbf'</code> claims.</li>
+<li>By creating a <code>ValidationConfig</code> instance to be passed to <code>validation</code> parameter, you can change other behaviors like the leeway when decoding <code>'iat'</code>, <code>'exp'</code>, <code>'nbf'</code> claims.</li>
 <li>
 <div class="admonition danger">
 <p class="admonition-title">Unverified JWT</p>
@@ -1480,7 +1480,7 @@
 </span><span id="__span-14-11"><a href="#__codelineno-14-11" id="__codelineno-14-11" name="__codelineno-14-11"></a>    <span class="n">JWTClaims</span><span class="o">.</span><span class="n">model_construct</span><span class="p">(</span><span class="n">exp</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)),</span>  <span class="c1"># (1),</span>
 </span><span id="__span-14-12"><a href="#__codelineno-14-12" id="__codelineno-14-12" name="__codelineno-14-12"></a>    <span class="n">secret_key</span><span class="p">,</span>
 </span><span id="__span-14-13"><a href="#__codelineno-14-13" id="__codelineno-14-13" name="__codelineno-14-13"></a>    <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span>
-</span><span id="__span-14-14"><a href="#__codelineno-14-14" id="__codelineno-14-14" name="__codelineno-14-14"></a>    <span class="n">claims_validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span>
+</span><span id="__span-14-14"><a href="#__codelineno-14-14" id="__codelineno-14-14" name="__codelineno-14-14"></a>    <span class="n">validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span>
 </span><span id="__span-14-15"><a href="#__codelineno-14-15" id="__codelineno-14-15" name="__codelineno-14-15"></a><span class="p">)</span>
 </span><span id="__span-14-16"><a href="#__codelineno-14-16" id="__codelineno-14-16" name="__codelineno-14-16"></a>
 </span><span id="__span-14-17"><a href="#__codelineno-14-17" id="__codelineno-14-17" name="__codelineno-14-17"></a><span class="c1"># decode token</span>
@@ -1489,7 +1489,7 @@
 </span><span id="__span-14-20"><a href="#__codelineno-14-20" id="__codelineno-14-20" name="__codelineno-14-20"></a>    <span class="c1">#&gt; TokenExpiredError: Token has expired</span>
 </span><span id="__span-14-21"><a href="#__codelineno-14-21" id="__codelineno-14-21" name="__codelineno-14-21"></a><span class="k">except</span> <span class="n">TokenExpiredError</span><span class="p">:</span>
 </span><span id="__span-14-22"><a href="#__codelineno-14-22" id="__codelineno-14-22" name="__codelineno-14-22"></a>    <span class="n">decoded</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span>
-</span><span id="__span-14-23"><a href="#__codelineno-14-23" id="__codelineno-14-23" name="__codelineno-14-23"></a>        <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span>
+</span><span id="__span-14-23"><a href="#__codelineno-14-23" id="__codelineno-14-23" name="__codelineno-14-23"></a>        <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span>
 </span><span id="__span-14-24"><a href="#__codelineno-14-24" id="__codelineno-14-24" name="__codelineno-14-24"></a>        <span class="p">)</span>  <span class="c1"># --&gt; 🤔 passes (3)</span>
 </span><span id="__span-14-25"><a href="#__codelineno-14-25" id="__codelineno-14-25" name="__codelineno-14-25"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">decoded</span><span class="o">.</span><span class="n">exp</span><span class="p">)</span>
 </span><span id="__span-14-26"><a href="#__codelineno-14-26" id="__codelineno-14-26" name="__codelineno-14-26"></a>    <span class="c1">#&gt; 1766960212</span>
@@ -1630,7 +1630,7 @@
 </li>
 <li>
 <p><strong>Default Claims Model for Validation</strong><br/>
-    Claims are validated against this model when <code>claims_validation</code> is not set in <code>decode()</code>.</p>
+    Claims are validated against this model when <code>validation</code> parameter is not set in <code>decode()</code>.</p>
 </li>
 <li><strong>Time Integrity Checks</strong><br/>
     Ensures the following conditions are met for <code>'iat'</code>, <code>'nbf'</code>, and <code>'exp'</code>:<ul>
@@ -1652,7 +1652,7 @@
 <p>There are several ways to validate your custom JWT data:</p>
 <ul>
 <li>By using Pydantic directly before encoding or after decoding.</li>
-<li>When using <code>decode()</code>, claims are validated against <code>JWTClaims</code> by default. You can specify a custom model via the <code>claims_validation</code> parameter or use a <a href="#validation-config">ValidationConfig</a>.</li>
+<li>When using <code>decode()</code>, claims are validated against <code>JWTClaims</code> by default. You can specify a custom model via the <code>validation</code> parameter or use a <a href="#validation-config">ValidationConfig</a>.</li>
 <li>When using <code>encode()</code>, raw <code>dict</code> claims are validated against <code>JWTClaims</code> by default, and Pydantic claims are validated against their own Pydantic model.</li>
 </ul>
 <div class="tabbed-set tabbed-alternate" data-tabs="5:2"><input checked="checked" id="decoding-process" name="__tabbed_5" type="radio"/><input id="encoding-process" name="__tabbed_5" type="radio"/><div class="tabbed-labels"><label for="decoding-process">Decoding Process</label><label for="encoding-process">Encoding Process</label></div>
@@ -1757,7 +1757,7 @@
 </span><span id="__span-20-25"><a href="#__codelineno-20-25" id="__codelineno-20-25" name="__codelineno-20-25"></a>    <span class="n">claims</span><span class="o">.</span><span class="n">items_id</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"banana"</span><span class="p">,</span> <span class="s2">"apple"</span><span class="p">,</span> <span class="s2">"orange"</span><span class="p">]</span>
 </span><span id="__span-20-26"><a href="#__codelineno-20-26" id="__codelineno-20-26" name="__codelineno-20-26"></a>    <span class="n">compact</span> <span class="o">=</span> <span class="n">encode</span><span class="p">(</span><span class="n">claims</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">)</span>  <span class="c1"># --&gt; ✅ passes (3)</span>
 </span><span id="__span-20-27"><a href="#__codelineno-20-27" id="__codelineno-20-27" name="__codelineno-20-27"></a>
-</span><span id="__span-20-28"><a href="#__codelineno-20-28" id="__codelineno-20-28" name="__codelineno-20-28"></a><span class="n">decoded</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">MyJWTClaims</span><span class="p">)</span>  <span class="c1"># --&gt; ✅ passes</span>
+</span><span id="__span-20-28"><a href="#__codelineno-20-28" id="__codelineno-20-28" name="__codelineno-20-28"></a><span class="n">decoded</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">MyJWTClaims</span><span class="p">)</span>  <span class="c1"># --&gt; ✅ passes</span>
 </span><span id="__span-20-29"><a href="#__codelineno-20-29" id="__codelineno-20-29" name="__codelineno-20-29"></a><span class="nb">print</span><span class="p">(</span><span class="n">decoded</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
 </span><span id="__span-20-30"><a href="#__codelineno-20-30" id="__codelineno-20-30" name="__codelineno-20-30"></a><span class="c1">#&gt; {'nbf': 1767225599.987654, 'items_id': ['banana', 'apple', 'orange']} (4)</span>
 </span></code></pre></div>
@@ -1855,10 +1855,10 @@
 </span><span id="__span-23-22"><a href="#__codelineno-23-22" id="__codelineno-23-22" name="__codelineno-23-22"></a><span class="c1">#&gt; {'user_id': 'not-a-uuid-v4'}</span>
 </span><span id="__span-23-23"><a href="#__codelineno-23-23" id="__codelineno-23-23" name="__codelineno-23-23"></a>
 </span><span id="__span-23-24"><a href="#__codelineno-23-24" id="__codelineno-23-24" name="__codelineno-23-24"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-23-25"><a href="#__codelineno-23-25" id="__codelineno-23-25" name="__codelineno-23-25"></a>    <span class="n">decode</span><span class="p">(</span><span class="n">invalid_compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">MyJWTClaims</span><span class="p">)</span>  <span class="c1"># --&gt; ❌ fails (4)</span>
+</span><span id="__span-23-25"><a href="#__codelineno-23-25" id="__codelineno-23-25" name="__codelineno-23-25"></a>    <span class="n">decode</span><span class="p">(</span><span class="n">invalid_compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">MyJWTClaims</span><span class="p">)</span>  <span class="c1"># --&gt; ❌ fails (4)</span>
 </span><span id="__span-23-26"><a href="#__codelineno-23-26" id="__codelineno-23-26" name="__codelineno-23-26"></a><span class="k">except</span> <span class="n">ClaimsValidationError</span><span class="p">:</span>
 </span><span id="__span-23-27"><a href="#__codelineno-23-27" id="__codelineno-23-27" name="__codelineno-23-27"></a>    <span class="n">decoded</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span>
-</span><span id="__span-23-28"><a href="#__codelineno-23-28" id="__codelineno-23-28" name="__codelineno-23-28"></a>        <span class="n">valid_compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">MyJWTClaims</span>
+</span><span id="__span-23-28"><a href="#__codelineno-23-28" id="__codelineno-23-28" name="__codelineno-23-28"></a>        <span class="n">valid_compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">MyJWTClaims</span>
 </span><span id="__span-23-29"><a href="#__codelineno-23-29" id="__codelineno-23-29" name="__codelineno-23-29"></a>        <span class="p">)</span>  <span class="c1"># --&gt; ✅ passes</span>
 </span></code></pre></div>
 <ol>
@@ -1949,13 +1949,13 @@
 </span><span id="__span-25-23"><a href="#__codelineno-25-23" id="__codelineno-25-23" name="__codelineno-25-23"></a><span class="n">compact</span> <span class="o">=</span> <span class="n">encode</span><span class="p">(</span><span class="n">claims</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">)</span>
 </span><span id="__span-25-24"><a href="#__codelineno-25-24" id="__codelineno-25-24" name="__codelineno-25-24"></a>
 </span><span id="__span-25-25"><a href="#__codelineno-25-25" id="__codelineno-25-25" name="__codelineno-25-25"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-25-26"><a href="#__codelineno-25-26" id="__codelineno-25-26" name="__codelineno-25-26"></a>    <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">strict</span><span class="p">)</span>
+</span><span id="__span-25-26"><a href="#__codelineno-25-26" id="__codelineno-25-26" name="__codelineno-25-26"></a>    <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">strict</span><span class="p">)</span>
 </span><span id="__span-25-27"><a href="#__codelineno-25-27" id="__codelineno-25-27" name="__codelineno-25-27"></a><span class="k">except</span> <span class="n">ClaimsValidationError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
 </span><span id="__span-25-28"><a href="#__codelineno-25-28" id="__codelineno-25-28" name="__codelineno-25-28"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
 </span><span id="__span-25-29"><a href="#__codelineno-25-29" id="__codelineno-25-29" name="__codelineno-25-29"></a>    <span class="c1">#&gt; Claims validation failed</span>
 </span><span id="__span-25-30"><a href="#__codelineno-25-30" id="__codelineno-25-30" name="__codelineno-25-30"></a>    <span class="c1">#&gt; claim ('sub',) -&gt; validation failed (missing): Field required</span>
 </span><span id="__span-25-31"><a href="#__codelineno-25-31" id="__codelineno-25-31" name="__codelineno-25-31"></a>
-</span><span id="__span-25-32"><a href="#__codelineno-25-32" id="__codelineno-25-32" name="__codelineno-25-32"></a><span class="n">decoded</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">lenient</span><span class="p">)</span>
+</span><span id="__span-25-32"><a href="#__codelineno-25-32" id="__codelineno-25-32" name="__codelineno-25-32"></a><span class="n">decoded</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span><span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">lenient</span><span class="p">)</span>
 </span><span id="__span-25-33"><a href="#__codelineno-25-33" id="__codelineno-25-33" name="__codelineno-25-33"></a><span class="nb">print</span><span class="p">(</span><span class="n">decoded</span><span class="o">.</span><span class="n">iss</span><span class="p">)</span>
 </span><span id="__span-25-34"><a href="#__codelineno-25-34" id="__codelineno-25-34" name="__codelineno-25-34"></a><span class="c1">#&gt; 'my-app'</span>
 </span></code></pre></div>
@@ -1987,7 +1987,7 @@
 </span><span id="__span-26-17"><a href="#__codelineno-26-17" id="__codelineno-26-17" name="__codelineno-26-17"></a>
 </span><span id="__span-26-18"><a href="#__codelineno-26-18" id="__codelineno-26-18" name="__codelineno-26-18"></a><span class="k">try</span><span class="p">:</span>
 </span><span id="__span-26-19"><a href="#__codelineno-26-19" id="__codelineno-26-19" name="__codelineno-26-19"></a>    <span class="n">encode</span><span class="p">(</span>
-</span><span id="__span-26-20"><a href="#__codelineno-26-20" id="__codelineno-26-20" name="__codelineno-26-20"></a>        <span class="n">valid_claims</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">JWTClaims</span>  <span class="c1"># --&gt; ❌ fails (2)</span>
+</span><span id="__span-26-20"><a href="#__codelineno-26-20" id="__codelineno-26-20" name="__codelineno-26-20"></a>        <span class="n">valid_claims</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">JWTClaims</span>  <span class="c1"># --&gt; ❌ fails (2)</span>
 </span><span id="__span-26-21"><a href="#__codelineno-26-21" id="__codelineno-26-21" name="__codelineno-26-21"></a>    <span class="p">)</span>
 </span><span id="__span-26-22"><a href="#__codelineno-26-22" id="__codelineno-26-22" name="__codelineno-26-22"></a><span class="k">except</span><span class="p">:</span>
 </span><span id="__span-26-23"><a href="#__codelineno-26-23" id="__codelineno-26-23" name="__codelineno-26-23"></a>    <span class="n">compact</span> <span class="o">=</span> <span class="n">encode</span><span class="p">(</span><span class="n">valid_claims</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">)</span>  <span class="c1"># --&gt; ✅ passes (3)</span>
@@ -1995,7 +1995,7 @@
 <ol>
 <li><code>.model_construct()</code> allows the creation of a Pydantic instance without running validation.</li>
 <li>By using <code>JWTClaims</code> as the validation model, the claims are no longer compliant because <code>'iss'</code> is an integer instead of a string.</li>
-<li>Even though <code>claims_validation</code> is not specified, if the input is a Pydantic instance, it is automatically validated against its own model, here <code>MyJWTClaims</code>.</li>
+<li>Even though the <code>validation</code> parameter is not specified, if the input is a Pydantic instance, it is automatically validated against its own model, here <code>MyJWTClaims</code>.</li>
 </ol>
 </div>
 <div class="tabbed-block">
@@ -2020,7 +2020,7 @@
 </span></code></pre></div>
 <ol>
 <li><code>.model_construct()</code> creates a Pydantic instance without running validation.</li>
-<li>Even without <code>claims_validation</code> specified, Pydantic instances are automatically validated against their own model, here <code>MyJWTClaims</code>.</li>
+<li>Even without <code>validation</code> parameter specified, Pydantic instances are automatically validated against their own model, here <code>MyJWTClaims</code>.</li>
 <li>During encoding, if claims are passed as a raw <code>dict</code>, claims validation runs by default against <code>JWTClaims</code>. The <code>permissions</code> extra field is allowed and has no validation rule, so the encoding is successful.</li>
 </ol>
 </div>
@@ -2070,12 +2070,12 @@
 </span><span id="__span-29-6"><a href="#__codelineno-29-6" id="__codelineno-29-6" name="__codelineno-29-6"></a><span class="n">claims_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"iss"</span><span class="p">:</span> <span class="mi">12345</span><span class="p">}</span>  <span class="c1"># 'iss' should be a string</span>
 </span><span id="__span-29-7"><a href="#__codelineno-29-7" id="__codelineno-29-7" name="__codelineno-29-7"></a>
 </span><span id="__span-29-8"><a href="#__codelineno-29-8" id="__codelineno-29-8" name="__codelineno-29-8"></a><span class="c1"># Encode without validation</span>
-</span><span id="__span-29-9"><a href="#__codelineno-29-9" id="__codelineno-29-9" name="__codelineno-29-9"></a><span class="n">compact</span> <span class="o">=</span> <span class="n">encode</span><span class="p">(</span><span class="n">claims</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span><span class="p">)</span>  <span class="c1"># (1)</span>
-</span><span id="__span-29-10"><a href="#__codelineno-29-10" id="__codelineno-29-10" name="__codelineno-29-10"></a><span class="n">compact</span> <span class="o">=</span> <span class="n">encode</span><span class="p">(</span><span class="n">claims_dict</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span><span class="p">)</span>  <span class="c1"># (2)</span>
+</span><span id="__span-29-9"><a href="#__codelineno-29-9" id="__codelineno-29-9" name="__codelineno-29-9"></a><span class="n">compact</span> <span class="o">=</span> <span class="n">encode</span><span class="p">(</span><span class="n">claims</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span><span class="p">)</span>  <span class="c1"># (1)</span>
+</span><span id="__span-29-10"><a href="#__codelineno-29-10" id="__codelineno-29-10" name="__codelineno-29-10"></a><span class="n">compact</span> <span class="o">=</span> <span class="n">encode</span><span class="p">(</span><span class="n">claims_dict</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span><span class="p">)</span>  <span class="c1"># (2)</span>
 </span><span id="__span-29-11"><a href="#__codelineno-29-11" id="__codelineno-29-11" name="__codelineno-29-11"></a>
 </span><span id="__span-29-12"><a href="#__codelineno-29-12" id="__codelineno-29-12" name="__codelineno-29-12"></a><span class="c1"># Decode without validation</span>
 </span><span id="__span-29-13"><a href="#__codelineno-29-13" id="__codelineno-29-13" name="__codelineno-29-13"></a><span class="n">decoded</span><span class="p">:</span> <span class="n">JWTBaseModel</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span>
-</span><span id="__span-29-14"><a href="#__codelineno-29-14" id="__codelineno-29-14" name="__codelineno-29-14"></a>    <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span>
+</span><span id="__span-29-14"><a href="#__codelineno-29-14" id="__codelineno-29-14" name="__codelineno-29-14"></a>    <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">Validation</span><span class="o">.</span><span class="n">DISABLE</span>
 </span><span id="__span-29-15"><a href="#__codelineno-29-15" id="__codelineno-29-15" name="__codelineno-29-15"></a>    <span class="p">)</span>  <span class="c1"># (3)</span>
 </span></code></pre></div>
 <ol>
@@ -2137,7 +2137,7 @@
 </span><span id="__span-30-10"><a href="#__codelineno-30-10" id="__codelineno-30-10" name="__codelineno-30-10"></a>    <span class="n">compact</span><span class="p">,</span> 
 </span><span id="__span-30-11"><a href="#__codelineno-30-11" id="__codelineno-30-11" name="__codelineno-30-11"></a>    <span class="n">secret_key</span><span class="p">,</span> 
 </span><span id="__span-30-12"><a href="#__codelineno-30-12" id="__codelineno-30-12" name="__codelineno-30-12"></a>    <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> 
-</span><span id="__span-30-13"><a href="#__codelineno-30-13" id="__codelineno-30-13" name="__codelineno-30-13"></a>    <span class="n">claims_validation</span><span class="o">=</span><span class="n">validation_config</span>
+</span><span id="__span-30-13"><a href="#__codelineno-30-13" id="__codelineno-30-13" name="__codelineno-30-13"></a>    <span class="n">validation</span><span class="o">=</span><span class="n">validation_config</span>
 </span><span id="__span-30-14"><a href="#__codelineno-30-14" id="__codelineno-30-14" name="__codelineno-30-14"></a><span class="p">)</span>
 </span></code></pre></div>
 <hr/>
@@ -2206,13 +2206,13 @@
 </span><span id="__span-32-24"><a href="#__codelineno-32-24" id="__codelineno-32-24" name="__codelineno-32-24"></a>
 </span><span id="__span-32-25"><a href="#__codelineno-32-25" id="__codelineno-32-25" name="__codelineno-32-25"></a><span class="k">try</span><span class="p">:</span>
 </span><span id="__span-32-26"><a href="#__codelineno-32-26" id="__codelineno-32-26" name="__codelineno-32-26"></a>    <span class="n">decode</span><span class="p">(</span>
-</span><span id="__span-32-27"><a href="#__codelineno-32-27" id="__codelineno-32-27" name="__codelineno-32-27"></a>        <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">validation_spoof_before</span>
+</span><span id="__span-32-27"><a href="#__codelineno-32-27" id="__codelineno-32-27" name="__codelineno-32-27"></a>        <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">validation_spoof_before</span>
 </span><span id="__span-32-28"><a href="#__codelineno-32-28" id="__codelineno-32-28" name="__codelineno-32-28"></a>    <span class="p">)</span>  <span class="c1"># --&gt; ❌ fails (1)</span>
 </span><span id="__span-32-29"><a href="#__codelineno-32-29" id="__codelineno-32-29" name="__codelineno-32-29"></a><span class="k">except</span> <span class="n">TokenNotYetValidError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
 </span><span id="__span-32-30"><a href="#__codelineno-32-30" id="__codelineno-32-30" name="__codelineno-32-30"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
 </span><span id="__span-32-31"><a href="#__codelineno-32-31" id="__codelineno-32-31" name="__codelineno-32-31"></a>    <span class="c1">#&gt; Token is no yet valid</span>
 </span><span id="__span-32-32"><a href="#__codelineno-32-32" id="__codelineno-32-32" name="__codelineno-32-32"></a>    <span class="n">decoded</span> <span class="o">=</span> <span class="n">decode</span><span class="p">(</span>
-</span><span id="__span-32-33"><a href="#__codelineno-32-33" id="__codelineno-32-33" name="__codelineno-32-33"></a>        <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">claims_validation</span><span class="o">=</span><span class="n">validation_spoof_after</span>
+</span><span id="__span-32-33"><a href="#__codelineno-32-33" id="__codelineno-32-33" name="__codelineno-32-33"></a>        <span class="n">compact</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">validation_spoof_after</span>
 </span><span id="__span-32-34"><a href="#__codelineno-32-34" id="__codelineno-32-34" name="__codelineno-32-34"></a>    <span class="p">)</span>  <span class="c1"># --&gt; ✅ passes (2)</span>
 </span></code></pre></div>
 <ol>
@@ -2366,7 +2366,7 @@
 </span><span id="__span-40-15"><a href="#__codelineno-40-15" id="__codelineno-40-15" name="__codelineno-40-15"></a>    <span class="n">secret_key</span><span class="p">,</span>
 </span><span id="__span-40-16"><a href="#__codelineno-40-16" id="__codelineno-40-16" name="__codelineno-40-16"></a>    <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">,</span>
 </span><span id="__span-40-17"><a href="#__codelineno-40-17" id="__codelineno-40-17" name="__codelineno-40-17"></a>    <span class="n">with_detached_payload</span><span class="o">=</span><span class="n">claims_dict</span><span class="p">,</span>  <span class="c1"># (2)</span>
-</span><span id="__span-40-18"><a href="#__codelineno-40-18" id="__codelineno-40-18" name="__codelineno-40-18"></a>    <span class="n">claims_validation</span><span class="o">=</span><span class="n">JWTClaims</span>
+</span><span id="__span-40-18"><a href="#__codelineno-40-18" id="__codelineno-40-18" name="__codelineno-40-18"></a>    <span class="n">validation</span><span class="o">=</span><span class="n">JWTClaims</span>
 </span><span id="__span-40-19"><a href="#__codelineno-40-19" id="__codelineno-40-19" name="__codelineno-40-19"></a><span class="p">)</span>
 </span><span id="__span-40-20"><a href="#__codelineno-40-20" id="__codelineno-40-20" name="__codelineno-40-20"></a><span class="c1">#&gt; {'iss': 'myapp', 'sub': 'user123', 'exp': 1767715523}</span>
 </span></code></pre></div>
