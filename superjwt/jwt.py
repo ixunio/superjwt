@@ -42,7 +42,7 @@ class JWT:
         algorithm: Alg | str,
         *,
         headers: JOSEHeader | dict[str, Any] | None = None,
-        claims_validation: type[JWTBaseModel]
+        validation: type[JWTBaseModel]
         | ValidationConfig
         | Validation
         | None = Validation.DEFAULT,
@@ -60,7 +60,7 @@ class JWT:
                 Will default to 'HS256' (HMAC with SHA-256).
             headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
                 in the JWT. Will use default JWS headers if not provided.
-            claims_validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
+            validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
                 Validation configuration for claims. Can be a pydantic model class, a ValidationConfig
                 instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
                 or None (no validation).
@@ -82,7 +82,7 @@ class JWT:
         # prepare claims data and perform validation
         if claims is None:
             claims = JWTBaseModel()
-        claims_validation = self.get_claims_validation(claims, claims_validation)
+        claims_validation = self.get_claims_validation(claims, validation)
 
         try:
             claims_pydantic, claims_dict = claims_validation.run(
@@ -124,7 +124,7 @@ class JWT:
         algorithm: Alg | str,
         *,
         with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
-        claims_validation: type[JWTBaseModel]
+        validation: type[JWTBaseModel]
         | ValidationConfig
         | Validation
         | None = Validation.DEFAULT,
@@ -141,7 +141,7 @@ class JWT:
             algorithm (Algorithm): The algorithm to use for verifying the JWT.
             with_detached_payload (JWTBaseModel | dict[str, Any] | None, opt.):
                 Detached payload to use for signature verification, if any.
-            claims_validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
+            validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
                 Validation configuration for claims. Can be a pydantic model class, a ValidationConfig
                 instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
                 or None (no validation).
@@ -164,7 +164,7 @@ class JWT:
         if with_detached_payload is not None:
             self.jws.enable_detached_payload()
             claims_validation = self.get_claims_validation(
-                with_detached_payload, claims_validation
+                with_detached_payload, validation
             )
 
             # prepare detached claims data and validate
@@ -188,7 +188,7 @@ class JWT:
             # JWS decode
             self.jws.decode(compact, key, headers_validation=headers_validation)
             claims_dict = self.jws.token.verified.payload
-            claims_validation = self.get_claims_validation(claims_dict, claims_validation)
+            claims_validation = self.get_claims_validation(claims_dict, validation)
 
             # validate claims
             try:

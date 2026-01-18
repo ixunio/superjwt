@@ -125,7 +125,7 @@ claims = (
     .with_expiration(minutes=15)
 )
 compact = encode(claims, secret_key, Alg.HS256)
-decoded: MyJWTClaims = decode(compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)
+decoded: MyJWTClaims = decode(compact, secret_key, Alg.HS256, validation=MyJWTClaims)
 print(decoded.to_dict())
 #> {'sub': 123, 'exp': 1767027591, 'user_id': 'b2a4c791-2cf4-4e41-9a20-8532129ff47c'}
 ```
@@ -142,10 +142,10 @@ invalid_claims = (
 
 # disable claims validation to create an "invalid" compact token
 invalid_compact = encode(
-    invalid_claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    invalid_claims, secret_key, Alg.HS256, validation=Validation.DISABLE
 )
 try:
-    decode(invalid_compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)
+    decode(invalid_compact, secret_key, Alg.HS256, validation=MyJWTClaims)
 except ClaimsValidationError as e:
     print("Claims validation error:", e)
     #> Claims validation error: Claims validation failed

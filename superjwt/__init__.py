@@ -45,7 +45,7 @@ def encode(
     *,
     headers: JOSEHeader | dict[str, Any] | None = None,
     detach_payload: bool = False,
-    claims_validation: type[JWTBaseModel]
+    validation: type[JWTBaseModel]
     | ValidationConfig
     | Validation
     | None = Validation.DEFAULT,
@@ -63,7 +63,7 @@ def encode(
         headers (JOSEHeader | dict[str, Any] | None, opt.): Custom JWS headers to include
             in the JWT. Will use default JWS headers if not provided.
         detach_payload (bool, opt.): whether to produce a JWT token with detached payload.
-        claims_validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
+        validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
             Validation configuration for claims. Can be a pydantic model class, a ValidationConfig
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
             or None (no validation).
@@ -82,7 +82,7 @@ def encode(
         key,
         algorithm,
         headers=headers,
-        claims_validation=claims_validation,
+        validation=validation,
         headers_validation=headers_validation,
     )
 
@@ -98,7 +98,7 @@ def decode(
     algorithm: Alg | str,
     *,
     with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
-    claims_validation: type[JWTBaseModel]
+    validation: type[JWTBaseModel]
     | ValidationConfig
     | Validation
     | None = Validation.DEFAULT,
@@ -115,7 +115,7 @@ def decode(
         algorithm (Algorithm): The algorithm to use for verifying the JWT.
         with_detached_payload (JWTBaseModel | dict[str, Any] | None, opt.):
             Detached payload to use for signature verification, if any.
-        claims_validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
+        validation (type[JWTBaseModel] | ValidationConfig | Validation | None, opt.):
             Validation configuration for claims. Can be a pydantic model class, a ValidationConfig
             instance, Validation.DEFAULT (uses default validation), Validation.DISABLE (no validation),
             or None (no validation).
@@ -134,7 +134,7 @@ def decode(
         key,
         algorithm,
         with_detached_payload=with_detached_payload,
-        claims_validation=claims_validation,
+        validation=validation,
         headers_validation=headers_validation,
     )
 

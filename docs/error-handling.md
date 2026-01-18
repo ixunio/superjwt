@@ -290,12 +290,12 @@ invalid_compact = encode(
     invalid_claims,
     secret_key,
     Alg.HS256,
-    claims_validation=Validation.DISABLE
+    validation=Validation.DISABLE
 )
 
 # DECODING
 try:
-    decode(invalid_compact, secret_key, Alg.HS256, claims_validation=JWTClaims)
+    decode(invalid_compact, secret_key, Alg.HS256, validation=JWTClaims)
 except ClaimsValidationError as e:
     print(e)
     #> Claims validation failed
@@ -322,7 +322,7 @@ invalid_claims = {"sub": "user123"}
 
 # ENCODING
 try:
-    encode(invalid_claims, secret_key, Alg.HS256, claims_validation=MyClaims)
+    encode(invalid_claims, secret_key, Alg.HS256, validation=MyClaims)
 except ClaimsValidationError as e:
     print(e)
     #> Claims validation failed
@@ -332,12 +332,12 @@ invalid_compact = encode(
     invalid_claims,
     secret_key,
     Alg.HS256,
-    claims_validation=Validation.DISABLE
+    validation=Validation.DISABLE
 )
 
 # DECODING
 try:
-    decode(invalid_compact, secret_key, Alg.HS256, claims_validation=MyClaims)
+    decode(invalid_compact, secret_key, Alg.HS256, validation=MyClaims)
 except ClaimsValidationError as e:
     print(e)
     #> Claims validation failed
@@ -372,12 +372,12 @@ expired_claims = JWTClaims.model_construct(
 
 # Encode without validation to create the expired token
 compact = encode(
-    expired_claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    expired_claims, secret_key, Alg.HS256, validation=Validation.DISABLE
 )
 
 try:
     # Decode with validation will check exp claim
-    decode(compact, secret_key, Alg.HS256, claims_validation=JWTClaims)
+    decode(compact, secret_key, Alg.HS256, validation=JWTClaims)
 except TokenExpiredError as e:
     print(e)
     #> Token has expired
@@ -409,12 +409,12 @@ future_claims = JWTClaims.model_construct(
 
 # Encode without validation to create the future token
 compact = encode(
-    future_claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    future_claims, secret_key, Alg.HS256, validation=Validation.DISABLE
 )
 
 try:
     # Decode with validation will check nbf claim
-    decode(compact, secret_key, Alg.HS256, claims_validation=JWTClaims)
+    decode(compact, secret_key, Alg.HS256, validation=JWTClaims)
 except TokenNotYetValidError as e:
     print(e)
     #> Token is not yet valid

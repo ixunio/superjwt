@@ -10,7 +10,7 @@ The function `encode()` produces a compact (three-part) signed JWT/JWS.
 | `algorithm` | `Alg` \| `str` | The signing algorithm (e.g., `Alg.HS256` or `"HS256"`). |
 | `headers` | `JOSEHeader` \| `dict` \| `None` | *(optional)* Custom JOSE headers. |
 | `detach_payload` | `bool` | *(optional)* If `True`, produces a detached payload JWT. |
-| `claims_validation` | `type[JWTBaseModel]`<br> &nbsp;&nbsp;\| `ValidationConfig`<br> &nbsp;&nbsp;\| `Validation` | *(optional)* Validation settings for claims. If `claims` is a Pydantic model it is validated automatically. |
+| `validation` | `type[JWTBaseModel]`<br> &nbsp;&nbsp;\| `ValidationConfig`<br> &nbsp;&nbsp;\| `Validation` | *(optional)* Validation settings for claims. If `claims` is a Pydantic model it is validated automatically. |
 | `headers_validation` | `type[JWTBaseModel]`<br> &nbsp;&nbsp;\| `ValidationConfig`<br> &nbsp;&nbsp;\| `Validation` | *(optional)* Validation settings for headers. If `headers` is a Pydantic model it is validated automatically. |
 ///
 
@@ -258,7 +258,7 @@ The function `decode()` decodes and verifies a compact (three-part) signed JWT/J
 | `key` | `Key` \| `bytes` \| `str` | The key to verify the JWT with (a secret key, a private key in PEM format, or a `Key` instance). |
 | `algorithm` | `Alg` \| `str` | The verifying algorithm (e.g., `Alg.HS256` or `"HS256"`). |
 | `with_detached_payload` | `JWTClaims` \| `dict` \| `None` | *(optional)* The detached payload data, if the token was encoded with a detached payload. |
-| `claims_validation` | `type[JWTBaseModel]`<br> &nbsp;&nbsp;\| `ValidationConfig`<br> &nbsp;&nbsp;\| `Validation` | *(optional)* Validation settings for claims. See [Validation](#validation). |
+| `validation` | `type[JWTBaseModel]`<br> &nbsp;&nbsp;\| `ValidationConfig`<br> &nbsp;&nbsp;\| `Validation` | *(optional)* Validation settings for claims. See [Validation](#validation). |
 | `headers_validation` | `type[JWTBaseModel]`<br> &nbsp;&nbsp;\| `ValidationConfig`<br> &nbsp;&nbsp;\| `Validation` | *(optional)* Validation settings for headers. By default, headers are validated against `JOSEHeader`. |
 ///
 
@@ -300,7 +300,7 @@ print(decoded.sub)
 
     Token inspection DOES NOT verify the signature! Never trust information from an unverified JWT. Only the `decode()` function guarantees integrity.
     ///
-2. The token was successfully verified and validated against the `JWTClaims` Pydantic model. Use the `claims_validation` parameter to validate against your own custom models. See [Validation](#validation).
+2. The token was successfully verified and validated against the `JWTClaims` Pydantic model. Use the `validation` parameter to validate against your own custom models. See [Validation](#validation).
 
 ///
 
@@ -355,7 +355,7 @@ except ClaimsValidationError as e:
     #> claim ('iss',) = True -> validation failed (string_type): Input should be a valid string
     
     decoded: JWTBaseModel = decode(
-        compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+        compact, secret_key, Alg.HS256, validation=Validation.DISABLE
         )  # --> 🤔 passes (3)
     print(decoded.to_dict())
     #> {'iss': True}
@@ -391,7 +391,7 @@ compact = (
 print(inspect(compact).payload)  # (1)
 #> {'sub': 'user', 'custom_field': 42}
 
-decoded: MyJWTClaims = decode(compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)
+decoded: MyJWTClaims = decode(compact, secret_key, Alg.HS256, validation=MyJWTClaims)
 print(decoded.to_dict())
 #> {'sub': 'user', 'custom_field': 42}
 ```
@@ -429,7 +429,7 @@ compact = (
 print(inspect(compact).payload)  # (2)
 #> {'sub': 'user', 'iat': 1767845938, 'exp': 2199756475, 'custom_field': 42}
 
-decoded: MyJWTClaims = decode(compact, secret_key, Alg.HS256, claims_validation=validation)
+decoded: MyJWTClaims = decode(compact, secret_key, Alg.HS256, validation=validation)
 print(decoded) # (3)
 #> iss=None sub='user' aud=None iat=datetime.datetime(2026, 1, 8, 4, 18, 58, tzinfo=TzInfo(0)) nbf=None 
 #  exp=datetime.datetime(2039, 9, 16, 3, 27, 55, tzinfo=TzInfo(0)) jti=None custom_field=42
@@ -438,7 +438,7 @@ print(decoded.to_dict())
 #> {'sub': 'user', 'iat': 1767845938, 'exp': 2199756475, 'custom_field': 42}
 ```
 
-1. By creating a `ValidationConfig` instance to be passed to `claims_validation` parameter, you can change other behaviors like the leeway when decoding `'iat'`, `'exp'`, `'nbf'` claims.
+1. By creating a `ValidationConfig` instance to be passed to `validation` parameter, you can change other behaviors like the leeway when decoding `'iat'`, `'exp'`, `'nbf'` claims.
 2.  /// danger | Unverified JWT
 
     A compact token inspection DOES NOT verify the signature! Never trust the information from an unverified JWT. Only the `decode()` function will prove the JWT integrity.
@@ -468,7 +468,7 @@ compact = encode(
     JWTClaims.model_construct(exp=datetime.now(UTC) - timedelta(days=1)),  # (1),
     secret_key,
     Alg.HS256,
-    claims_validation=Validation.DISABLE
+    validation=Validation.DISABLE
 )
 
 # decode token
@@ -477,7 +477,7 @@ try:
     #> TokenExpiredError: Token has expired
 except TokenExpiredError:
     decoded = decode(
-        compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+        compact, secret_key, Alg.HS256, validation=Validation.DISABLE
         )  # --> 🤔 passes (3)
     print(decoded.exp)
     #> 1766960212
@@ -629,7 +629,7 @@ Properties:
     ///
 
 - **Default Claims Model for Validation**<br>
-    Claims are validated against this model when `claims_validation` is not set in `decode()`.
+    Claims are validated against this model when `validation` parameter is not set in `decode()`.
 - **Time Integrity Checks**<br>
     Ensures the following conditions are met for `'iat'`, `'nbf'`, and `'exp'`:
     - `'iat'` < *now* (can be disabled with `allow_future_iat`, see [Validation Config](#validation-config))
@@ -651,7 +651,7 @@ In SuperJWT, **validation** refers to the process of ensuring that the JWT data�
 There are several ways to validate your custom JWT data:
 
 - By using Pydantic directly before encoding or after decoding.
-- When using `decode()`, claims are validated against `JWTClaims` by default. You can specify a custom model via the `claims_validation` parameter or use a [ValidationConfig](#validation-config).
+- When using `decode()`, claims are validated against `JWTClaims` by default. You can specify a custom model via the `validation` parameter or use a [ValidationConfig](#validation-config).
 - When using `encode()`, raw `dict` claims are validated against `JWTClaims` by default, and Pydantic claims are validated against their own Pydantic model.
 
 /// tab | Decoding Process
@@ -762,7 +762,7 @@ except ClaimsValidationError:
     claims.items_id = ["banana", "apple", "orange"]
     compact = encode(claims, secret_key, Alg.HS256)  # --> ✅ passes (3)
 
-decoded = decode(compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)  # --> ✅ passes
+decoded = decode(compact, secret_key, Alg.HS256, validation=MyJWTClaims)  # --> ✅ passes
 print(decoded.to_dict())
 #> {'nbf': 1767225599.987654, 'items_id': ['banana', 'apple', 'orange']} (4)
 ```
@@ -868,10 +868,10 @@ decode(invalid_compact, secret_key, Alg.HS256)  # --> 🤔 passes (3)
 #> {'user_id': 'not-a-uuid-v4'}
 
 try:
-    decode(invalid_compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims)  # --> ❌ fails (4)
+    decode(invalid_compact, secret_key, Alg.HS256, validation=MyJWTClaims)  # --> ❌ fails (4)
 except ClaimsValidationError:
     decoded = decode(
-        valid_compact, secret_key, Alg.HS256, claims_validation=MyJWTClaims
+        valid_compact, secret_key, Alg.HS256, validation=MyJWTClaims
         )  # --> ✅ passes
 
 ```
@@ -960,13 +960,13 @@ claims = JWTClaims(iss="my-app")
 compact = encode(claims, secret_key, Alg.HS256)
 
 try:
-    decode(compact, secret_key, Alg.HS256, claims_validation=strict)
+    decode(compact, secret_key, Alg.HS256, validation=strict)
 except ClaimsValidationError as e:
     print(e)
     #> Claims validation failed
     #> claim ('sub',) -> validation failed (missing): Field required
 
-decoded = decode(compact, secret_key, Alg.HS256, claims_validation=lenient)
+decoded = decode(compact, secret_key, Alg.HS256, validation=lenient)
 print(decoded.iss)
 #> 'my-app'
 
@@ -1000,7 +1000,7 @@ valid_claims = MyJWTClaims.model_construct(
 
 try:
     encode(
-        valid_claims, secret_key, Alg.HS256, claims_validation=JWTClaims  # --> ❌ fails (2)
+        valid_claims, secret_key, Alg.HS256, validation=JWTClaims  # --> ❌ fails (2)
     )
 except:
     compact = encode(valid_claims, secret_key, Alg.HS256)  # --> ✅ passes (3)
@@ -1008,7 +1008,7 @@ except:
 
 1. `.model_construct()` allows the creation of a Pydantic instance without running validation.
 2. By using `JWTClaims` as the validation model, the claims are no longer compliant because `'iss'` is an integer instead of a string.
-3. Even though `claims_validation` is not specified, if the input is a Pydantic instance, it is automatically validated against its own model, here `MyJWTClaims`.
+3. Even though the `validation` parameter is not specified, if the input is a Pydantic instance, it is automatically validated against its own model, here `MyJWTClaims`.
 
 ///
 
@@ -1037,7 +1037,7 @@ except ClaimsValidationError:
 ```
 
 1. `.model_construct()` creates a Pydantic instance without running validation.
-2. Even without `claims_validation` specified, Pydantic instances are automatically validated against their own model, here `MyJWTClaims`.
+2. Even without `validation` parameter specified, Pydantic instances are automatically validated against their own model, here `MyJWTClaims`.
 3. During encoding, if claims are passed as a raw `dict`, claims validation runs by default against `JWTClaims`. The `permissions` extra field is allowed and has no validation rule, so the encoding is successful.
 
 ///
@@ -1094,12 +1094,12 @@ claims = JWTClaims.model_construct(iss=12345)  # 'iss' should be a string
 claims_dict = {"iss": 12345}  # 'iss' should be a string
 
 # Encode without validation
-compact = encode(claims, secret_key, Alg.HS256, claims_validation=Validation.DISABLE)  # (1)
-compact = encode(claims_dict, secret_key, Alg.HS256, claims_validation=Validation.DISABLE)  # (2)
+compact = encode(claims, secret_key, Alg.HS256, validation=Validation.DISABLE)  # (1)
+compact = encode(claims_dict, secret_key, Alg.HS256, validation=Validation.DISABLE)  # (2)
 
 # Decode without validation
 decoded: JWTBaseModel = decode(
-    compact, secret_key, Alg.HS256, claims_validation=Validation.DISABLE
+    compact, secret_key, Alg.HS256, validation=Validation.DISABLE
     )  # (3)
 ```
 
@@ -1135,7 +1135,7 @@ decoded = decode(
     compact, 
     secret_key, 
     Alg.HS256, 
-    claims_validation=validation_config
+    validation=validation_config
 )
 ```
 
@@ -1210,13 +1210,13 @@ validation_spoof_after = ValidationConfig(
 
 try:
     decode(
-        compact, secret_key, Alg.HS256, claims_validation=validation_spoof_before
+        compact, secret_key, Alg.HS256, validation=validation_spoof_before
     )  # --> ❌ fails (1)
 except TokenNotYetValidError as e:
     print(e)
     #> Token is no yet valid
     decoded = decode(
-        compact, secret_key, Alg.HS256, claims_validation=validation_spoof_after
+        compact, secret_key, Alg.HS256, validation=validation_spoof_after
     )  # --> ✅ passes (2)
 ```
 
@@ -1379,7 +1379,7 @@ decoded = decode(
     secret_key,
     Alg.HS256,
     with_detached_payload=claims_dict,  # (2)
-    claims_validation=JWTClaims
+    validation=JWTClaims
 )
 #> {'iss': 'myapp', 'sub': 'user123', 'exp': 1767715523}
 ```
