@@ -107,7 +107,7 @@ print(inspect(compact).payload)
 #> {'sub': 'Alice', 'jti': 'jwt-id', 'custom_claim': 'a string', 'custom_date': 1766536919}
 ```
 
-1. Without a custom Pydantic model, you cannot pass a Python `datetime` object and have it automatically serialized to a UNIX timestamp.
+1. Without a custom Pydantic model, you cannot pass a Python `datetime` object and have it is automatically serialized as a UNIX timestamp.
 
 /// tip | Extra claims
 The `JWTClaims` Pydantic model is configured with `extra="allow"`, which allows adding custom claims without explicit definition. These custom claims will not have validation rules during `encode()` or `decode()`. To include validation, use a custom model that inherits from `JWTClaims`. See [Pydantic Models](#pydantic-models) and [Validation](#validation).
@@ -171,8 +171,8 @@ print(inspect(compact).payload)
 #> {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767838155} (2)
 ```
 
-1. We have added the creation time. In the `JWTClaims` Pydantic instance, the value is stored as a Python `datetime` (UTC). It is automatically serialized as a timestamp in the JSON output.
-2. By default, timestamps are serialized as integers, but this can be changed to floats. See [Datetime Fields](#datetime-fields).
+1. We have added the Issued At claim. In the `JWTClaims` Pydantic instance, the value is stored as a Python `datetime` (UTC). It is automatically serialized as a timestamp in the JSON output.
+2. By default, `'iat'` timestamp is serialized to an integer, but this can be changed to a float. See [Datetime Fields](#datetime-fields).
 
 ### Set Expiration &#8680; `'exp'`
 
@@ -195,7 +195,7 @@ print(inspect(compact).payload)
 #> {'sub': 'Jane Doe', 'exp': 1767045509}  (1)
 ```
 
-1. By default, timestamps are serialized as integers. See [Datetime Fields](#datetime-fields).
+1. By default, `'exp'` timestamp is serialized to an integer, but this can be changed to a float. See [Datetime Fields](#datetime-fields).
 
 ///
 
@@ -220,11 +220,12 @@ print(inspect(compact).payload)
 ```
 ///
 
-/// tab | Data from a `dict`<br><small>(Python 3.11+)</small>
+/// tab | Data from<br>a `dict`
 
 You can use a Python `dict` and add the `'exp'` timestamp manually.
 
 ```python
+# Python 3.11+
 from datetime import datetime, timedelta, UTC
 from superjwt import Alg, encode, inspect
 
@@ -234,15 +235,15 @@ claims = {"sub": "Jane Doe", "exp": (datetime.now(UTC) + timedelta(minutes=15)).
 
 compact = encode(claims, secret_key, Alg.HS256)
 print(inspect(compact).payload)
-#> {'sub': 'Jane Doe', 'exp': 1767046329.859796}  # (1)
+#> {'sub': 'Jane Doe', 'exp': 1767046329}  # (1)
 ```
 
-1. Since the claims were passed as a raw `dict`, no Pydantic validation or serialization is performed. Therefore, the timestamp remains a `float`. See [Datetime Fields](#datetime-fields).
+1. Even though we manually passed the `'exp'` claim as a float, the claims is validated against `JWTClaims`. Therefore, `'exp'` is then serialized automatically to an integer, but this can be changed to a float. See [Datetime Fields](#datetime-fields).
 
 ///
 
 /// details | Date/time objects
-`iat`, `exp` and `nbf` represent all date/time information and are serialized as UNIX timestamp in the payload. But in a Pydantic model, they are stored as Python datetime objects! See more in [Datetime Fields](#datetime-fields).
+`iat`, `exp` and `nbf` represent all date/time information and are serialized as UNIX timestamps in the payload. But in a Pydantic model, they are stored as Python datetime objects! See more in [Datetime Fields](#datetime-fields).
 ///
 
 ---
@@ -743,7 +744,7 @@ from superjwt.exceptions import ClaimsValidationError
 secret_key = "your-secret-key-of-len-32-bytes!"
 
 class MyJWTClaims(JWTClaims):
-    # 'nbf' is required and serialized as a float timestamp
+    # 'nbf' is required and serialized to a float timestamp
     nbf: JWTDatetimeFloat = Field(default=...)  # (1)
 
     # a new required field
@@ -770,7 +771,7 @@ print(decoded.to_dict())
 1. Serializes `'nbf'` as a float timestamp.
 2. Fails validation because `MyJWTClaims` is used automatically.
 3. Once the `items_id` data is corrected, encoding succeeds.
-4. `'nbf'` is correctly serialized as a float. See [Datetime Fields](#datetime-fields).
+4. `'nbf'` is correctly serialized to a float. See [Datetime Fields](#datetime-fields).
 
 ///
 
@@ -1055,7 +1056,7 @@ from uuid import UUID
 secret_key = "your-secret-key-of-len-32-bytes!"
 
 class MyJWTClaims(JWTClaims):
-    # 'exp' is required (and will be serialized as float)
+    # 'exp' is required (and will be serialized to float)
     exp: JWTDatetimeFloat = Field(default=...)
 
     # 'user_id' is required and must be a valid UUIDv4 string
@@ -1176,7 +1177,7 @@ print(inspect(compact).payload)
 #> {'exp': 1768257699.998604, 'custom_time': 1767225599} (1)
 ```
 
-1. `'exp'` timestamp is serialized as a `float` because it was redefined as `JWTDatetimeFloat`.<br><br>`'custom_time'` timestamp is an `int` because it is defined as `JWTDatetimeInt`.
+1. `'exp'` timestamp is serialized to a `float` because it was redefined as `JWTDatetimeFloat`.<br><br>`'custom_time'` timestamp is an `int` because it is defined as `JWTDatetimeInt`.
 
 ### Spoof Time
 
