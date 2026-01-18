@@ -1107,7 +1107,7 @@
 </span><span id="__span-3-13"><a href="#__codelineno-3-13" id="__codelineno-3-13" name="__codelineno-3-13"></a><span class="c1">#&gt; {'sub': 'Alice', 'jti': 'jwt-id', 'custom_claim': 'a string', 'custom_date': 1766536919}</span>
 </span></code></pre></div>
 <ol>
-<li>Without a custom Pydantic model, you cannot pass a Python <code>datetime</code> object and have it automatically serialized to a UNIX timestamp.</li>
+<li>Without a custom Pydantic model, you cannot pass a Python <code>datetime</code> object and have it is automatically serialized as a UNIX timestamp.</li>
 </ol>
 <div class="admonition tip">
 <p class="admonition-title">Extra claims</p>
@@ -1165,11 +1165,11 @@
 </span><span id="__span-5-16"><a href="#__codelineno-5-16" id="__codelineno-5-16" name="__codelineno-5-16"></a><span class="c1">#&gt; {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767838155} (2)</span>
 </span></code></pre></div>
 <ol>
-<li>We have added the creation time. In the <code>JWTClaims</code> Pydantic instance, the value is stored as a Python <code>datetime</code> (UTC). It is automatically serialized as a timestamp in the JSON output.</li>
-<li>By default, timestamps are serialized as integers, but this can be changed to floats. See <a href="#datetime-fields">Datetime Fields</a>.</li>
+<li>We have added the Issued At claim. In the <code>JWTClaims</code> Pydantic instance, the value is stored as a Python <code>datetime</code> (UTC). It is automatically serialized as a timestamp in the JSON output.</li>
+<li>By default, <code>'iat'</code> timestamp is serialized to an integer, but this can be changed to a float. See <a href="#datetime-fields">Datetime Fields</a>.</li>
 </ol>
 <h3 id="set-expiration-exp">Set Expiration ⇨ <code>'exp'</code><a class="headerlink" href="#set-expiration-exp" title="Permanent link">¶</a></h3>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="basicexample_1" name="__tabbed_2" type="radio"><input id="include-iat-as-well" name="__tabbed_2" type="radio"><input id="data-from-a-dictpython-311" name="__tabbed_2" type="radio"><div class="tabbed-labels"><label for="basicexample_1">Basic<br/>Example</label><label for="include-iat-as-well">Include <code>'iat'</code><br/> as well</label><label for="data-from-a-dictpython-311">Data from a <code>dict</code><br/><small>(Python 3.11+)</small></label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="basicexample_1" name="__tabbed_2" type="radio"><input id="include-iat-as-well" name="__tabbed_2" type="radio"><input id="data-froma-dict_1" name="__tabbed_2" type="radio"><div class="tabbed-labels"><label for="basicexample_1">Basic<br/>Example</label><label for="include-iat-as-well">Include <code>'iat'</code><br/> as well</label><label for="data-froma-dict_1">Data from<br/>a <code>dict</code></label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Use <code>.with_expiration()</code> to return a new <code>JWTClaims</code> instance with the <code>'exp'</code> timestamp set. Choose your desired expiration as a duration from the time of creation. It accepts <code>days</code>, <code>hours</code>, and <code>minutes</code> as arguments.</p>
@@ -1187,7 +1187,7 @@
 </span><span id="__span-6-12"><a href="#__codelineno-6-12" id="__codelineno-6-12" name="__codelineno-6-12"></a><span class="c1">#&gt; {'sub': 'Jane Doe', 'exp': 1767045509}  (1)</span>
 </span></code></pre></div>
 <ol>
-<li>By default, timestamps are serialized as integers. See <a href="#datetime-fields">Datetime Fields</a>.</li>
+<li>By default, <code>'exp'</code> timestamp is serialized to an integer, but this can be changed to a float. See <a href="#datetime-fields">Datetime Fields</a>.</li>
 </ol>
 </div>
 <div class="tabbed-block">
@@ -1209,26 +1209,27 @@
 </div>
 <div class="tabbed-block">
 <p>You can use a Python <code>dict</code> and add the <code>'exp'</code> timestamp manually.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">UTC</span>
-</span><span id="__span-8-2"><a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">superjwt</span><span class="w"> </span><span class="kn">import</span> <span class="n">Alg</span><span class="p">,</span> <span class="n">encode</span><span class="p">,</span> <span class="n">inspect</span>
-</span><span id="__span-8-3"><a href="#__codelineno-8-3" id="__codelineno-8-3" name="__codelineno-8-3"></a>
-</span><span id="__span-8-4"><a href="#__codelineno-8-4" id="__codelineno-8-4" name="__codelineno-8-4"></a><span class="n">secret_key</span> <span class="o">=</span> <span class="s2">"your-secret-key-of-len-32-bytes!"</span>
-</span><span id="__span-8-5"><a href="#__codelineno-8-5" id="__codelineno-8-5" name="__codelineno-8-5"></a>
-</span><span id="__span-8-6"><a href="#__codelineno-8-6" id="__codelineno-8-6" name="__codelineno-8-6"></a><span class="n">claims</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"sub"</span><span class="p">:</span> <span class="s2">"Jane Doe"</span><span class="p">,</span> <span class="s2">"exp"</span><span class="p">:</span> <span class="p">(</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">15</span><span class="p">))</span><span class="o">.</span><span class="n">timestamp</span><span class="p">()}</span>
-</span><span id="__span-8-7"><a href="#__codelineno-8-7" id="__codelineno-8-7" name="__codelineno-8-7"></a>
-</span><span id="__span-8-8"><a href="#__codelineno-8-8" id="__codelineno-8-8" name="__codelineno-8-8"></a><span class="n">compact</span> <span class="o">=</span> <span class="n">encode</span><span class="p">(</span><span class="n">claims</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">)</span>
-</span><span id="__span-8-9"><a href="#__codelineno-8-9" id="__codelineno-8-9" name="__codelineno-8-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">inspect</span><span class="p">(</span><span class="n">compact</span><span class="p">)</span><span class="o">.</span><span class="n">payload</span><span class="p">)</span>
-</span><span id="__span-8-10"><a href="#__codelineno-8-10" id="__codelineno-8-10" name="__codelineno-8-10"></a><span class="c1">#&gt; {'sub': 'Jane Doe', 'exp': 1767046329.859796}  # (1)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="c1"># Python 3.11+</span>
+</span><span id="__span-8-2"><a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">UTC</span>
+</span><span id="__span-8-3"><a href="#__codelineno-8-3" id="__codelineno-8-3" name="__codelineno-8-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">superjwt</span><span class="w"> </span><span class="kn">import</span> <span class="n">Alg</span><span class="p">,</span> <span class="n">encode</span><span class="p">,</span> <span class="n">inspect</span>
+</span><span id="__span-8-4"><a href="#__codelineno-8-4" id="__codelineno-8-4" name="__codelineno-8-4"></a>
+</span><span id="__span-8-5"><a href="#__codelineno-8-5" id="__codelineno-8-5" name="__codelineno-8-5"></a><span class="n">secret_key</span> <span class="o">=</span> <span class="s2">"your-secret-key-of-len-32-bytes!"</span>
+</span><span id="__span-8-6"><a href="#__codelineno-8-6" id="__codelineno-8-6" name="__codelineno-8-6"></a>
+</span><span id="__span-8-7"><a href="#__codelineno-8-7" id="__codelineno-8-7" name="__codelineno-8-7"></a><span class="n">claims</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"sub"</span><span class="p">:</span> <span class="s2">"Jane Doe"</span><span class="p">,</span> <span class="s2">"exp"</span><span class="p">:</span> <span class="p">(</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">15</span><span class="p">))</span><span class="o">.</span><span class="n">timestamp</span><span class="p">()}</span>
+</span><span id="__span-8-8"><a href="#__codelineno-8-8" id="__codelineno-8-8" name="__codelineno-8-8"></a>
+</span><span id="__span-8-9"><a href="#__codelineno-8-9" id="__codelineno-8-9" name="__codelineno-8-9"></a><span class="n">compact</span> <span class="o">=</span> <span class="n">encode</span><span class="p">(</span><span class="n">claims</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">,</span> <span class="n">Alg</span><span class="o">.</span><span class="n">HS256</span><span class="p">)</span>
+</span><span id="__span-8-10"><a href="#__codelineno-8-10" id="__codelineno-8-10" name="__codelineno-8-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">inspect</span><span class="p">(</span><span class="n">compact</span><span class="p">)</span><span class="o">.</span><span class="n">payload</span><span class="p">)</span>
+</span><span id="__span-8-11"><a href="#__codelineno-8-11" id="__codelineno-8-11" name="__codelineno-8-11"></a><span class="c1">#&gt; {'sub': 'Jane Doe', 'exp': 1767046329}  # (1)</span>
 </span></code></pre></div>
 <ol>
-<li>Since the claims were passed as a raw <code>dict</code>, no Pydantic validation or serialization is performed. Therefore, the timestamp remains a <code>float</code>. See <a href="#datetime-fields">Datetime Fields</a>.</li>
+<li>Even though we manually passed the <code>'exp'</code> claim as a float, the claims is validated against <code>JWTClaims</code>. Therefore, <code>'exp'</code> is then serialized automatically to an integer, but this can be changed to a float. See <a href="#datetime-fields">Datetime Fields</a>.</li>
 </ol>
 </div>
 </div>
 </input></input></input></div>
 <details>
 <summary>Date/time objects</summary>
-<p><code>iat</code>, <code>exp</code> and <code>nbf</code> represent all date/time information and are serialized as UNIX timestamp in the payload. But in a Pydantic model, they are stored as Python datetime objects! See more in <a href="#datetime-fields">Datetime Fields</a>.</p>
+<p><code>iat</code>, <code>exp</code> and <code>nbf</code> represent all date/time information and are serialized as UNIX timestamps in the payload. But in a Pydantic model, they are stored as Python datetime objects! See more in <a href="#datetime-fields">Datetime Fields</a>.</p>
 </details>
 <hr/>
 <h2 id="decoding-a-jwt">Decoding a JWT ⏬<a class="headerlink" href="#decoding-a-jwt" title="Permanent link">¶</a></h2>
@@ -1738,7 +1739,7 @@
 </span><span id="__span-20-6"><a href="#__codelineno-20-6" id="__codelineno-20-6" name="__codelineno-20-6"></a><span class="n">secret_key</span> <span class="o">=</span> <span class="s2">"your-secret-key-of-len-32-bytes!"</span>
 </span><span id="__span-20-7"><a href="#__codelineno-20-7" id="__codelineno-20-7" name="__codelineno-20-7"></a>
 </span><span id="__span-20-8"><a href="#__codelineno-20-8" id="__codelineno-20-8" name="__codelineno-20-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyJWTClaims</span><span class="p">(</span><span class="n">JWTClaims</span><span class="p">):</span>
-</span><span id="__span-20-9"><a href="#__codelineno-20-9" id="__codelineno-20-9" name="__codelineno-20-9"></a>    <span class="c1"># 'nbf' is required and serialized as a float timestamp</span>
+</span><span id="__span-20-9"><a href="#__codelineno-20-9" id="__codelineno-20-9" name="__codelineno-20-9"></a>    <span class="c1"># 'nbf' is required and serialized to a float timestamp</span>
 </span><span id="__span-20-10"><a href="#__codelineno-20-10" id="__codelineno-20-10" name="__codelineno-20-10"></a>    <span class="n">nbf</span><span class="p">:</span> <span class="n">JWTDatetimeFloat</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=...</span><span class="p">)</span>  <span class="c1"># (1)</span>
 </span><span id="__span-20-11"><a href="#__codelineno-20-11" id="__codelineno-20-11" name="__codelineno-20-11"></a>
 </span><span id="__span-20-12"><a href="#__codelineno-20-12" id="__codelineno-20-12" name="__codelineno-20-12"></a>    <span class="c1"># a new required field</span>
@@ -1765,7 +1766,7 @@
 <li>Serializes <code>'nbf'</code> as a float timestamp.</li>
 <li>Fails validation because <code>MyJWTClaims</code> is used automatically.</li>
 <li>Once the <code>items_id</code> data is corrected, encoding succeeds.</li>
-<li><code>'nbf'</code> is correctly serialized as a float. See <a href="#datetime-fields">Datetime Fields</a>.</li>
+<li><code>'nbf'</code> is correctly serialized to a float. See <a href="#datetime-fields">Datetime Fields</a>.</li>
 </ol>
 </div>
 <div class="tabbed-block">
@@ -2034,7 +2035,7 @@
 </span><span id="__span-28-6"><a href="#__codelineno-28-6" id="__codelineno-28-6" name="__codelineno-28-6"></a><span class="n">secret_key</span> <span class="o">=</span> <span class="s2">"your-secret-key-of-len-32-bytes!"</span>
 </span><span id="__span-28-7"><a href="#__codelineno-28-7" id="__codelineno-28-7" name="__codelineno-28-7"></a>
 </span><span id="__span-28-8"><a href="#__codelineno-28-8" id="__codelineno-28-8" name="__codelineno-28-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyJWTClaims</span><span class="p">(</span><span class="n">JWTClaims</span><span class="p">):</span>
-</span><span id="__span-28-9"><a href="#__codelineno-28-9" id="__codelineno-28-9" name="__codelineno-28-9"></a>    <span class="c1"># 'exp' is required (and will be serialized as float)</span>
+</span><span id="__span-28-9"><a href="#__codelineno-28-9" id="__codelineno-28-9" name="__codelineno-28-9"></a>    <span class="c1"># 'exp' is required (and will be serialized to float)</span>
 </span><span id="__span-28-10"><a href="#__codelineno-28-10" id="__codelineno-28-10" name="__codelineno-28-10"></a>    <span class="n">exp</span><span class="p">:</span> <span class="n">JWTDatetimeFloat</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=...</span><span class="p">)</span>
 </span><span id="__span-28-11"><a href="#__codelineno-28-11" id="__codelineno-28-11" name="__codelineno-28-11"></a>
 </span><span id="__span-28-12"><a href="#__codelineno-28-12" id="__codelineno-28-12" name="__codelineno-28-12"></a>    <span class="c1"># 'user_id' is required and must be a valid UUIDv4 string</span>
@@ -2173,7 +2174,7 @@
 </span><span id="__span-31-17"><a href="#__codelineno-31-17" id="__codelineno-31-17" name="__codelineno-31-17"></a><span class="c1">#&gt; {'exp': 1768257699.998604, 'custom_time': 1767225599} (1)</span>
 </span></code></pre></div>
 <ol>
-<li><code>'exp'</code> timestamp is serialized as a <code>float</code> because it was redefined as <code>JWTDatetimeFloat</code>.<br/><br/><code>'custom_time'</code> timestamp is an <code>int</code> because it is defined as <code>JWTDatetimeInt</code>.</li>
+<li><code>'exp'</code> timestamp is serialized to a <code>float</code> because it was redefined as <code>JWTDatetimeFloat</code>.<br/><br/><code>'custom_time'</code> timestamp is an <code>int</code> because it is defined as <code>JWTDatetimeInt</code>.</li>
 </ol>
 <h3 id="spoof-time">Spoof Time<a class="headerlink" href="#spoof-time" title="Permanent link">¶</a></h3>
 <p>You can override the current time with a custom <code>datetime</code> object for testing purposes. All time integrity and validity checks will account for the new spoofed "present time". Spoofing is especially useful to test <code>'nbf'</code> claim during decoding.</p>
