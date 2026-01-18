@@ -34,7 +34,8 @@ def pydantic_validation_errors_to_str(
     validation_errors: Sequence[Mapping[str, Any]],
 ) -> str:
     error = "\n".join(
-        f"{trim_str(str(error['loc']), 64) if error['loc'] else ''} = {trim_str(str(error['input']))} "
+        f"{trim_str(str(error['loc']), 64) if error['loc'] else ''} = "
+        f"{trim_str(str(error['input'])) if error['type'] != 'missing' else 'Not found'} "
         f"-> validation failed ({error['type']}): {error['msg']}"
         for error in validation_errors
     )

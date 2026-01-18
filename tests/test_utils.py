@@ -163,6 +163,19 @@ def test_pydantic_validation_errors_to_str():
     assert "..." in result
     assert len(result.split(" = ")[0]) == 67  # 64 chars + "..."
 
+    # Missing type should show 'Not found'
+    err5 = {
+        "loc": ("required_field",),
+        "input": {"some": "data"},
+        "type": "missing",
+        "msg": "Field required",
+    }
+    result = pydantic_validation_errors_to_str([err5])
+    assert "('required_field',)" in result
+    assert " = Not found " in result  # Should be 'None', not the actual input
+    assert "{'some': 'data'}" not in result  # Input should not appear
+    assert "validation failed (missing): Field required" in result
+
     # Multiple errors joined by newline
     result_multi = pydantic_validation_errors_to_str([err1, err2])
     lines = result_multi.split("\n")
