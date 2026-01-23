@@ -3,17 +3,20 @@ from typing import Any
 
 import pytest
 from pydantic import Field
-from superjwt.algorithms import Alg
 from superjwt.exceptions import TokenExpiredError, TokenNotYetValidError
+from superjwt.jwt import decode, encode
+from superjwt.shared import Alg
 from superjwt.validations import (
     DEFAULT_ALLOW_FUTURE_IAT,
     DEFAULT_LEEWAY_SECONDS,
+    JOSEHeader,
     JWTBaseModel,
     JWTClaims,
+    JWTDatetimeFloat,
+    JWTDatetimeInt,
     Operation,
     Validation,
     ValidationConfig,
-    get_validation_config,
 )
 
 
@@ -473,30 +476,27 @@ def test_spoof_time_revert():
 # ============================================================================
 
 
-def test_default_int_serialization(jwt, secret_key):
+def test_default_int_serialization(secret_key):
     """Test that default JWTClaims uses JWTDatetimeInt (microseconds truncated)."""
-    from superjwt.algorithms import Alg
-
     now = datetime.now(UTC)
     claims = JWTClaims(iat=now, exp=now + timedelta(hours=1))
 
     # Encode and decode
-    token = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
+    token = encode(claims, secret_key, Alg.HS256)
+    decoded = decode(token, secret_key, Alg.HS256)
+    decoded_dict = decoded.to_dict()
 
     # Check payload has int timestamps
-    assert isinstance(decoded.payload["iat"], int)
-    assert isinstance(decoded.payload["exp"], int)
+    assert isinstance(decoded_dict["iat"], int)
+    assert isinstance(decoded_dict["exp"], int)
 
     # Verify microseconds were truncated
-    assert decoded.payload["iat"] == int(now.timestamp())
-    assert decoded.payload["exp"] == int((now + timedelta(hours=1)).timestamp())
+    assert decoded_dict["iat"] == int(now.timestamp())
+    assert decoded_dict["exp"] == int((now + timedelta(hours=1)).timestamp())
 
 
-def test_float_serialization_with_custom_model(jwt, secret_key):
+def test_float_serialization_with_custom_model(secret_key):
     """Test that JWTDatetimeFloat custom fields preserve microseconds."""
-    from superjwt.algorithms import Alg
-    from superjwt.validations import JWTDatetimeFloat
 
     class CustomFloatClaims(JWTClaims):
         # Override exp as JWTDatetimeFloat to preserve microseconds
@@ -511,26 +511,25 @@ def test_float_serialization_with_custom_model(jwt, secret_key):
     claims = CustomFloatClaims(iat=now, exp=exp_time, custom_time=custom_time)
 
     # Encode and decode
-    token = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
+    token = encode(claims, secret_key, Alg.HS256)
+    decoded = decode(token, secret_key, Alg.HS256, validation=CustomFloatClaims)
+    decoded_dict = decoded.to_dict()
 
     # iat should still be int (JWTDatetimeInt in base JWTClaims)
-    assert isinstance(decoded.payload["iat"], int)
-    assert decoded.payload["iat"] == int(now.timestamp())
+    assert isinstance(decoded_dict["iat"], int)
+    assert decoded_dict["iat"] == int(now.timestamp())
 
     # exp should be float (overridden as JWTDatetimeFloat)
-    assert isinstance(decoded.payload["exp"], float)
-    assert abs(decoded.payload["exp"] - exp_time.timestamp()) < 1e-6
+    assert isinstance(decoded_dict["exp"], float)
+    assert abs(decoded_dict["exp"] - exp_time.timestamp()) < 1e-6
 
     # custom_time should be float (JWTDatetimeFloat)
-    assert isinstance(decoded.payload["custom_time"], float)
-    assert abs(decoded.payload["custom_time"] - custom_time.timestamp()) < 1e-6
+    assert isinstance(decoded_dict["custom_time"], float)
+    assert abs(decoded_dict["custom_time"] - custom_time.timestamp()) < 1e-6
 
 
-def test_mixed_datetime_serialization_types(jwt, secret_key):
+def test_mixed_datetime_serialization_types(secret_key):
     """Test custom claims with mixed JWTDatetimeInt and JWTDatetimeFloat."""
-    from superjwt.algorithms import Alg
-    from superjwt.validations import JWTDatetimeFloat, JWTDatetimeInt
 
     class MixedClaims(JWTClaims):
         # exp overridden as JWTDatetimeFloat
@@ -561,34 +560,33 @@ def test_mixed_datetime_serialization_types(jwt, secret_key):
     )
 
     # Encode and decode
-    token = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
+    token = encode(claims, secret_key, Alg.HS256)
+    decoded = decode(token, secret_key, Alg.HS256, validation=MixedClaims)
+    decoded_dict = decoded.to_dict()
 
     # iat should be int (default JWTDatetimeInt)
-    assert isinstance(decoded.payload["iat"], int)
-    assert decoded.payload["iat"] == int(iat_time.timestamp())
+    assert isinstance(decoded_dict["iat"], int)
+    assert decoded_dict["iat"] == int(iat_time.timestamp())
 
     # exp should be float (overridden as JWTDatetimeFloat)
-    assert isinstance(decoded.payload["exp"], float)
-    assert abs(decoded.payload["exp"] - exp_time.timestamp()) < 1e-6
+    assert isinstance(decoded_dict["exp"], float)
+    assert abs(decoded_dict["exp"] - exp_time.timestamp()) < 1e-6
 
     # nbf should be int (overridden as JWTDatetimeInt)
-    assert isinstance(decoded.payload["nbf"], int)
-    assert decoded.payload["nbf"] == int(nbf_time.timestamp())
+    assert isinstance(decoded_dict["nbf"], int)
+    assert decoded_dict["nbf"] == int(nbf_time.timestamp())
 
     # custom_float_time should be float with microseconds preserved
-    assert isinstance(decoded.payload["custom_float_time"], float)
-    assert abs(decoded.payload["custom_float_time"] - custom_float.timestamp()) < 1e-6
+    assert isinstance(decoded_dict["custom_float_time"], float)
+    assert abs(decoded_dict["custom_float_time"] - custom_float.timestamp()) < 1e-6
 
     # custom_int_time should be int with microseconds truncated
-    assert isinstance(decoded.payload["custom_int_time"], int)
-    assert decoded.payload["custom_int_time"] == int(custom_int.timestamp())
+    assert isinstance(decoded_dict["custom_int_time"], int)
+    assert decoded_dict["custom_int_time"] == int(custom_int.timestamp())
 
 
-def test_microseconds_preserved_in_float_type(jwt, secret_key):
+def test_microseconds_preserved_in_float_type(secret_key):
     """Verify microseconds are preserved with JWTDatetimeFloat."""
-    from superjwt.algorithms import Alg
-    from superjwt.validations import JWTDatetimeFloat
 
     class FloatTimeClaims(JWTClaims):
         iat: JWTDatetimeFloat = Field(default=...)  # type: ignore
@@ -598,18 +596,19 @@ def test_microseconds_preserved_in_float_type(jwt, secret_key):
     claims = FloatTimeClaims(iat=dt_with_microseconds)
 
     # Encode and decode
-    token = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
+    token = encode(claims, secret_key, Alg.HS256)
+    decoded = decode(token, secret_key, Alg.HS256, validation=FloatTimeClaims)
+    decoded_dict = decoded.to_dict()
 
     # Reconstruct datetime from float timestamp
-    decoded_dt = datetime.fromtimestamp(decoded.payload["iat"], tz=UTC)
+    decoded_dt = datetime.fromtimestamp(decoded_dict["iat"], tz=UTC)
 
     # Verify microseconds match
     assert decoded_dt.microsecond == 123456
     assert decoded_dt == dt_with_microseconds
 
 
-def test_microseconds_truncated_in_int_type(jwt, secret_key):
+def test_microseconds_truncated_in_int_type(secret_key):
     """Verify microseconds are truncated with JWTDatetimeInt (default)."""
 
     # Create datetime with specific microseconds
@@ -617,11 +616,12 @@ def test_microseconds_truncated_in_int_type(jwt, secret_key):
     claims = JWTClaims(iat=dt_with_microseconds)
 
     # Encode and decode
-    token = jwt.encode(claims, secret_key, Alg.HS256)
-    decoded = jwt.decode(token.compact, secret_key, Alg.HS256)
+    token = encode(claims, secret_key, Alg.HS256)
+    decoded = decode(token, secret_key, Alg.HS256)
+    decoded_dict = decoded.to_dict()
 
     # Reconstruct datetime from int timestamp
-    decoded_dt = datetime.fromtimestamp(decoded.payload["iat"], tz=UTC)
+    decoded_dt = datetime.fromtimestamp(decoded_dict["iat"], tz=UTC)
 
     # Verify microseconds were lost
     assert decoded_dt.microsecond == 0
@@ -632,7 +632,6 @@ def test_microseconds_truncated_in_int_type(jwt, secret_key):
 
 def test_to_dict_serialization(claims_dict: dict[str, Any]):
     """Test datetime serialization in to_dict()."""
-    from superjwt.validations import JWTDatetimeFloat
 
     claims = JWTClaims.model_construct(**claims_dict)
     claims_serialized = claims.to_dict()
@@ -665,7 +664,7 @@ def test_validation_config_default_initialization():
     validation = ValidationConfig()
 
     assert validation.enabled is True
-    assert validation.model is None
+    assert validation.model is JWTBaseModel
     assert validation.forward_pydantic_model is True
     assert validation.leeway is None
     assert validation.allow_future_iat is None
@@ -692,23 +691,24 @@ def test_validation_config_custom_initialization():
     assert validation.now == now
 
 
-def test_validation_config_apply_internal_cfg_with_none_model():
-    """Test apply_internal_cfg uses defaults when model is None."""
-    validation = ValidationConfig(
+def test_validation_applies_defaults_for_jwtclaims_models():
+    """Test get_validation fills defaults for JWTClaims-derived validation models."""
+    validation_cfg = ValidationConfig(
+        model=JWTClaims,
         leeway=None,
         allow_future_iat=None,
         now=None,
     )
 
-    validation.apply_internal_cfg(model=None)
+    validation = Validation.get({"sub": "test"}, validation_cfg, JWTClaims)
 
     assert validation.leeway == DEFAULT_LEEWAY_SECONDS
     assert validation.allow_future_iat == DEFAULT_ALLOW_FUTURE_IAT
     assert validation.now is None
 
 
-def test_validation_config_apply_internal_cfg_inherits_from_model():
-    """Test apply_internal_cfg inherits None values from model."""
+def test_validation_inherits_from_model():
+    """Test get_validation inherits None values from pydantic model."""
     # Create model with custom internal values
     model = JWTClaims()
     model.set_leeway(20.0)
@@ -717,21 +717,22 @@ def test_validation_config_apply_internal_cfg_inherits_from_model():
     model.spoof_time(custom_now)
 
     # Validation with all None values should inherit
-    validation = ValidationConfig(
+    validation_cfg = ValidationConfig(
+        model=JWTClaims,
         leeway=None,
         allow_future_iat=None,
         now=None,
     )
 
-    validation.apply_internal_cfg(model)
+    validation = Validation.get(model, validation_cfg, JWTClaims)
 
     assert validation.leeway == 20.0
     assert validation.allow_future_iat is True
     assert validation.now == custom_now
 
 
-def test_validation_config_apply_internal_cfg_does_not_override():
-    """Test apply_internal_cfg does not override set values."""
+def test_validation_does_not_override():
+    """Test get_validation does not override set values."""
     # Create model with custom internal values
     model = JWTClaims()
     model.set_leeway(100.0)
@@ -741,99 +742,57 @@ def test_validation_config_apply_internal_cfg_does_not_override():
 
     # Validation with set values should NOT be overridden
     config_now = model_now + timedelta(hours=1)
-    validation = ValidationConfig(
+    validation_cfg = ValidationConfig(
+        model=JWTClaims,
         leeway=7.0,
         allow_future_iat=False,
         now=config_now,
     )
 
-    validation.apply_internal_cfg(model)
+    validation = Validation.get(model, validation_cfg, JWTClaims)
 
     assert validation.leeway == 7.0  # NOT 100.0
     assert validation.allow_future_iat is False  # NOT True
     assert validation.now == config_now  # NOT model_now
 
 
-def test_validation_config_apply_internal_cfg_mixed():
-    """Test apply_internal_cfg with mix of None and set values."""
+def test_validation_mixed():
+    """Test get_validation with mix of None and set values."""
     model = JWTClaims()
     model.set_leeway(50.0)
     model.allow_future_iat()
     model_now = datetime.now(UTC)
     model.spoof_time(model_now)
 
-    validation = ValidationConfig(
+    validation_cfg = ValidationConfig(
+        model=JWTClaims,
         leeway=10.0,  # Set - should NOT be overridden
         allow_future_iat=None,  # None - should inherit True
         now=None,  # None - should inherit model_now
     )
 
-    validation.apply_internal_cfg(model)
+    validation = Validation.get(model, validation_cfg, JWTClaims)
 
     assert validation.leeway == 10.0  # Used validation's value
     assert validation.allow_future_iat is True  # Inherited from model
     assert validation.now == model_now  # Inherited from model
 
 
-def test_validation_config_model_copy():
-    """Test ValidationConfig.model_copy creates independent copy."""
-    now = datetime.now(UTC)
-    original = ValidationConfig(
-        model=JWTClaims,
-        leeway=10.0,
-        allow_future_iat=True,
-        now=now,
-    )
+def test_validation_run_rejects_invalid_data_type():
+    """Test Validation.run() rejects unsupported data types."""
+    validation = Validation(enabled=True, model=JWTClaims)
 
-    copy = original.model_copy(deep=True)
-
-    # Verify values match
-    assert copy.model == original.model
-    assert copy.leeway == original.leeway
-    assert copy.allow_future_iat == original.allow_future_iat
-    assert copy.now == original.now
-
-    # Modify copy - should not affect original
-    copy.leeway = 20.0
-    copy.allow_future_iat = False
-
-    assert original.leeway == 10.0
-    assert original.allow_future_iat is True
-
-
-def test_validation_config_forbids_extra_fields():
-    """Test ValidationConfig rejects extra fields due to extra='forbid' config."""
-    import pydantic
-
-    # Should raise ValidationError when trying to set an invalid field
-    with pytest.raises(pydantic.ValidationError, match="Extra inputs are not permitted"):
-        ValidationConfig(
-            model=JWTClaims,
-            invalid_field="some_value",  # type: ignore
-        )
-
-
-def test_validation_config_run_with_no_validation_model():
-    """Test ValidationConfig.run() raises error when validation_model is None."""
-    validation = ValidationConfig(
-        model=None,
-        enabled=True,
-    )
-
-    data = {"sub": "user123"}
-
-    # Should raise error because validation_model is None but validation is enabled
     with pytest.raises(
-        ValueError, match="Validation model is not set in ValidationConfig"
+        TypeError, match="Wrong type during data preparation and validation"
     ):
-        validation.run(data)
+        validation.run(123)  # type: ignore[arg-type]
 
 
-def test_validation_config_run_with_dict_data():
-    """Test ValidationConfig.run() with dict data."""
-    validation = ValidationConfig(
-        model=JWTClaims,
+def test_validation_run_with_dict_data():
+    """Test Validation.run() with dict data."""
+    validation = Validation(
         enabled=True,
+        model=JWTClaims,
     )
 
     now = datetime.now(UTC)
@@ -842,180 +801,189 @@ def test_validation_config_run_with_dict_data():
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=1)).timestamp()),
     }
-    _, result_dict = validation.run(data)
+    _, result_dict, _ = validation.run(data, dump_dict=True)
 
     # Should return dict with validated data
     assert isinstance(result_dict, dict)
     assert result_dict["sub"] == "user123"
 
 
-def test_validation_config_run_with_pydantic_data():
-    """Test ValidationConfig.run() with pydantic data."""
-    validation = ValidationConfig(
-        model=JWTClaims,
+def test_validation_run_with_pydantic_data():
+    """Test Validation.run() with pydantic data."""
+    validation = Validation(
         enabled=True,
+        model=JWTClaims,
     )
 
     data = JWTClaims(sub="user123")
-    _, result_dict = validation.run(data)
+    _, result_dict, _ = validation.run(data, dump_dict=True)
 
     # Should return dict
     assert isinstance(result_dict, dict)
     assert result_dict["sub"] == "user123"
 
 
-def test_validation_config_run_disabled():
-    """Test ValidationConfig.run() with validation disabled."""
-    validation = ValidationConfig(
-        model=None,
+def test_validation_run_disabled():
+    """Test Validation.run() with validation disabled."""
+    validation = Validation(
         enabled=False,
+        model=JWTClaims,
     )
 
     # Test with dict
     data_dict = {"sub": "user123"}
-    _, result_dict = validation.run(data_dict)
+    _, result_dict, _ = validation.run(data_dict, dump_dict=True)
     assert result_dict == data_dict
 
     # Test with pydantic model
     data_pydantic = JWTClaims(sub="user123")
-    _, result_dict = validation.run(data_pydantic)
+    _, result_dict, _ = validation.run(data_pydantic, dump_dict=True)
     assert isinstance(result_dict, dict)
     assert result_dict["sub"] == "user123"
 
 
 # ============================================================================
-# get_validation_config() Tests - DISABLE Cases
+# Test JOSEHeader Validation
 # ============================================================================
 
 
-def test_get_validation_config_disable_with_validation_none():
-    """Test get_validation_config with validation=None (DISABLE)."""
-    data = {"sub": "user123"}
-    default_validation = ValidationConfig(model=JWTClaims)
+class TestJOSEHeaderValidation:
+    """Test suite for JOSEHeader model validation."""
 
-    result = get_validation_config(
+    def test_validate_crit_none(self):
+        """Test that crit=None is valid."""
+        header = JOSEHeader(alg="HS256", crit=None)
+        assert header.crit is None
+
+    def test_validate_crit_empty_list_raises_error(self):
+        """Test that empty crit list raises ValueError."""
+        with pytest.raises(
+            ValueError, match="'crit' header must be a non-empty list of strings"
+        ):
+            JOSEHeader(alg="HS256", crit=[])
+
+    def test_validate_crit_missing_header_raises_error(self):
+        """Test that crit referencing missing header raises ValueError."""
+        with pytest.raises(ValueError, match="'crit' header missing 'missing_header'"):
+            JOSEHeader(alg="HS256", crit=["missing_header"])
+
+    def test_validate_crit_valid(self):
+        """Test that valid crit list passes validation."""
+        header = JOSEHeader(alg="HS256", kid="key-123", crit=["kid"])
+        assert header.crit == ["kid"]
+
+    def test_validate_crit_multiple_headers(self):
+        """Test crit validation with multiple headers."""
+        header = JOSEHeader(alg="HS256", kid="key-123", typ="JWT", crit=["kid", "typ"])
+        assert header.crit == ["kid", "typ"]
+
+
+# ============================================================================
+# Validation.get() Tests - DISABLE Cases
+# ============================================================================
+
+
+def test_get_validation_disable_with_validation_none_uses_default_fallback():
+    """Test get_validation_config with validation=None disables validation and uses fallback model."""
+    data = {"sub": "user123"}
+
+    result = Validation.get(
         data=data,
         validation=None,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
     assert result.enabled is False
+    assert result.model is JWTBaseModel
 
 
-def test_get_validation_config_disable_with_validation_disable():
-    """Test get_validation_config with validation=Validation.DISABLE."""
+def test_get_validation_disable_with_custom_fallback_model():
+    """Test disabled validation can select a custom fallback model."""
+    data = {"sub": "user123"}
+
+    result = Validation.get(
+        data=data,
+        validation=None,
+        default_validation=JWTClaims,
+        fallback_model=JWTClaims,
+    )
+
+    assert result.enabled is False
+    assert result.model is JWTClaims
+
+
+def test_get_validation_disable_with_validation_disable_uses_fallback():
+    """Test get_validation_config with validation=Validation.DISABLE disables validation."""
     data = ModelA(field_a="test")
-    default_validation = ValidationConfig(model=JWTClaims)
 
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=Validation.DISABLE,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
     assert result.enabled is False
+    assert result.model is JWTBaseModel
 
 
-def test_get_validation_config_disable_with_enabled_false():
-    """Test get_validation_config with ValidationConfig(enabled=False)."""
+def test_get_validation_disable_with_enabled_false_uses_fallback():
+    """Test get_validation_config treats ValidationConfig(enabled=False) as disabled."""
     data = {"sub": "user123"}
     custom_validation = ValidationConfig(enabled=False, model=JWTClaims)
-    default_validation = ValidationConfig(model=JWTBaseModel)
 
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=custom_validation,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
     assert result.enabled is False
+    assert result.model is JWTBaseModel
 
 
 # ============================================================================
-# get_validation_config() Tests - DEFAULT Cases
+# Validation.get() Tests - DEFAULT Cases
 # ============================================================================
 
 
-def test_get_validation_config_default_with_pydantic_data_forward_true():
-    """Test DEFAULT validation with pydantic data and forward=True.
-
-    Expected: validation_model should be data's type (ModelA), not default's model.
-    """
+def test_get_validation_default_with_pydantic_data_forwards_data_model():
+    """Test DEFAULT validation forwards the input pydantic model type."""
     data = ModelA(field_a="test")
-    default_validation = ValidationConfig(
-        model=JWTBaseModel,
-        forward_pydantic_model=True,
-    )
 
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=Validation.DEFAULT,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
-    assert result.model == ModelA
     assert result.enabled is True
+    assert result.model is ModelA
 
 
-def test_get_validation_config_default_with_pydantic_data_forward_false():
-    """Test DEFAULT validation with pydantic data and forward=False.
-
-    Expected: validation_model should be default's model (JWTBaseModel).
-    """
-    data = ModelA(field_a="test")
-    default_validation = ValidationConfig(
-        model=JWTBaseModel,
-        forward_pydantic_model=False,
-    )
-
-    result = get_validation_config(
-        data=data,
-        validation=Validation.DEFAULT,
-        default_validation=default_validation,
-    )
-
-    assert result.model == JWTBaseModel
-    assert result.enabled is True
-
-
-def test_get_validation_config_default_with_dict_data():
-    """Test DEFAULT validation with dict data.
-
-    Expected: validation_model should be default's model (no forwarding possible).
-    """
+def test_get_validation_default_with_dict_data_uses_default_validation_model():
+    """Test DEFAULT validation for dict data uses default_validation model."""
     data = {"sub": "user123"}
-    default_validation = ValidationConfig(
-        model=JWTClaims,
-        forward_pydantic_model=True,
-    )
 
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=Validation.DEFAULT,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
-    assert result.model == JWTClaims
     assert result.enabled is True
+    assert result.model is JWTClaims
 
 
-def test_get_validation_config_default_inherits_internal_config():
+def test_get_validation_default_inherits_internal_config():
     """Test DEFAULT validation inherits internal config from pydantic model."""
     data = ModelA(field_a="test")
     data.set_leeway(20.0)
     data.allow_future_iat()
 
-    default_validation = ValidationConfig(
-        model=JWTBaseModel,
-        forward_pydantic_model=True,
-        leeway=None,  # Should inherit from data
-        allow_future_iat=None,  # Should inherit from data
-    )
-
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=Validation.DEFAULT,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
     assert result.leeway == 20.0
@@ -1023,89 +991,51 @@ def test_get_validation_config_default_inherits_internal_config():
 
 
 # ============================================================================
-# get_validation_config() Tests - CUSTOM ValidationConfig Cases
+# Validation.get() Tests - CUSTOM ValidationConfig Cases
 # ============================================================================
 
 
-def test_get_validation_config_custom_validation_config_with_pydantic_forward_true():
-    """Test custom ValidationConfig with pydantic data and forward=True.
-
-    Expected: If validation_model is None, forward data's type.
-    """
+def test_get_validation_custom_validation_config_pydantic_forward_true_overrides_model():
+    """If forward_pydantic_model=True and data is pydantic, it forwards to data's type."""
     data = ModelA(field_a="test")
-    custom_validation = ValidationConfig(
-        model=None,
-        forward_pydantic_model=True,
-    )
-    default_validation = ValidationConfig(model=JWTBaseModel)
+    custom_validation = ValidationConfig(model=ModelB, forward_pydantic_model=True)
 
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=custom_validation,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
-    assert result.model == ModelA
     assert result.enabled is True
+    assert result.model is ModelA
 
 
-def test_get_validation_config_custom_validation_config_with_explicit_model():
-    """Test custom ValidationConfig with explicit validation_model.
-
-    Expected: validation_model should NOT be overridden by forwarding.
-    """
+def test_get_validation_custom_validation_config_pydantic_forward_false_keeps_model():
+    """If forward_pydantic_model=False, the explicit model is kept."""
     data = ModelA(field_a="test")
-    custom_validation = ValidationConfig(
-        model=ModelB,  # Explicit model
-        forward_pydantic_model=True,  # Should NOT override explicit model
-    )
-    default_validation = ValidationConfig(model=JWTBaseModel)
+    custom_validation = ValidationConfig(model=ModelB, forward_pydantic_model=False)
 
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=custom_validation,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
-    assert result.model == ModelB  # NOT ModelA
     assert result.enabled is True
+    assert result.model is ModelB
 
 
-def test_get_validation_config_custom_validation_config_forward_false_no_model():
-    """Test custom ValidationConfig with forward=False and validation_model=None.
-
-    Expected: validation_model should be None (invalid configuration).
-    """
-    data = ModelA(field_a="test")
-    custom_validation = ValidationConfig(
-        model=None,
-        forward_pydantic_model=False,
-    )
-    default_validation = ValidationConfig(model=JWTBaseModel)
-
-    result = get_validation_config(
-        data=data,
-        validation=custom_validation,
-        default_validation=default_validation,
-    )
-
-    assert result.model is None
-    assert result.enabled is True
-
-
-def test_get_validation_config_custom_validation_config_with_dict_data():
+def test_get_validation_custom_validation_config_with_dict_data():
     """Test custom ValidationConfig with dict data and explicit model."""
     data = {"sub": "user123"}
     custom_validation = ValidationConfig(
         model=JWTClaims,
         leeway=15.0,
     )
-    default_validation = ValidationConfig(model=JWTBaseModel)
-
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=custom_validation,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
     assert result.model == JWTClaims
@@ -1113,81 +1043,83 @@ def test_get_validation_config_custom_validation_config_with_dict_data():
     assert result.enabled is True
 
 
-def test_get_validation_config_custom_validation_config_does_not_mutate():
-    """Test that get_validation_config does not mutate input validation config."""
-    custom_validation = ValidationConfig(
-        model=JWTBaseModel,
-        leeway=10.0,
-        allow_future_iat=False,
-    )
-    data = {"sub": "user123"}
-    default_validation = ValidationConfig(model=JWTClaims)
+def test_get_validation_custom_validation_config_forwards_model():
+    """Test that ValidationConfig with forward_pydantic_model=True forwards the data model type."""
+    data = ModelA(field_a="test")
+    custom_validation = ValidationConfig(model=JWTClaims, forward_pydantic_model=True)
 
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=custom_validation,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
-    # Modify result
-    result.leeway = 20.0
-    result.allow_future_iat = True
-
-    # Original should be unchanged
-    assert custom_validation.leeway == 10.0
-    assert custom_validation.allow_future_iat is False
+    # The resulting Validation instance should have the forwarded model
+    assert isinstance(result, Validation)
+    assert result.model is ModelA
+    # The original ValidationConfig should remain unchanged
+    assert custom_validation.model is JWTClaims
 
 
-def test_get_validation_config_custom_validation_config_inherits_from_model():
+def test_get_validation_custom_validation_config_inherits_from_model():
     """Test custom ValidationConfig inherits internal config from pydantic model."""
     data = CustomModel(custom_field=42)
     data.set_leeway(30.0)
 
     custom_validation = ValidationConfig(
-        model=None,
+        model=JWTClaims,
         forward_pydantic_model=True,
         leeway=None,  # Should inherit from data
     )
-    default_validation = ValidationConfig(model=JWTBaseModel)
 
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=custom_validation,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
+    )
+
+    assert result.leeway == 30.0
+
+
+def test_get_validation_custom_model_class_inherits_from_model():
+    """Test custom model class inherits internal config from pydantic data."""
+    data = CustomModel(custom_field=42)
+    data.set_leeway(30.0)
+
+    result = Validation.get(
+        data=data,
+        validation=JWTClaims,  # Model class directly
+        default_validation=JWTClaims,
     )
 
     assert result.leeway == 30.0
 
 
 # ============================================================================
-# get_validation_config() Tests - CUSTOM Model Class Cases
+# Validation.get() Tests - CUSTOM Model Class Cases
 # ============================================================================
 
 
-def test_get_validation_config_custom_model_class():
+def test_get_validation_custom_model_class():
     """Test get_validation_config with model class as validation parameter."""
     data = {"sub": "user123"}
-    default_validation = ValidationConfig(model=JWTBaseModel)
-
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=JWTClaims,  # Model class
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
     assert result.model == JWTClaims
     assert result.enabled is True
 
 
-def test_get_validation_config_custom_model_class_with_pydantic_data():
+def test_get_validation_custom_model_class_with_pydantic_data():
     """Test get_validation_config with model class and pydantic data."""
     data = ModelA(field_a="test")
-    default_validation = ValidationConfig(model=JWTBaseModel)
-
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=ModelB,  # Different model class
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
     assert result.model == ModelB  # NOT ModelA
@@ -1195,11 +1127,11 @@ def test_get_validation_config_custom_model_class_with_pydantic_data():
 
 
 # ============================================================================
-# get_validation_config() Tests - Internal Config Application
+# Validation.get() Tests - Internal Config Application
 # ============================================================================
 
 
-def test_get_validation_config_applies_defaults_for_dict_data():
+def test_get_validation_applies_defaults_for_dict_data():
     """Test get_validation_config applies defaults for dict data."""
     data = {"sub": "user123"}
     custom_validation = ValidationConfig(
@@ -1207,12 +1139,10 @@ def test_get_validation_config_applies_defaults_for_dict_data():
         leeway=None,
         allow_future_iat=None,
     )
-    default_validation = ValidationConfig(model=JWTBaseModel)
-
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=custom_validation,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
     # Should have default values applied
@@ -1220,33 +1150,31 @@ def test_get_validation_config_applies_defaults_for_dict_data():
     assert result.allow_future_iat == DEFAULT_ALLOW_FUTURE_IAT
 
 
-def test_get_validation_config_does_not_override_explicit_values():
+def test_get_validation_does_not_override_explicit_values():
     """Test get_validation_config does not override explicit internal config."""
     data = ModelA(field_a="test")
     data.set_leeway(50.0)
 
     custom_validation = ValidationConfig(
-        model=None,
+        model=JWTClaims,
         forward_pydantic_model=True,
         leeway=10.0,  # Explicit - should NOT be overridden
     )
-    default_validation = ValidationConfig(model=JWTBaseModel)
-
-    result = get_validation_config(
+    result = Validation.get(
         data=data,
         validation=custom_validation,
-        default_validation=default_validation,
+        default_validation=JWTClaims,
     )
 
     assert result.leeway == 10.0  # NOT 50.0 from data
 
 
 # ============================================================================
-# get_validation_config() Tests - Comprehensive Scenarios
+# Validation.get() Tests - Comprehensive Scenarios
 # ============================================================================
 
 
-def test_get_validation_config_all_combinations():
+def test_get_validation_all_combinations():
     """Test get_validation_config with all parameter combinations.
 
     This is a comprehensive test covering the 8 main scenarios:
@@ -1259,122 +1187,83 @@ def test_get_validation_config_all_combinations():
     7. Dict data + forward=False + validation_model=None → no model
     8. Dict data + forward=False + validation_model=Set → uses explicit model
     """
-    default_validation = ValidationConfig(model=JWTBaseModel)
+    # Default validation model for this matrix
+    default_validation_model = JWTClaims
 
-    # Case 1: Pydantic + forward=True + model=None
+    # Case 1: Pydantic + forward=True + model=JWTClaims -> forwards to data type
     data_1 = ModelA(field_a="test")
-    validation_1 = ValidationConfig(model=None, forward_pydantic_model=True)
-    result_1 = get_validation_config(data_1, validation_1, default_validation)
-    assert result_1.model == ModelA
+    validation_1 = ValidationConfig(model=JWTClaims, forward_pydantic_model=True)
+    result_1 = Validation.get(data_1, validation_1, default_validation_model)
+    assert result_1.model is ModelA
 
-    # Case 2: Pydantic + forward=True + model=Set
+    # Case 2: Pydantic + forward=True + model=ModelB -> still forwards to data type
     data_2 = ModelA(field_a="test")
     validation_2 = ValidationConfig(model=ModelB, forward_pydantic_model=True)
-    result_2 = get_validation_config(data_2, validation_2, default_validation)
-    assert result_2.model == ModelB
+    result_2 = Validation.get(data_2, validation_2, default_validation_model)
+    assert result_2.model is ModelA
 
-    # Case 3: Pydantic + forward=False + model=None
+    # Case 3: Pydantic + forward=False + model=JWTClaims -> keeps JWTClaims
     data_3 = ModelA(field_a="test")
-    validation_3 = ValidationConfig(model=None, forward_pydantic_model=False)
-    result_3 = get_validation_config(data_3, validation_3, default_validation)
-    assert result_3.model is None
+    validation_3 = ValidationConfig(model=JWTClaims, forward_pydantic_model=False)
+    result_3 = Validation.get(data_3, validation_3, default_validation_model)
+    assert result_3.model is JWTClaims
 
-    # Case 4: Pydantic + forward=False + model=Set
+    # Case 4: Pydantic + forward=False + model=ModelB -> keeps ModelB
     data_4 = ModelA(field_a="test")
     validation_4 = ValidationConfig(model=ModelB, forward_pydantic_model=False)
-    result_4 = get_validation_config(data_4, validation_4, default_validation)
-    assert result_4.model == ModelB
+    result_4 = Validation.get(data_4, validation_4, default_validation_model)
+    assert result_4.model is ModelB
 
-    # Case 5: Dict + forward=True + model=None
+    # Case 5: Dict + forward=True + model=JWTBaseModel -> stays JWTBaseModel
     data_5 = {"sub": "user123"}
-    validation_5 = ValidationConfig(model=None, forward_pydantic_model=True)
-    result_5 = get_validation_config(data_5, validation_5, default_validation)
-    assert result_5.model is None
+    validation_5 = ValidationConfig(model=JWTBaseModel, forward_pydantic_model=True)
+    result_5 = Validation.get(data_5, validation_5, default_validation_model)
+    assert result_5.model is JWTBaseModel
 
-    # Case 6: Dict + forward=True + model=Set
+    # Case 6: Dict + forward=True + model=JWTClaims -> stays JWTClaims
     data_6 = {"sub": "user123"}
     validation_6 = ValidationConfig(model=JWTClaims, forward_pydantic_model=True)
-    result_6 = get_validation_config(data_6, validation_6, default_validation)
-    assert result_6.model == JWTClaims
+    result_6 = Validation.get(data_6, validation_6, default_validation_model)
+    assert result_6.model is JWTClaims
 
-    # Case 7: Dict + forward=False + model=None
+    # Case 7: Dict + forward=False + model=JWTBaseModel -> stays JWTBaseModel
     data_7 = {"sub": "user123"}
-    validation_7 = ValidationConfig(model=None, forward_pydantic_model=False)
-    result_7 = get_validation_config(data_7, validation_7, default_validation)
-    assert result_7.model is None
+    validation_7 = ValidationConfig(model=JWTBaseModel, forward_pydantic_model=False)
+    result_7 = Validation.get(data_7, validation_7, default_validation_model)
+    assert result_7.model is JWTBaseModel
 
-    # Case 8: Dict + forward=False + model=Set
+    # Case 8: Dict + forward=False + model=JWTClaims -> stays JWTClaims
     data_8 = {"sub": "user123"}
     validation_8 = ValidationConfig(model=JWTClaims, forward_pydantic_model=False)
-    result_8 = get_validation_config(data_8, validation_8, default_validation)
-    assert result_8.model == JWTClaims
+    result_8 = Validation.get(data_8, validation_8, default_validation_model)
+    assert result_8.model is JWTClaims
 
 
-def test_get_validation_config_default_vs_custom():
-    """Test key differences between Validation.DEFAULT and custom ValidationConfig.
-
-    Key differences:
-    1. DEFAULT with pydantic+forward=True → forwards data type
-    2. CUSTOM with explicit model → uses explicit model only
-    3. DEFAULT uses default_validation's config values
-    4. CUSTOM uses its own config values
-    """
+def test_get_validation_default_vs_custom():
+    """Test key differences between Validation.DEFAULT and a custom ValidationConfig."""
     data_pydantic = ModelA(field_a="test")
     data_dict = {"sub": "user123"}
 
-    default_validation = ValidationConfig(
-        model=JWTBaseModel,
-        forward_pydantic_model=True,
-        leeway=10.0,
-    )
+    # DEFAULT forwards pydantic type
+    result_default_pydantic = Validation.get(data_pydantic, Validation.DEFAULT, JWTClaims)
+    assert result_default_pydantic.model is ModelA
 
-    # Scenario 1: DEFAULT with pydantic data forwards model type
-    result_default_pydantic = get_validation_config(
-        data_pydantic, Validation.DEFAULT, default_validation
-    )
-    assert result_default_pydantic.model == ModelA
-    assert result_default_pydantic.leeway == 10.0
+    # DEFAULT uses default_validation model for dict
+    result_default_dict = Validation.get(data_dict, Validation.DEFAULT, JWTClaims)
+    assert result_default_dict.model is JWTClaims
 
-    # Scenario 2: CUSTOM with explicit model uses explicit model
-    custom_validation = ValidationConfig(
-        model=JWTClaims,
-        forward_pydantic_model=True,
-        leeway=7.0,
-    )
-    result_custom_pydantic = get_validation_config(
-        data_pydantic, custom_validation, default_validation
-    )
-    assert result_custom_pydantic.model == JWTClaims  # NOT ModelA
-    assert result_custom_pydantic.leeway == 7.0  # NOT 10.0
-
-    # Scenario 3: DEFAULT with dict data uses default's model
-    result_default_dict = get_validation_config(
-        data_dict, Validation.DEFAULT, default_validation
-    )
-    assert result_default_dict.model == JWTBaseModel
-    assert result_default_dict.leeway == 10.0
-
-    # Scenario 4: CUSTOM with dict data uses custom model
-    result_custom_dict = get_validation_config(
-        data_dict, custom_validation, default_validation
-    )
-    assert result_custom_dict.model == JWTClaims
-    assert result_custom_dict.leeway == 7.0
+    # Custom config can disable forwarding
+    custom_validation = ValidationConfig(model=JWTClaims, forward_pydantic_model=False)
+    result_custom_pydantic = Validation.get(data_pydantic, custom_validation, JWTClaims)
+    assert result_custom_pydantic.model is JWTClaims
 
 
-# ============================================================================
-# Edge Cases
-# ============================================================================
-
-
-def test_get_validation_config_invalid_validation_type():
+def test_get_validation_invalid_validation_type():
     """Test get_validation_config raises error for invalid validation type."""
     data = {"sub": "user123"}
-    default_validation = ValidationConfig(model=JWTBaseModel)
-
     with pytest.raises(TypeError, match="Wrong validation object type"):
-        get_validation_config(
+        Validation.get(
             data=data,
             validation="invalid",  # type: ignore
-            default_validation=default_validation,
+            default_validation=JWTClaims,
         )

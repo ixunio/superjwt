@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "superjwt"
 dynamic = ["version"]
 dependencies = [
+    "cryptography>=43.0.0",
     "pydantic>=2",
     "typing-extensions>=4.0.1",
 ]
@@ -42,11 +43,6 @@ keywords = [
     "pydantic",
 ]
 
-[project.optional-dependencies]
-asymmetric = [
-    "cryptography>=43.0.0",
-]
-
 [project.urls]
 Homepage = "https://github.com/ixunio/superjwt"
 Repository = "https://github.com/ixunio/superjwt.git"
@@ -69,6 +65,9 @@ test = [
     "pytest",
     "pytest-cov",
 ]
+
+[tool.setuptools.packages.find]
+include = ["superjwt"]
 
 [tool.setuptools.dynamic]
 version = {attr = "superjwt._version.__version__"}

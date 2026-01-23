@@ -1,28 +1,19 @@
-from __future__ import annotations
-
 import secrets
 import warnings
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar, Generic, Literal, TypeVar, cast
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+from typing_extensions import Self
+
 from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning, SuperJWTError
 from superjwt.utils import (
-    CRYPTOGRAPHY_AVAILABLE,
     as_bytes,
-    check_cryptography_available,
     is_pem_format,
     is_ssh_key,
 )
-
-
-if CRYPTOGRAPHY_AVAILABLE:  # pragma: no cover
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
-
-
-if TYPE_CHECKING:  # pragma: no cover
-    from typing_extensions import Self
 
 
 class Key(ABC):
@@ -92,8 +83,6 @@ class Key(ABC):
         If both private_key and public_key are provided and derive_public_key is True,
         they will be checked against each other for consistency.
         """
-        if cls is NoneKey:
-            return cls()
 
         if private_key is None and public_key is None:
             raise ValueError("No key was provided")
@@ -109,26 +98,6 @@ class Key(ABC):
         key = cls()
         key._prepare_key(private_key, public_key, derive_public_key)
         return key
-
-
-class NoneKey(Key):
-    name = "NoneKey"
-    description = "No key (used for 'none' algorithm)"
-    algorithms = ("none",)
-
-    @classmethod
-    def import_signing_key(cls, _) -> Self:
-        return cls()
-
-    @classmethod
-    def import_verifying_key(cls, _) -> Self:
-        return cls()
-
-    @classmethod
-    def generate(cls) -> Self:
-        return cls()  # pragma: no cover
-
-    def _prepare_key(self, *_) -> None: ...
 
 
 class SymmetricKey(Key):
@@ -210,8 +179,6 @@ class AsymmetricKey(Key, Generic[PrivateKeyType, PublicKeyType]):
 
     def __init__(self):
         super().__init__()
-
-        check_cryptography_available()
 
         self._private_key_obj: PrivateKeyType | None = None
         self._public_key_obj: PublicKeyType | None = None
@@ -401,7 +368,6 @@ class RSAKey(AsymmetricKey["rsa.RSAPrivateKey", "rsa.RSAPublicKey"]):
             key_size: The size of the key in bits.
                       Recommended values: 2048, 3072, 4096.
         """
-        check_cryptography_available()
         private_key_obj = rsa.generate_private_key(
             public_exponent=65537, key_size=key_size, backend=default_backend()
         )
@@ -476,7 +442,6 @@ class ECKey(AsymmetricKey["ec.EllipticCurvePrivateKey", "ec.EllipticCurvePublicK
                    "secp384r1", "secp521r1", "secp256k1",
                    or an algorithm name: "ES256", "ES256K", "ES384", "ES512".
         """
-        check_cryptography_available()
 
         # Map string names to curve instances
         if isinstance(curve, str):
@@ -577,7 +542,6 @@ class OKPKey(
         Args:
             curve: The EdDSA curve to use: "Ed25519" or "Ed448".
         """
-        check_cryptography_available()
 
         if curve == "Ed25519":
             private_key_obj = ed25519.Ed25519PrivateKey.generate()

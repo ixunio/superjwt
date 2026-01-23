@@ -6,24 +6,6 @@ from datetime import datetime
 from typing import Any
 
 
-def check_cryptography_available(raise_error: bool = True) -> bool:
-    """Check if cryptography library is available, raise helpful error if not."""
-    try:
-        import cryptography  # noqa: F401
-
-        return True
-    except ImportError as e:  # pragma: no cover
-        if raise_error:
-            raise ImportError(
-                "Asymmetric key algorithms require the 'cryptography' library. "
-                "Install it with: pip install superjwt[asymmetric]"
-            ) from e
-        return False
-
-
-CRYPTOGRAPHY_AVAILABLE = check_cryptography_available(raise_error=False)
-
-
 def trim_str(s: str, max_length: int = 200) -> str:
     if len(s) <= max_length:
         return s

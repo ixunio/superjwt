@@ -1,6 +1,6 @@
 import pytest
+from cryptography.hazmat.primitives import serialization
 from superjwt.algorithms import (
-    Alg,
     Ed448Algorithm,
     Ed25519Algorithm,
     ES256Algorithm,
@@ -10,7 +10,6 @@ from superjwt.algorithms import (
     HS256Algorithm,
     HS384Algorithm,
     HS512Algorithm,
-    NoneAlgorithm,
     PS256Algorithm,
     PS384Algorithm,
     PS512Algorithm,
@@ -18,19 +17,8 @@ from superjwt.algorithms import (
     RS384Algorithm,
     RS512Algorithm,
 )
-from superjwt.exceptions import (
-    AlgorithmNotSupportedError,
-    InvalidAlgorithmError,
-    SuperJWTError,
-)
-from superjwt.keys import ECKey, NoneKey, OctKey, OKPKey, RSAKey
-from superjwt.utils import CRYPTOGRAPHY_AVAILABLE
-
-from .conftest import requires_cryptography
-
-
-if CRYPTOGRAPHY_AVAILABLE:
-    from cryptography.hazmat.primitives import serialization
+from superjwt.exceptions import SuperJWTError
+from superjwt.keys import ECKey, OctKey, OKPKey, RSAKey
 
 
 # Use session-scoped fixture from conftest.py - alias it for compatibility
@@ -38,65 +26,6 @@ if CRYPTOGRAPHY_AVAILABLE:
 def rsa_key_pair(rsa_2048_key_pair):
     """Alias for session-scoped RSA key pair fixture."""
     return rsa_2048_key_pair
-
-
-class TestAlgEnum:
-    """Test suite for the Alg enum methods."""
-
-    def test_get_instance_not_implemented(self):
-        """Test that get_instance() raises AlgorithmNotSupportedError for unimplemented algorithms."""
-        # EdDSA is defined but not yet implemented (ALG_INSTANCES[RS256] = None)
-        with pytest.raises(
-            AlgorithmNotSupportedError, match=r"EdDSA.*not yet implemented"
-        ):
-            Alg.EdDSA.get_instance()
-
-    def test_get_instance_by_name_invalid_algorithm(self):
-        """Test that get_instance_by_name() raises InvalidAlgorithmError for invalid algorithm names."""
-        with pytest.raises(
-            InvalidAlgorithmError, match=r"INVALID.*not a valid JWS algorithm"
-        ):
-            Alg.get_instance_by_name("INVALID")
-
-    def test_get_instance_by_name_not_implemented(self):
-        """Test that get_instance_by_name() raises AlgorithmNotSupportedError for unimplemented algorithms."""
-        # EdDSA is defined but not yet implemented (ALG_INSTANCES[PS256] = None)
-        with pytest.raises(
-            AlgorithmNotSupportedError, match=r"EdDSA.*not yet implemented"
-        ):
-            Alg.get_instance_by_name("EdDSA")
-
-    def test_get_instance_success(self):
-        """Test that get_instance() successfully returns an algorithm instance for implemented algorithms."""
-        instance = Alg.HS256.get_instance()
-        assert instance is not None
-        assert instance.__class__.__name__ == "HS256Algorithm"
-
-    def test_get_instance_by_name_success(self):
-        """Test that get_instance_by_name() successfully returns an algorithm instance for implemented algorithms."""
-        instance = Alg.get_instance_by_name("HS256")
-        assert instance is not None
-        assert instance.__class__.__name__ == "HS256Algorithm"
-
-    def test_get_algorithm_with_enum(self):
-        """Test that get_algorithm() handles Alg enum values."""
-        instance = Alg.get_algorithm(Alg.HS256)
-        assert instance is not None
-        assert instance.__class__.__name__ == "HS256Algorithm"
-
-    def test_get_algorithm_with_string(self):
-        """Test that get_algorithm() handles string algorithm names."""
-        instance = Alg.get_algorithm("HS256")
-        assert instance is not None
-        assert instance.__class__.__name__ == "HS256Algorithm"
-
-    def test_get_algorithm_with_instance(self):
-        """Test that get_algorithm() passes through algorithm instances."""
-        from superjwt.algorithms import HS256Algorithm
-
-        original_instance = HS256Algorithm()
-        returned_instance = Alg.get_algorithm(original_instance)
-        assert returned_instance is original_instance
 
 
 class TestSymmetricAlgorithmKeyTypes:
@@ -109,7 +38,6 @@ class TestSymmetricAlgorithmKeyTypes:
         assert HS512Algorithm.key_type is OctKey
 
 
-@requires_cryptography
 class TestAsymmetricAlgorithmKeyTypes:
     """Test that asymmetric algorithms have correct key types defined."""
 
@@ -136,56 +64,6 @@ class TestAsymmetricAlgorithmKeyTypes:
         """Test that EdDSA algorithms specify OKPKey as key type."""
         assert Ed25519Algorithm.key_type is OKPKey
         assert Ed448Algorithm.key_type is OKPKey
-
-
-class TestNoneAlgorithm:
-    """Test suite for the 'none' algorithm (no signature)."""
-
-    @pytest.fixture
-    def none_key(self):
-        """Create a NoneKey."""
-        return NoneKey()
-
-    @pytest.fixture
-    def test_data(self):
-        """Test data to sign."""
-        return b"The quick brown fox jumps over the lazy dog"
-
-    def test_none_algorithm_sign(self, none_key, test_data):
-        """Test that 'none' algorithm produces a signature."""
-        algorithm = NoneAlgorithm()
-        signature = algorithm.sign(test_data, none_key)
-
-        assert isinstance(signature, bytes)
-        assert signature == b"no-signature"
-
-    def test_none_algorithm_verify(self, none_key, test_data):
-        """Test that 'none' algorithm always returns True for verification."""
-        algorithm = NoneAlgorithm()
-
-        # Should verify any signature
-        assert algorithm.verify(test_data, b"any-signature", none_key) is True
-        assert algorithm.verify(test_data, b"", none_key) is True
-        assert algorithm.verify(b"different-data", b"any-signature", none_key) is True
-
-    def test_none_algorithm_check_key_validates_type(self, none_key):
-        """Test that check_key validates key type."""
-        algorithm = NoneAlgorithm()
-        algorithm.check_key(none_key)  # Should not raise
-
-        # Try with wrong key type
-        oct_key = OctKey.import_key(b"test-secret")
-        with pytest.raises(SuperJWTError, match="must be a NoneKey"):
-            algorithm.check_key(oct_key)  # type: ignore
-
-    def test_none_algorithm_generate_key(self):
-        """Test that generate_key returns a NoneKey."""
-        algorithm = NoneAlgorithm()
-        key = algorithm.generate_key()
-
-        assert isinstance(key, NoneKey)
-        assert key.private_key == b""
-        assert key.public_key == b""
 
 
 class TestHMACAlgorithms:
@@ -255,7 +133,6 @@ class TestHMACAlgorithms:
         tampered_data = test_data + b" (modified)"
         assert algorithm.verify(tampered_data, signature, secret_key) is False
 
-    @requires_cryptography
     def test_hmac_check_key_validates_type(self, secret_key):
         """Test that check_key validates key type."""
         algorithm = HS256Algorithm()
@@ -267,7 +144,6 @@ class TestHMACAlgorithms:
             algorithm.check_key(rsa_key)  # type: ignore
 
 
-@requires_cryptography
 class TestRSAAlgorithms:
     """Test suite for RSA algorithms (RS256, RS384, RS512)."""
 
@@ -508,7 +384,6 @@ class TestRSAAlgorithms:
         )
 
 
-@requires_cryptography
 class TestRSAPSSAlgorithms:
     """Tests for RSASSA-PSS algorithms (PS256, PS384, PS512)."""
 
@@ -632,10 +507,6 @@ class TestRSAPSSAlgorithms:
         """Test that PS algorithms validate key types."""
         algo = PS256Algorithm()
 
-        none_key = NoneKey()
-        with pytest.raises(SuperJWTError, match="Key must be a RSAKey for algorithm"):
-            algo.check_key(none_key)  # type: ignore
-
         oct_key = OctKey.import_key(b"test-secret")
         with pytest.raises(SuperJWTError, match="Key must be a RSAKey for algorithm"):
             algo.check_key(oct_key)  # type: ignore
@@ -695,7 +566,6 @@ class TestRSAPSSAlgorithms:
         assert algo.verify(data, sig3, public_key)
 
 
-@requires_cryptography
 class TestECDSAAlgorithms:
     """Test suite for ECDSA algorithms (ES256, ES256K, ES384, ES512)."""
 
@@ -876,7 +746,6 @@ class TestECDSAAlgorithms:
             es256.sign(test_data, ec_p384_key_pair.key_instance_from_private_pem)
 
 
-@requires_cryptography
 class TestEdDSAAlgorithms:
     """Test suite for EdDSA algorithms (Ed25519, Ed448)."""
 
@@ -1129,7 +998,6 @@ class TestHMACGenerateKey:
         assert key1.private_key != key2.private_key
 
 
-@requires_cryptography
 class TestRSAGenerateKey:
     """Test RSA algorithm key generation."""
 
@@ -1167,7 +1035,6 @@ class TestRSAGenerateKey:
         assert algo.verify(test_data, signature, key)
 
 
-@requires_cryptography
 class TestRSAPSSGenerateKey:
     """Test RSA-PSS algorithm key generation."""
 
@@ -1201,7 +1068,6 @@ class TestRSAPSSGenerateKey:
         assert algo.verify(test_data, signature, key)
 
 
-@requires_cryptography
 class TestECDSAGenerateKey:
     """Test ECDSA algorithm key generation."""
 
@@ -1257,7 +1123,6 @@ class TestECDSAGenerateKey:
         assert algo.verify(test_data, signature2, key)
 
 
-@requires_cryptography
 class TestEdDSAGenerateKey:
     """Test EdDSA algorithm key generation."""
 

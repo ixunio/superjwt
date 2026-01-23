@@ -3,12 +3,11 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import BaseModel, Field
-from superjwt.algorithms import Alg
-from superjwt.jws import JWS
-from superjwt.jwt import JWT
 from superjwt.keys import AsymmetricKey, ECKey, OKPKey, RSAKey
-from superjwt.utils import CRYPTOGRAPHY_AVAILABLE
 from superjwt.validations import JWTClaims, JWTDatetimeFloat, JWTDatetimeInt
 
 
@@ -78,16 +77,6 @@ def check_claims_instance(
 
 
 @pytest.fixture
-def jwt() -> JWT:
-    return JWT()
-
-
-@pytest.fixture
-def jws_HS256() -> JWS:  # noqa: N802
-    return JWS(algorithm=Alg.HS256)
-
-
-@pytest.fixture
 def secret_key_random() -> str:
     return secrets.token_hex(32)
 
@@ -153,16 +142,6 @@ def claims_fixed_dt() -> JWTCustomClaims:
 # Asymmetric Key Fixtures (session-scoped for performance)
 # ============================================================================
 
-# Mark to skip tests that require cryptography
-requires_cryptography = pytest.mark.skipif(
-    not CRYPTOGRAPHY_AVAILABLE, reason="cryptography library not installed"
-)
-
-if CRYPTOGRAPHY_AVAILABLE:
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa
-
 
 class KeyPair(BaseModel):
     """Model for asymmetric key pair fixture data.
@@ -212,72 +191,54 @@ class KeyPair(BaseModel):
 @pytest.fixture(scope="session")
 def rsa_2048_key_pair():
     """Generate RSA-2048 key pair once per session for all RSA tests."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(RSAKey.generate(2048))
 
 
 @pytest.fixture(scope="session")
 def rsa_2048_key_pair_alt():
     """Generate a second RSA-2048 key pair for wrong key tests."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(RSAKey.generate(2048))
 
 
 @pytest.fixture(scope="session")
 def ec_p256_key_pair():
     """Generate EC P-256 (SECP256R1) key pair once per session."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(ECKey.generate("P-256"))
 
 
 @pytest.fixture(scope="session")
 def ec_p256_key_pair_alt():
     """Generate a second EC P-256 key pair for wrong key tests."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(ECKey.generate("P-256"))
 
 
 @pytest.fixture(scope="session")
 def ec_p384_key_pair():
     """Generate EC P-384 (SECP384R1) key pair once per session."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(ECKey.generate("P-384"))
 
 
 @pytest.fixture(scope="session")
 def ec_p521_key_pair():
     """Generate EC P-521 (SECP521R1) key pair once per session."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(ECKey.generate("P-521"))
 
 
 @pytest.fixture(scope="session")
 def ed25519_key_pair():
     """Generate Ed25519 key pair once per session."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(OKPKey.generate("Ed25519"))
 
 
 @pytest.fixture(scope="session")
 def ed25519_key_pair_alt():
     """Generate a second Ed25519 key pair for wrong key tests."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(OKPKey.generate("Ed25519"))
 
 
 @pytest.fixture(scope="session")
 def ed448_key_pair():
     """Generate Ed448 key pair once per session."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(OKPKey.generate("Ed448"))
 
 
@@ -285,16 +246,12 @@ def ed448_key_pair():
 @pytest.fixture(scope="session")
 def rsa_3072_key_pair():
     """Generate RSA-3072 key pair once per session."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(RSAKey.generate(3072))
 
 
 @pytest.fixture(scope="session")
 def rsa_4096_key_pair():
     """Generate RSA-4096 key pair once per session."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
     return KeyPair.make_obj(RSAKey.generate(4096))
 
 
@@ -302,9 +259,6 @@ def rsa_4096_key_pair():
 @pytest.fixture(scope="session")
 def rsa_1024_weak_key():
     """Generate weak RSA-1024 key pair once per session for warning tests."""
-    if not CRYPTOGRAPHY_AVAILABLE:
-        pytest.skip("cryptography not available")
-
     private_key = rsa.generate_private_key(
         public_exponent=65537, key_size=1024, backend=default_backend()
     )

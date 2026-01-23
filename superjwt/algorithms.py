@@ -1,33 +1,20 @@
-import hashlib
-import hmac
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
 
-from typing_extensions import Self
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes, hmac
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding
+from cryptography.hazmat.primitives.asymmetric.utils import (
+    decode_dss_signature,
+    encode_dss_signature,
+)
 
 from superjwt.exceptions import (
-    AlgorithmNotSupportedError,
-    InvalidAlgorithmError,
     SuperJWTError,
 )
-from superjwt.keys import ECKey, Key, NoneKey, OctKey, OKPKey, RSAKey
-from superjwt.utils import (
-    CRYPTOGRAPHY_AVAILABLE,
-    check_cryptography_available,
-    decode_integer,
-    encode_integer,
-)
+from superjwt.keys import ECKey, Key, OctKey, OKPKey, RSAKey
+from superjwt.utils import decode_integer, encode_integer
 
-
-if CRYPTOGRAPHY_AVAILABLE:  # pragma: no cover
-    from cryptography.exceptions import InvalidSignature
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding
-    from cryptography.hazmat.primitives.asymmetric.utils import (
-        decode_dss_signature,
-        encode_dss_signature,
-    )
 
 if TYPE_CHECKING:  # pragma: no cover
     from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurve
@@ -51,7 +38,6 @@ class BaseJWSAlgorithm(ABC, Generic[KeyType]):
     name: ClassVar[str]
     description: ClassVar[str]
     key_type: type[KeyType]
-    requires_cryptography: ClassVar[bool] = True
 
     @abstractmethod
     def generate_key(self, *args: Any, **kwargs: Any) -> KeyType: ...
@@ -66,35 +52,12 @@ class BaseJWSAlgorithm(ABC, Generic[KeyType]):
     def verify(self, data: bytes, signature: bytes, key: KeyType) -> bool: ...
 
 
-class NoneAlgorithm(BaseJWSAlgorithm[NoneKey]):
-    """No digital signature performed. Disabled by default for security reasons."""
-
-    name = "none"
-    description = "No signature"
-    key_type = NoneKey
-    requires_cryptography = False
-
-    def generate_key(self) -> NoneKey:
-        return self.key_type()
-
-    def check_key(self, key: NoneKey) -> None:
-        if not isinstance(key, NoneKey):
-            raise SuperJWTError("Key must be a NoneKey for 'none' algorithm")
-
-    def sign(self, _: bytes, __: NoneKey) -> bytes:
-        return b"no-signature"
-
-    def verify(self, _: bytes, __: bytes, ___: NoneKey) -> bool:
-        return True
-
-
 class HMACAlgorithm(BaseJWSAlgorithm[OctKey]):
     """Base class for HMAC using SHA algorithms"""
 
     key_type = OctKey
-    requires_cryptography = False
 
-    def __init__(self, hash_algorithm: Any):
+    def __init__(self, hash_algorithm: "HashAlgorithm"):
         self.hash_algorithm = hash_algorithm
 
     def generate_key(self, key_size: int | None = None) -> OctKey:
@@ -110,7 +73,7 @@ class HMACAlgorithm(BaseJWSAlgorithm[OctKey]):
             A new OctKey instance with a randomly generated key.
         """
         final_key_size = (
-            key_size if key_size is not None else self.hash_algorithm().digest_size
+            key_size if key_size is not None else self.hash_algorithm.digest_size
         )
         return self.key_type.generate(final_key_size)
 
@@ -119,10 +82,22 @@ class HMACAlgorithm(BaseJWSAlgorithm[OctKey]):
             raise SuperJWTError("Key must be an OctKey for HMAC algorithms")
 
     def sign(self, data: bytes, key: OctKey) -> bytes:
-        return hmac.new(key.private_key, data, self.hash_algorithm).digest()
+        self.check_key(key)
+
+        h = hmac.HMAC(key.private_key, self.hash_algorithm)
+        h.update(data)
+        return h.finalize()
 
     def verify(self, data: bytes, signature: bytes, key: OctKey) -> bool:
-        return hmac.compare_digest(signature, self.sign(data, key))
+        self.check_key(key)
+
+        h = hmac.HMAC(key.private_key, self.hash_algorithm)
+        h.update(data)
+        try:
+            h.verify(signature)
+            return True
+        except InvalidSignature:
+            return False
 
 
 class AsymmetricJWSAlgorithm(BaseJWSAlgorithm[AsymmetricKeyType], ABC):
@@ -141,7 +116,6 @@ class RSAAlgorithm(AsymmetricJWSAlgorithm[RSAKey]):
     key_type = RSAKey
 
     def __init__(self, hash_algorithm: "HashAlgorithm", padding: "AsymmetricPadding"):
-        check_cryptography_available()
         self.hash_algorithm = hash_algorithm
         self.padding = padding
 
@@ -157,11 +131,14 @@ class RSAAlgorithm(AsymmetricJWSAlgorithm[RSAKey]):
 
     def sign(self, data: bytes, key: RSAKey) -> bytes:
         """Sign data using RSA private key."""
+        self.check_key(key)
+
         private_key = key._get_private_key()
         return private_key.sign(data, self.padding, self.hash_algorithm)
 
     def verify(self, data: bytes, signature: bytes, key: RSAKey) -> bool:
         """Verify signature using RSA public key."""
+        self.check_key(key)
 
         public_key = key._get_public_key()
         try:
@@ -197,7 +174,6 @@ class ECDSAAlgorithm(AsymmetricJWSAlgorithm[ECKey]):
     key_type = ECKey
 
     def __init__(self, hash_algorithm: "HashAlgorithm", curve: "type[EllipticCurve]"):
-        check_cryptography_available()
         self.hash_algorithm = hash_algorithm
         self.curve = curve
         self.curve_name = curve.name
@@ -226,11 +202,10 @@ class ECDSAAlgorithm(AsymmetricJWSAlgorithm[ECKey]):
 
     def sign(self, data: bytes, key: ECKey) -> bytes:
         self.check_key(key)
-        private_key = key._get_private_key()
-
-        der_signature = private_key.sign(data, ec.ECDSA(self.hash_algorithm))
 
         # Encode r and s as raw bytes for JWT format
+        private_key = key._get_private_key()
+        der_signature = private_key.sign(data, ec.ECDSA(self.hash_algorithm))
         r, s = decode_dss_signature(der_signature)
         size = key.curve_key_size
         return encode_integer(r, size) + encode_integer(s, size)
@@ -269,7 +244,6 @@ class EdDSAAlgorithm(AsymmetricJWSAlgorithm[OKPKey]):
         curve_type_private: "type[Ed25519PrivateKey | Ed448PrivateKey]",
         curve_type_public: "type[Ed25519PublicKey | Ed448PublicKey]",
     ):
-        check_cryptography_available()
         self.curve_type_private = curve_type_private
         self.curve_type_public = curve_type_public
 
@@ -297,11 +271,13 @@ class EdDSAAlgorithm(AsymmetricJWSAlgorithm[OKPKey]):
 
     def sign(self, data: bytes, key: OKPKey) -> bytes:
         self.check_key(key)
+
         private_key = key._get_private_key()
         return private_key.sign(data)
 
     def verify(self, data: bytes, signature: bytes, key: OKPKey) -> bool:
         self.check_key(key)
+
         public_key = key._get_public_key()
         try:
             public_key.verify(signature, data)
@@ -318,7 +294,7 @@ class HS256Algorithm(HMACAlgorithm):
     description = "HMAC with SHA-256 signature"
 
     def __init__(self):
-        super().__init__(hashlib.sha256)
+        super().__init__(hashes.SHA256())
 
 
 class HS384Algorithm(HMACAlgorithm):
@@ -326,7 +302,7 @@ class HS384Algorithm(HMACAlgorithm):
     description = "HMAC with SHA-384 signature"
 
     def __init__(self):
-        super().__init__(hashlib.sha384)
+        super().__init__(hashes.SHA384())
 
 
 class HS512Algorithm(HMACAlgorithm):
@@ -334,7 +310,7 @@ class HS512Algorithm(HMACAlgorithm):
     description = "HMAC with SHA-512 signature"
 
     def __init__(self):
-        super().__init__(hashlib.sha512)
+        super().__init__(hashes.SHA512())
 
 
 class RS256Algorithm(RSAPKCS1v15Algorithm):
@@ -431,72 +407,3 @@ class Ed448Algorithm(EdDSAAlgorithm):
 
     def __init__(self):
         super().__init__(ed448.Ed448PrivateKey, ed448.Ed448PublicKey)
-
-
-class Alg(str, Enum):
-    """JWS/JWT Algorithm names with associated implementation instances."""
-
-    HS256 = "HS256"
-    HS384 = "HS384"
-    HS512 = "HS512"
-    RS256 = "RS256"
-    RS384 = "RS384"
-    RS512 = "RS512"
-    PS256 = "PS256"
-    PS384 = "PS384"
-    PS512 = "PS512"
-    ES256 = "ES256"
-    ES256K = "ES256K"
-    ES384 = "ES384"
-    ES512 = "ES512"
-    EdDSA = "EdDSA"
-    Ed25519 = "Ed25519"
-    Ed448 = "Ed448"
-
-    def get_instance(self) -> BaseJWSAlgorithm:
-        class_ = ALGORITHMS.get(self.value)
-        if class_ is None:
-            raise AlgorithmNotSupportedError(
-                f"JWS Algorithm '{self.value}' is not yet implemented"
-            )
-        if class_.requires_cryptography:
-            check_cryptography_available()
-        return class_()
-
-    @staticmethod
-    def get_instance_by_name(name: str) -> BaseJWSAlgorithm:
-        if name not in ALGORITHMS:
-            raise InvalidAlgorithmError(
-                f"Algorithm '{name}' is not a valid JWS algorithm"
-            )
-        return getattr(Alg, name).get_instance()
-
-    @classmethod
-    def get_algorithm(cls, algorithm: Self | BaseJWSAlgorithm | str) -> BaseJWSAlgorithm:
-        if isinstance(algorithm, cls):
-            return algorithm.get_instance()
-        elif isinstance(algorithm, BaseJWSAlgorithm):
-            return algorithm
-        else:
-            return cls.get_instance_by_name(algorithm)
-
-
-ALGORITHMS: dict[str, type[BaseJWSAlgorithm] | None] = {
-    "none": NoneAlgorithm,
-    "HS256": HS256Algorithm,
-    "HS384": HS384Algorithm,
-    "HS512": HS512Algorithm,
-    "RS256": RS256Algorithm,
-    "RS384": RS384Algorithm,
-    "RS512": RS512Algorithm,
-    "PS256": PS256Algorithm,
-    "PS384": PS384Algorithm,
-    "PS512": PS512Algorithm,
-    "ES256": ES256Algorithm,
-    "ES256K": ES256KAlgorithm,
-    "ES384": ES384Algorithm,
-    "ES512": ES512Algorithm,
-    "EdDSA": None,  # Deprecated and not supported
-    "Ed25519": Ed25519Algorithm,
-    "Ed448": Ed448Algorithm,
-}

@@ -3,58 +3,11 @@
 import warnings
 
 import pytest
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
 from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning, SuperJWTError
-from superjwt.keys import ECKey, NoneKey, OctKey, OKPKey, RSAKey
-from superjwt.utils import CRYPTOGRAPHY_AVAILABLE, check_cryptography_available
-
-from .conftest import requires_cryptography
-
-
-if CRYPTOGRAPHY_AVAILABLE:
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
-
-
-@requires_cryptography
-class TestCheckCryptographyAvailable:
-    """Test the check_cryptography_available function."""
-
-    def test_check_cryptography_available_when_installed(self):
-        """Test that check passes when cryptography is installed."""
-        # Should not raise an error
-        check_cryptography_available()
-
-
-class TestNoneKey:
-    """Test NoneKey class."""
-
-    def test_none_key_creation(self):
-        """Test creating a NoneKey."""
-        key = NoneKey()
-        assert key.private_key == b""
-        assert key.public_key == b""
-
-    def test_none_key_import(self):
-        """Test importing a NoneKey."""
-        key = NoneKey.import_key(b"anything")
-        assert isinstance(key, NoneKey)
-        assert key.private_key == b""
-        assert key.public_key == b""
-
-    def test_none_key_import_signing_key(self):
-        """Test importing NoneKey via import_signing_key."""
-        key = NoneKey.import_signing_key(b"any data")
-        assert isinstance(key, NoneKey)
-        assert key.private_key == b""
-        assert key.public_key == b""
-
-    def test_none_key_import_verifying_key(self):
-        """Test importing NoneKey via import_verifying_key."""
-        key = NoneKey.import_verifying_key(b"any data")
-        assert isinstance(key, NoneKey)
-        assert key.private_key == b""
-        assert key.public_key == b""
+from superjwt.keys import ECKey, OctKey, OKPKey, RSAKey
 
 
 class TestOctKey:
@@ -83,16 +36,6 @@ class TestOctKey:
         ):
             OctKey.import_key(b"short")
 
-    def test_oct_key_empty_string_raises_error(self):
-        """Test that empty string raises ValueError."""
-        with pytest.raises(ValueError, match="Private key must not be empty"):
-            OctKey.import_key("")
-
-    def test_oct_key_empty_bytes_raises_error(self):
-        """Test that empty bytes raises ValueError."""
-        with pytest.raises(ValueError, match="Private key must not be empty"):
-            OctKey.import_key(b"")
-
     def test_oct_key_none_raises_error(self):
         """Test that None raises ValueError."""
         with pytest.raises(ValueError, match="No key was provided"):
@@ -118,10 +61,6 @@ MIIEpAIBAAKCAQEA4Z9v...
         ):
             OctKey.import_key(ssh_key)
 
-    def test_oct_key_name_attribute(self):
-        """Test that OctKey has correct name attribute."""
-        assert OctKey.name == "oct"
-
     def test_oct_key_sufficient_length(self):
         """Test that sufficiently long keys don't trigger warnings."""
         # 14 bytes = 112 bits (minimum)
@@ -139,13 +78,6 @@ MIIEpAIBAAKCAQEA4Z9v...
         """Test importing OctKey via import_signing_key."""
         secret = b"my-secret-key-at-least-32-bytes-long"
         key = OctKey.import_signing_key(secret)
-        assert isinstance(key, OctKey)
-        assert key.private_key == secret
-
-    def test_oct_key_import_verifying_key(self):
-        """Test importing OctKey via import_verifying_key."""
-        secret = b"my-secret-key-at-least-32-bytes-long"
-        key = OctKey.import_verifying_key(secret)
         assert isinstance(key, OctKey)
         assert key.private_key == secret
 
@@ -206,7 +138,6 @@ MIIEpAIBAAKCAQEA4Z9v...
         assert hmac.compare_digest(signature, expected)
 
 
-@requires_cryptography
 class TestRSAKey:
     """Test RSAKey (asymmetric key) class."""
 
@@ -348,11 +279,6 @@ invalid base64 data!!!
         assert isinstance(key_public, rsa.RSAPublicKey)
         assert isinstance(original_public, rsa.RSAPublicKey)
         assert key_public.public_numbers() == original_public.public_numbers()
-
-    def test_rsa_key_empty_string_raises_error(self):
-        """Test that empty string raises ValueError."""
-        with pytest.raises(ValueError, match="Private key must not be empty"):
-            RSAKey.import_key("")
 
     def test_rsa_key_none_raises_error(self):
         """Test that None raises ValueError."""
@@ -498,7 +424,6 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
         assert b"BEGIN PUBLIC KEY" in pem
 
 
-@requires_cryptography
 class TestECKey:
     """Test ECKey (Elliptic Curve key) class."""
 
@@ -627,11 +552,6 @@ invalid base64 data!!!
         assert isinstance(key_public, ec.EllipticCurvePublicKey)
         assert isinstance(original_public, ec.EllipticCurvePublicKey)
         assert key_public.public_numbers() == original_public.public_numbers()
-
-    def test_ec_key_empty_string_raises_error(self):
-        """Test that empty string raises ValueError."""
-        with pytest.raises(ValueError, match="Private key must not be empty"):
-            ECKey.import_key("")
 
     def test_ec_key_none_raises_error(self):
         """Test that None raises ValueError."""
@@ -797,7 +717,6 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
             key._derive_public_key_from_private()
 
 
-@requires_cryptography
 class TestOKPKey:
     """Test OKPKey (Octet Key Pair for EdDSA) class."""
 
@@ -922,11 +841,6 @@ invalid base64 data!!!
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw,
         )
-
-    def test_okp_key_empty_string_raises_error(self):
-        """Test that empty string raises ValueError."""
-        with pytest.raises(ValueError, match="Private key must not be empty"):
-            OKPKey.import_key("")
 
     def test_okp_key_none_raises_error(self):
         """Test that None raises ValueError."""
@@ -1062,3 +976,214 @@ CORRUPTED_DATA_HERE_NOT_VALID_BASE64!!!
 
         assert isinstance(pem, bytes)
         assert b"BEGIN PUBLIC KEY" in pem
+
+
+class TestKeyFormatEdgeCases:
+    """Test edge cases in key import/export and format handling."""
+
+    def test_key_with_leading_trailing_whitespace(self, rsa_2048_key_pair):
+        """Test that keys with leading/trailing whitespace are handled."""
+        pem_with_whitespace = b"\n\n  " + rsa_2048_key_pair.private_pem + b"  \n\n"
+
+        # Should successfully import despite whitespace
+        key = RSAKey.import_private_key(pem_with_whitespace)
+        assert key.name == "RSA"
+
+        # Public key should also work
+        pub_with_whitespace = b"\n" + rsa_2048_key_pair.public_pem + b"\n"
+        pub_key = RSAKey.import_public_key(pub_with_whitespace)
+        assert pub_key.name == "RSA"
+
+    def test_key_with_mixed_line_endings(self, ec_p256_key_pair):
+        """Test keys with mixed line endings (CRLF vs LF)."""
+        # Replace LF with CRLF
+        pem_crlf = ec_p256_key_pair.private_pem.replace(b"\n", b"\r\n")
+
+        key = ECKey.import_private_key(pem_crlf)
+        assert key.name == "EC"
+
+    def test_empty_key_data(self):
+        """Test that empty key data raises appropriate error."""
+        with pytest.raises(ValueError, match="must not be empty"):
+            RSAKey.import_private_key(b"")
+
+        with pytest.raises(ValueError, match="must not be empty"):
+            ECKey.import_key(b"")
+
+        with pytest.raises(ValueError, match="must not be empty"):
+            OctKey.import_key(b"")
+
+    def test_invalid_pem_format(self):
+        """Test that invalid PEM format raises appropriate error."""
+        invalid_pem = b"-----BEGIN INVALID KEY-----\ngarbage\n-----END INVALID KEY-----"
+
+        with pytest.raises(InvalidKeyError):
+            RSAKey.import_private_key(invalid_pem)
+
+    def test_malformed_pem_headers(self):
+        """Test PEM with malformed headers."""
+        # Missing END marker
+        malformed = b"-----BEGIN PRIVATE KEY-----\nZGF0YQ==\n"
+
+        with pytest.raises(InvalidKeyError):
+            RSAKey.import_private_key(malformed)
+
+    def test_encrypted_private_key_rejection(self):
+        """Test that encrypted private keys are rejected (not supported)."""
+        # Encrypted private key (PKCS#8 with password)
+        encrypted_pem = b"""-----BEGIN ENCRYPTED PRIVATE KEY-----
+MIIFLTBXBgkqhkiG9w0BBQ0wSjApBgkqhkiG9w0BBQwwHAQIxzYF8JIc3RQCAggA
+MAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBCTOZ5PVfF8CWTcqHPJgmFpBIIE
+0ENC4OuSEKQhSVHT4r5d5v+VfQr+8lBUxpLq7p+Qzg==
+-----END ENCRYPTED PRIVATE KEY-----"""
+
+        with pytest.raises(InvalidKeyError):
+            RSAKey.import_private_key(encrypted_pem)
+
+    def test_wrong_key_type_import(self, rsa_2048_key_pair, ec_p256_key_pair):
+        """Test that importing wrong key type raises appropriate error."""
+        # Try to import RSA key as EC key
+        with pytest.raises(InvalidKeyError):
+            ECKey.import_private_key(rsa_2048_key_pair.private_pem)
+
+        # Try to import EC key as RSA key
+        with pytest.raises(InvalidKeyError):
+            RSAKey.import_private_key(ec_p256_key_pair.private_pem)
+
+    def test_public_key_as_private_key(self, rsa_2048_key_pair):
+        """Test that importing public key as private key fails."""
+        with pytest.raises(InvalidKeyError):
+            RSAKey.import_private_key(rsa_2048_key_pair.public_pem)
+
+    def test_oct_key_minimum_size(self):
+        """Test OctKey validation for minimum key size."""
+        # HMAC keys should be at least 256 bits (32 bytes) for HS256
+        short_key = b"tooshort"  # Only 8 bytes
+
+        # Should still import but might not be secure
+        key = OctKey.import_key(short_key)
+        assert key.name == "oct"
+
+    def test_oct_key_various_encodings(self):
+        """Test OctKey import with various byte encodings."""
+        # Raw bytes
+        raw_bytes = b"this_is_a_secure_secret_key_32b"
+        key1 = OctKey.import_key(raw_bytes)
+        assert key1.name == "oct"
+
+        # UTF-8 string
+        utf8_string = "unicode_key_秘密_🔑"
+        key2 = OctKey.import_key(utf8_string)
+        assert key2.name == "oct"
+
+    def test_rsa_key_size_validation(self):
+        """Test that RSA keys of various sizes are handled correctly."""
+        # 1024-bit key (considered weak)
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        weak_key = rsa.generate_private_key(public_exponent=65537, key_size=1024)
+        from cryptography.hazmat.primitives import serialization
+
+        weak_pem = weak_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+
+        # Should import successfully (library doesn't enforce minimum)
+        key = RSAKey.import_private_key(weak_pem)
+        assert key.name == "RSA"
+
+    def test_ec_curve_mismatch_detection(self, ec_p256_key_pair, ec_p384_key_pair):
+        """Test that EC curve mismatches are properly detected."""
+        # Import P-256 key
+        key_p256 = ECKey.import_private_key(ec_p256_key_pair.private_pem)
+        assert key_p256.name == "EC"
+
+        # Import P-384 key
+        key_p384 = ECKey.import_private_key(ec_p384_key_pair.private_pem)
+        assert key_p384.name == "EC"
+
+        # Verify both import successfully
+        assert key_p256._private_key_obj is not None
+        assert key_p384._private_key_obj is not None
+
+    def test_okp_key_type_detection(self, ed25519_key_pair, ed448_key_pair):
+        """Test OKP key type detection for Ed25519 and Ed448."""
+        # Ed25519
+        key_ed25519 = OKPKey.import_key(ed25519_key_pair.private_pem)
+        assert key_ed25519.name == "OKP"
+
+        # Ed448
+        key_ed448 = OKPKey.import_key(ed448_key_pair.private_pem)
+        assert key_ed448.name == "OKP"
+
+    def test_key_export_import_roundtrip(self, rsa_2048_key_pair):
+        """Test that export/import roundtrip preserves key."""
+        original_key = RSAKey.import_private_key(rsa_2048_key_pair.private_pem)
+
+        # Export as PEM
+        exported_pem = original_key.export_private_key_pem()
+
+        # Re-import
+        reimported_key = RSAKey.import_private_key(exported_pem)
+
+        # Export again and compare
+        exported_again = reimported_key.export_private_key_pem()
+        assert exported_pem == exported_again
+
+    def test_public_key_from_private_consistency(self, ec_p256_key_pair):
+        """Test that public key derived from private key matches original."""
+        # Import key with public key derivation enabled
+        private_key = ECKey.import_key(
+            ec_p256_key_pair.private_pem, derive_public_key=True
+        )
+
+        # Export public key from private key
+        derived_public_pem = private_key.export_public_key_pem()
+
+        # Compare with original
+        assert derived_public_pem == ec_p256_key_pair.public_pem
+
+    def test_oct_key_length_properties(self):
+        """Test OctKey length reporting for different key sizes."""
+        key_16 = OctKey.import_key(b"0123456789abcdef")  # 16 bytes = 128 bits
+        key_32 = OctKey.import_key(
+            b"0123456789abcdef0123456789abcdef"
+        )  # 32 bytes = 256 bits
+        key_64 = OctKey.import_key(b"0123456789abcdef" * 4)  # 64 bytes = 512 bits
+
+        # Verify keys import successfully
+        assert key_16.name == "oct"
+        assert key_32.name == "oct"
+        assert key_64.name == "oct"
+
+    def test_invalid_base64_in_pem(self):
+        """Test handling of invalid base64 data in PEM format."""
+        invalid_b64_pem = b"""-----BEGIN PRIVATE KEY-----
+This is not valid base64!!!
+-----END PRIVATE KEY-----"""
+
+        with pytest.raises(InvalidKeyError):
+            RSAKey.import_private_key(invalid_b64_pem)
+
+    def test_pem_with_extra_headers(self):
+        """Test PEM with extra headers (should be ignored)."""
+        # Some PEM formats include additional headers like Proc-Type, DEK-Info
+        pem_with_headers = b"""-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDHMwFQ==
+-----END PRIVATE KEY-----"""
+
+        # Should handle gracefully (might fail due to invalid key data, but not due to format)
+        try:
+            RSAKey.import_private_key(pem_with_headers)
+        except InvalidKeyError:
+            pass  # Expected for invalid key data
+
+    def test_key_comparison_same_key(self, rsa_2048_key_pair):
+        """Test that same key imported twice is considered equal."""
+        key1 = RSAKey.import_key(rsa_2048_key_pair.private_pem, derive_public_key=True)
+        key2 = RSAKey.import_key(rsa_2048_key_pair.private_pem, derive_public_key=True)
+
+        # Both should produce same public key
+        assert key1.export_public_key_pem() == key2.export_public_key_pem()

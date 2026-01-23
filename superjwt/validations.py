@@ -1,4 +1,4 @@
-from copy import deepcopy
+import json
 from datetime import datetime, timedelta
 from enum import Enum
 from inspect import isclass
@@ -16,12 +16,11 @@ from pydantic import (
 )
 from typing_extensions import Self
 
-from superjwt.algorithms import Alg
 from superjwt.exceptions import (
-    InvalidHeadersError,
     TokenExpiredError,
     TokenNotYetValidError,
 )
+from superjwt.shared import SUPPORTED_ALGORITHMS
 from superjwt.utils import delta_datetime_timestamp
 
 
@@ -46,6 +45,9 @@ class JWTBaseModel(BaseModel):
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)
 
+    def to_json(self) -> str:
+        return self.model_dump_json(exclude_none=True)
+
     def spoof_time(self, set_now: datetime | None) -> None:
         """Spoof the current time for testing purposes. Set to None to disable spoofing."""
         self.internal__now = set_now
@@ -63,8 +65,6 @@ class HttpsUrl(HttpUrl):
 
 
 class JOSEHeader(JWTBaseModel):
-    _strict_crit_check: bool = False
-
     alg: Annotated[
         str,
         Field(description="algorithm - the algorithm used to sign the JWT"),
@@ -89,23 +89,16 @@ class JOSEHeader(JWTBaseModel):
         ),
     ] = None
 
-    @classmethod
-    def make_default(cls, algorithm: Alg | str, **kwargs: Any) -> Self:
-        return cls(alg=algorithm, **kwargs)
-
     @field_validator("alg")
     @classmethod
-    def validate_alg(cls, value: Alg | str) -> str:
+    def validate_alg(cls, value: str) -> str:
         """Validate that the algorithm is a valid algorithm name and normalize to string."""
-        # Get the string value (works for both Algorithm enum and str)
-        alg_str = value.value if isinstance(value, Alg) else value
 
-        # Check if it's a valid algorithm (including "none")
-        valid_algorithms = set(member.value for member in Alg) | {"none"}
-        if alg_str not in valid_algorithms:
-            raise ValueError(f"'{alg_str}' is not a valid algorithm")
+        # Check if it's a valid algorithm
+        if value not in SUPPORTED_ALGORITHMS:
+            raise ValueError(f"'{value}' is not a valid algorithm")
 
-        return alg_str
+        return value
 
     @field_validator("crit")
     @classmethod
@@ -116,33 +109,11 @@ class JOSEHeader(JWTBaseModel):
         if value is not None and len(value) == 0:  # empty list is forbidden
             raise ValueError("'crit' header must be a non-empty list of strings")
 
-        missing = []
-        unsupported = []
         for el in value:
-            # check for missing headers declared in 'crit'
             if el not in info.data.keys():
-                missing.append(el)
-            # check for unsupported custom headers
-            elif cls._strict_crit_check and (el not in cls.model_fields.keys()):
-                unsupported.append(el)
-        if missing:
-            raise ValueError(f"Missing crit headers: {', '.join(missing)}")
-        if unsupported:
-            raise ValueError(f"Unsupported custom crit headers: {', '.join(unsupported)}")
-
-        if "b64" in info.data.keys():
-            if "b64" not in value:
-                raise ValueError("'b64' header parameter must be listed in 'crit' header")
+                raise ValueError(f"'crit' header missing '{el}'")
 
         return value
-
-    @model_validator(mode="after")
-    def unsupported_b64_false(self) -> Self:
-        if hasattr(self, "b64") and self.b64 is False:  # type: ignore
-            raise InvalidHeadersError(
-                "'b64' header parameter is not supported in this implementation"
-            )
-        return self
 
 
 def serialize_jwtdatetime_timestamp_to_int(value: datetime | int | float) -> int:
@@ -317,162 +288,223 @@ class JWTClaims(JWTClaimsModel):
         return self.model_copy(update={"exp": exp_time})
 
 
-class ValidationConfig(BaseModel):
-    """JWT data validation object."""
+class ValidationConfig:
+    """JWT validation configuration (immutable from library perspective)."""
 
-    model_config = {"extra": "forbid"}
+    def __init__(
+        self,
+        *,
+        enabled: bool = True,
+        model: type[JWTBaseModel] = JWTBaseModel,
+        forward_pydantic_model: bool = True,
+        now: datetime | None = None,
+        leeway: float | None = None,
+        allow_future_iat: bool | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.enabled = enabled
+        self.model = model
+        self.forward_pydantic_model = forward_pydantic_model
+        self.now = now
+        self.leeway = leeway
+        self.allow_future_iat = allow_future_iat
 
-    # ------------- General validation config -------------
-    """Enable or disable data validation."""
-    enabled: bool = True
 
-    """The pydantic model to use for data validation."""
-    model: type[JWTBaseModel] | None = None
+class Validation:
+    """Internal validation executor that performs the actual validation work."""
 
-    """Forward the data pydantic model to validation config (and its internal config)."""
-    forward_pydantic_model: bool = True
+    # Validation flags
+    class Flags(str, Enum):
+        DEFAULT = "default"
+        DISABLE = "disable"
 
-    # ------------- JWTBaseModel specific internal config -------------
-    """Spoofed 'now' datetime."""
-    now: datetime | None = None
+    DEFAULT = Flags.DEFAULT
+    DISABLE = Flags.DISABLE
 
-    # ------------- JWTClaims specific internal config -------------
-    """Leeway for time-based validations, in seconds."""
-    leeway: float | None = None
+    def __init__(
+        self,
+        enabled: bool,
+        model: type[JWTBaseModel],
+        now: datetime | None = None,
+        leeway: float | None = None,
+        allow_future_iat: bool | None = None,
+    ):
+        self.enabled = enabled
+        self.model = model
+        self.now = now
+        self.leeway = leeway
+        self.allow_future_iat = allow_future_iat
 
-    """Allow 'iat' claim to be in the future."""
-    allow_future_iat: bool | None = None
-
-    def _internal_params_matrix(self) -> list[tuple[str, type[JWTBaseModel], Any]]:
+    def _internal_params_matrix(self) -> list[tuple[str, Any]]:
         return [
-            ("now", JWTBaseModel, None),
-            ("leeway", JWTClaims, DEFAULT_LEEWAY_SECONDS),
-            ("allow_future_iat", JWTClaims, DEFAULT_ALLOW_FUTURE_IAT),
+            ("now", None),
+            ("leeway", DEFAULT_LEEWAY_SECONDS),
+            ("allow_future_iat", DEFAULT_ALLOW_FUTURE_IAT),
         ]
 
     def _get_internal_cfg(self) -> dict[str, Any]:
         """Get internal config values as a dict for injection into validation."""
         internal_config = {}
-        for param, model_type, _ in self._internal_params_matrix():
-            if self.model is not None and issubclass(self.model, model_type):
+        if self.enabled and issubclass(self.model, JWTClaims):
+            for param, _ in self._internal_params_matrix():
                 value = getattr(self, param)
                 if value is not None:
                     internal_config[f"internal__{param}"] = value
         return internal_config
 
-    def apply_internal_cfg(self, model: JWTBaseModel | None = None) -> None:
-        """Set internal config values when unset, either from a compatible data model
-        or from default values."""
-        for param, model_type, default in self._internal_params_matrix():
-            if getattr(self, param) is None:  # only overwrite when unset
-                if model is not None and isinstance(model, model_type):
-                    setattr(self, param, getattr(model, f"internal__{param}"))
-                elif model is None:
-                    setattr(self, param, default)
-
     def run(
         self,
         data: JWTBaseModel | dict[str, Any],
-        fallback_model: type[JWTBaseModel] = JWTBaseModel,
         operation: Operation | None = None,
-    ) -> tuple[JWTBaseModel, dict[str, Any]]:
-        # case pydantic model
-        if isinstance(data, JWTBaseModel):
-            data_dict = data.to_dict()
-        # case dict
-        elif isinstance(data, dict):
-            data_dict = deepcopy(data)
-        else:
+        dump_dict: bool = False,
+        dump_json: bool = False,
+    ) -> tuple[JWTBaseModel, dict[str, Any], str]:
+        if not isinstance(data, (JWTBaseModel, dict)):
             raise TypeError("Wrong type during data preparation and validation")
 
+        # case pydantic model
+        if isinstance(data, JWTBaseModel):
+            return self.validate_from_pydantic_instance(
+                data, operation, dump_dict, dump_json
+            )
+        # case dict
+        if isinstance(data, dict):
+            return self.validate_from_dict(data, operation, dump_dict, dump_json)
+
+    def validate_from_pydantic_instance(
+        self,
+        data_pydantic: JWTBaseModel,
+        operation: Operation | None,
+        dump_dict: bool = False,
+        dump_json: bool = False,
+    ) -> tuple[JWTBaseModel, dict[str, Any], str]:
+        """Validate data when provided as a pydantic instance."""
+        data_dict = data_pydantic.to_dict()
+
+        # Validation is disabled
         if self.enabled is False:
-            return fallback_model.model_construct(**data_dict), data_dict
+            return (
+                data_pydantic,
+                data_dict,
+                data_pydantic.to_json(),
+            )
 
-        if self.model is None:
-            raise ValueError("Validation model is not set in ValidationConfig")
-
-        ##### BEGIN VALIDATION #####
+        # Validation is enabled
         data_pydantic = self.model.model_validate(
             data_dict | self._get_internal_cfg(),
             context={"operation": operation},
         )
-        ##### END VALIDATION #####
+        return (
+            data_pydantic,
+            data_pydantic.to_dict() if dump_dict else {},
+            data_pydantic.to_json() if dump_json else "{}",
+        )
 
-        return data_pydantic, data_pydantic.to_dict()
+    def validate_from_dict(
+        self,
+        data: dict[str, Any],
+        operation: Operation | None,
+        dump_dict: bool = False,
+        dump_json: bool = False,
+    ) -> tuple[JWTBaseModel, dict[str, Any], str]:
+        """Validate data when provided as a dict."""
+        # Validation is disabled
+        if self.enabled is False:
+            return (
+                self.model.model_construct(**data),
+                data,
+                json.dumps(data) if dump_json else "{}",
+            )
 
+        # Validation is enabled
+        data_pydantic = self.model.model_validate(
+            data | self._get_internal_cfg(),
+            context={"operation": operation},
+        )
 
-JWTClaimsDefaultValidation = ValidationConfig(
-    model=JWTClaims,
-)
-JWTHeadersDefaultValidation = ValidationConfig(
-    model=JOSEHeader,
-)
+        return (
+            data_pydantic,
+            data_pydantic.to_dict() if dump_dict else {},
+            data_pydantic.to_json() if dump_json else "{}",
+        )
 
+    @classmethod
+    def get(
+        cls,
+        data: JWTBaseModel | dict[str, Any],
+        validation: type[JWTBaseModel] | ValidationConfig | str | None,
+        default_validation: type[JWTBaseModel],
+        fallback_model: type[JWTBaseModel] = JWTBaseModel,
+    ) -> "Validation":
+        ##############################
+        # case validation is DISABLED
+        if (
+            validation is cls.DISABLE
+            or validation is None
+            or (isinstance(validation, ValidationConfig) and validation.enabled is False)
+        ):
+            return cls(enabled=False, model=fallback_model)
 
-class Validation(str, Enum):
-    """Flags to control validation behavior in JWT operations."""
+        ##############################
+        # case validation is ENABLED
 
-    DEFAULT = "default"
-    DISABLE = "disable"
+        # Start with None values
+        enabled = True
+        model = default_validation
+        forward_pydantic_model = True
+        now = None
+        leeway = None
+        allow_future_iat = None
 
+        # 1. case DEFAULT/AUTOMATIC behavior
+        if validation is cls.DEFAULT:
+            model = default_validation
+            forward_pydantic_model = True
 
-def get_validation_config(
-    data: JWTBaseModel | dict[str, Any],
-    validation: type[JWTBaseModel] | ValidationConfig | Validation | None,
-    default_validation: ValidationConfig,
-) -> ValidationConfig:
-    ##############################
-    # case validation is DISABLED
-    if (
-        validation is Validation.DISABLE
-        or validation is None
-        or (isinstance(validation, ValidationConfig) and validation.enabled is False)
-    ):
-        return ValidationConfig(enabled=False)
+        # 2. case CUSTOM (ValidationConfig instance sent explicitly)
+        elif isinstance(validation, ValidationConfig):
+            enabled = validation.enabled
+            model = validation.model
+            forward_pydantic_model = validation.forward_pydantic_model
+            now = validation.now
+            leeway = validation.leeway
+            allow_future_iat = validation.allow_future_iat
 
-    ##############################
-    # case validation is ENABLED
+        # 3 case CUSTOM (Pydantic model sent explicitly)
+        #   --> we never forward the data pydantic model in the scenario where data is a pydantic instance
+        elif isclass(validation) and issubclass(validation, JWTBaseModel):
+            model = validation
+            forward_pydantic_model = False
 
-    # 1. case DEFAULT/AUTOMATIC behavior
-    if validation is Validation.DEFAULT:
-        # make a copy, mutable object!!
-        validation_cfg = default_validation.model_copy(deep=True)
+        else:
+            raise TypeError("Wrong validation object type")
+
+        # finalize internal config
         if isinstance(data, JWTBaseModel):
-            if validation_cfg.forward_pydantic_model is True:
-                # ALWAYS forward data model to validation model in DEFAULT case
-                # --> the validation model was a mere fallback for dict data
-                validation_cfg.model = None  # we will forward the model below
-
-    # 2. case CUSTOM
-    elif isinstance(validation, ValidationConfig) or (
-        isclass(validation) and issubclass(validation, JWTBaseModel)
-    ):
-        # 2.1 case ValidationConfig instance
-        if isinstance(validation, ValidationConfig):
-            # make a copy, mutable object!!
-            validation_cfg = validation.model_copy(deep=True)
-
-        # 2.2 case Pydantic model
-        if isclass(validation) and issubclass(validation, JWTBaseModel):
-            validation_cfg = ValidationConfig(model=validation)
-
-    else:
-        raise TypeError("Wrong validation object type")
-
-    # finalize internal config
-    if isinstance(data, JWTBaseModel):
-        if validation_cfg.model is None:
-            if validation_cfg.forward_pydantic_model is True:
+            if forward_pydantic_model is True:
                 # forward data model type to validation model
-                validation_cfg.model = type(data)
-                # forward internal config from data model
-                validation_cfg.apply_internal_cfg(data)
-            else:
-                # do not forward data internal config
-                validation_cfg.apply_internal_cfg()
-    else:
-        # set default values for unset internal config
-        # --> data is a dict and carries no config
-        validation_cfg.apply_internal_cfg()
+                model = type(data)
+            # always forward internal config from data model if it's JWTClaims
+            if isinstance(data, JWTClaims) and issubclass(model, JWTClaims):
+                if now is None:
+                    now = data.internal__now
+                if leeway is None:
+                    leeway = data.internal__leeway
+                if allow_future_iat is None:
+                    allow_future_iat = data.internal__allow_future_iat
+        else:
+            # set default values for unset internal config
+            # --> data is a dict and carries no config
+            if issubclass(model, JWTClaims):
+                if leeway is None:
+                    leeway = DEFAULT_LEEWAY_SECONDS
+                if allow_future_iat is None:
+                    allow_future_iat = DEFAULT_ALLOW_FUTURE_IAT
 
-    return validation_cfg
+        return cls(
+            enabled=enabled,
+            model=model,
+            now=now,
+            leeway=leeway,
+            allow_future_iat=allow_future_iat,
+        )
