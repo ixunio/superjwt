@@ -39,17 +39,13 @@ When you decide to upgrade to a new minor version (e.g., from `0.7.x` to `0.8.x`
 
 SuperJWT is designed to be lightweight, but it stands on the shoulders of giants:
 
-### ⇨ [Pydantic v2](https://docs.pydantic.dev/latest/)
-Core validation logic relies on **Pydantic**:
+### ⇨ [Pydantic](https://docs.pydantic.dev/latest/)
+Core validation logic relies on **Pydantic v2**:
 
 - **Required**: `pydantic>=2.0.0`
-- SuperJWT is fully compatible with Pydantic v2.
 
 ### ⇨ [pyca/cryptography](https://cryptography.io/en/latest/)
 
-*(optional)*
-
-Asymmetric support (RSA, ECDSA, EdDSA) relies on `cryptography` library:
+Cryptography operations rely on the `cryptography` library:
 
 - **Required**: `cryptography>=43.0.0`
-- Install via: `pip install "superjwt[asymmetric]"`

@@ -121,16 +121,15 @@ See [Custom Models](#custom-models) for more information about custom Pydantic m
 
 ```python
 from datetime import datetime
-from pydantic import AfterValidator, Field
+from pydantic import UUID4, Field, PlainSerializer
 from superjwt import Alg, JWTClaims, JWTDatetimeInt, encode, inspect
 from typing import Annotated
-from uuid import UUID
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
 class MyJWTClaims(JWTClaims):
     sub: int = Field(default=...)  # 'sub' is redefined as a required integer
-    user_id: Annotated[str, AfterValidator(lambda x: str(UUID(x, version=4)))]  # must be UUIDv4
+    user_id: Annotated[UUID4, PlainSerializer(lambda v: str(v))]  # must be UUIDv4
     custom_date: JWTDatetimeInt  # must be a datetime/timestamp
 
 claims = MyJWTClaims(
@@ -395,6 +394,8 @@ print(inspect(compact).payload)  # (1)
 decoded: MyJWTClaims = decode(compact, secret_key, Alg.HS256, validation=MyJWTClaims)
 print(decoded.to_dict())
 #> {'sub': 'user', 'custom_field': 42}
+print(decoded.custom_field)
+#> 42
 ```
 
 1.  /// danger | Unverified JWT
@@ -531,7 +532,7 @@ The `inspect()` function does **NOT** verify the JWT content. This means the tok
 
 SuperJWT uses Pydantic for automatic validation and serialization of JWT claims and headers. You can use ready-made Pydantic models or create your own by inheriting from the following base models.
 
-### <code style="font-size:1.1em">JWTBaseModel</code>
+<h3><code style="font-size:1.1em">JWTBaseModel</code></h3>
 
 The base Pydantic model for SuperJWT, which inherits from `pydantic.BaseModel`. All Pydantic models used in this package derive from `JWTBaseModel`. It includes the following features:
 
@@ -556,13 +557,6 @@ Properties:
     Defines a mandatory `alg` field and other optional fields such as `'typ'='JWT'`, `'kid'`, and `'crit'`.
 - **Default Headers Model for Validation**<br>
     Headers are validated against this model when `headers_validation` is not set in `decode()`.
-- **Make Default Method**<br>
-    Creates header data with the required `'alg'` field populated.
-    ```python
-    from superjwt import Alg, JOSEHeader
-
-    headers = JOSEHeader.make_default(Alg.ES256)
-    #> {'alg': 'ES256', 'typ': 'JWT'}
     ```
 
 - **No Support for `b64=false`**
@@ -690,11 +684,10 @@ You can create custom Pydantic models by extending `JWTClaims` or `JWTBaseModel`
 <h4>Claims</h4>
 
 ```python
-from pydantic import AfterValidator, Field, ValidationError
+from pydantic import UUID4, Field, PlainSerializer, ValidationError
 from superjwt import Alg, JWTClaims, JWTDatetimeInt
 from superjwt.exceptions import ClaimsValidationError
 from typing import Annotated
-from uuid import UUID
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
@@ -706,7 +699,7 @@ class MyJWTClaims(JWTClaims):
     sub: int = Field(default=...)  # (2)
 
     # 'user_id' is optional and must be a valid UUIDv4 string
-    user_id: Annotated[str | None, AfterValidator(lambda x: str(UUID(x, version=4)))]
+    user_id: Annotated[UUID4, PlainSerializer(lambda v: str(v))]
     
 
 claims = MyJWTClaims.model_construct(
@@ -781,16 +774,16 @@ print(decoded.to_dict())
 
 ```python
 from pydantic import ValidationError
-from superjwt import Alg, JOSEHeader, JWT
+from superjwt import Alg, JOSEHeader
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
 class CustomHeaders(JOSEHeader):
     session_id: str
 
-headers = CustomHeaders.make_default(Alg.HS512, session_id="sess-123456")
+headers = CustomHeaders(alg=Alg.HS512, session_id="sess-123456")
 headers.session_id = 123456
-headers.to_dict()
+print(headers.to_dict())
 #> {'alg': 'HS512', 'typ': 'JWT', 'session_id': 'sess-123456'}
 
 try:
@@ -809,7 +802,7 @@ except ValidationError:
 <h4>Headers</h4>
 
 ```python
-from superjwt import Alg, JOSEHeader, JWT
+from superjwt import Alg, JOSEHeader, encode, inspect
 from superjwt.exceptions import HeadersValidationError
 
 secret_key = "your-secret-key-of-len-32-bytes!"
@@ -817,26 +810,26 @@ secret_key = "your-secret-key-of-len-32-bytes!"
 class CustomHeaders(JOSEHeader):
     session_id: str
 
-headers = CustomHeaders.make_default(Alg.HS512, session_id="sess-123456")
+headers = CustomHeaders(alg=Alg.HS512, session_id="sess-123456")
 headers.session_id = 123456
-headers.to_dict()
+print(headers.to_dict())
 #> {'alg': 'HS512', 'typ': 'JWT', 'session_id': '123456'}
 
-jwt = JWT()  # (1)
-
 try:
-    jwt.encode({}, secret_key, Alg.HS512, headers=headers)  # --> ❌ fails (2)
+    encode({}, secret_key, Alg.HS512, headers=headers)  # --> ❌ fails (1)
 except HeadersValidationError:
     headers.session_id = "sess-123456"
-    compact = jwt.encode({}, secret_key, Alg.HS512, headers=headers).compact  # --> ✅ passes
+    compact = encode({}, secret_key, Alg.HS512, headers=headers)  # --> ✅ passes
 
-jws_token = jwt.decode(compact, secret_key, Alg.HS512, headers_validation=CustomHeaders)
-jws_token.headers
+print(inspect(compact).headers)  # (2)
 #> {'alg': 'HS512', 'typ': 'JWT', 'session_id': 'sess-123456'}
 ```
 
-1. We are using a lower-level API here to access the headers data. But it works the same with module-level `encode()` and `decode()` functions. Warning: `JWT` is a stateful and non thread-safe object.
-2. Because `headers` is a Pydantic instance, headers validation runs against its own Pydantic model. Here, `session_id` is `int` and not `str`, thus failing.
+1. Because `headers` is a Pydantic instance, headers validation runs against its own Pydantic model. Here, `session_id` is `int` and not `str`, thus failing.
+2. /// danger | Unverified JWT
+
+    Token inspection DOES NOT verify the signature! Never trust information from an unverified JWT.
+    ///
 
 ///
 
@@ -845,7 +838,7 @@ jws_token.headers
 /// tab | — DECODING —<br><small><em>Default Behavior</em></small>
 
 ```python
-from pydantic import AfterValidator
+from pydantic import UUID4, PlainSerializer
 from superjwt import Alg, JWTClaims, decode, inspect
 from superjwt.exceptions import ClaimsValidationError
 from typing import Annotated
@@ -855,18 +848,19 @@ secret_key = "your-secret-key-of-len-32-bytes!"
 
 class MyJWTClaims(JWTClaims):
     # 'user_id' is required and must be a valid UUIDv4 string
-    user_id: Annotated[str, AfterValidator(lambda x: str(UUID(x, version=4)))]
+    user_id: Annotated[UUID4, PlainSerializer(lambda v: str(v))]
 
 valid_compact = b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiY2U3OGI4MTMtMjQ0YS00YmRmLWEzNmMtYTc5YjkxOWIyOTY4In0.EEfaVozcCntiHpbuuV2WRGKw1UtLQge2GoJ19HTq_dc"
-inspect(valid_compact).payload
+print(inspect(valid_compact).payload)
 #> {'user_id': 'ce78b813-244a-4bdf-a36c-a79b919b2968'} ⚡ (1)
 
 invalid_compact = b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoibm90LWEtdXVpZC12NCJ9.-DeMZUugR40FDbWBU4nRESczZb5d8UDfuhkTumEeme0"
-inspect(invalid_compact).payload
+print(inspect(invalid_compact).payload)
 #> {'user_id': 'not-a-uuid-v4'} ⚡ (2)
 
-decode(invalid_compact, secret_key, Alg.HS256)  # --> 🤔 passes (3)
-#> {'user_id': 'not-a-uuid-v4'}
+decoded = decode(invalid_compact, secret_key, Alg.HS256)  # --> 🤔 passes (3)
+print(str(decoded.user_id))
+#> 'not-a-uuid-v4'
 
 try:
     decode(invalid_compact, secret_key, Alg.HS256, validation=MyJWTClaims)  # --> ❌ fails (4)
@@ -907,10 +901,11 @@ class MyJWTClaims(JWTClaims):
     permissions: list[Literal["user", "dev", "admin"]]
 
 invalid_compact = b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwZXJtaXNzaW9ucyI6WyJkZXYiLCJhbmFseXN0Il0sImV4cCI6MjExMzI2NzI1MH0.ul7aDgO0VQmIKu-7OGpa2qHfXkA6s2XDQuyTA38HDiE"
-inspect(invalid_compact).payload
+print(inspect(invalid_compact).payload)
 #> {'permissions': ['dev', 'analyst'], 'exp': 2113267250} ⚡ (1)
 
 decoded = decode(invalid_compact, secret_key, Alg.HS256)  # --> 🤔 passes (2)
+print(decoded)
 #> {'permissions': ['dev', 'analyst'], 'exp': 2113267250}
 
 decoded_claims = MyJWTClaims.model_construct(**decoded.to_dict())
@@ -1048,10 +1043,9 @@ except ClaimsValidationError:
 You can manually validate your claims before encoding your JWT.
 
 ```python
-from pydantic import AfterValidator, Field, ValidationError
+from pydantic import UUID4, Field, PlainSerializer, ValidationError
 from superjwt import Alg, JWTClaims, JWTDatetimeFloat, encode
 from typing import Annotated
-from uuid import UUID
 
 secret_key = "your-secret-key-of-len-32-bytes!"
 
@@ -1060,7 +1054,7 @@ class MyJWTClaims(JWTClaims):
     exp: JWTDatetimeFloat = Field(default=...)
 
     # 'user_id' is required and must be a valid UUIDv4 string
-    user_id: Annotated[str, AfterValidator(lambda x: str(UUID(x, version=4)))]
+    user_id: Annotated[UUID4, PlainSerializer(lambda v: str(v))]
 
 try:
     claims = MyJWTClaims.model_construct(**{"user_id": "not-a-uuid-v4"})
@@ -1368,9 +1362,11 @@ from superjwt import Alg, JWTClaims, decode, encode
 secret_key = "your-secret-key-of-len-32-bytes!"
 claims = JWTClaims(sub="user123", iss="myapp").with_expiration(minutes=30)
 claims_dict = claims.to_dict()
+print(claims_dict)
 #> {'iss': 'myapp', 'sub': 'user123', 'exp': 1767715523}
 
 compact = encode(claims, secret_key, Alg.HS256, detach_payload=True)
+print(compact)
 #> b'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
 #   .. (1)
 #   wNZgGwkVGw_Rble80j2J6a9IylXa5jgq4EO33XiEa4g'
@@ -1382,8 +1378,49 @@ decoded = decode(
     with_detached_payload=claims_dict,  # (2)
     validation=JWTClaims
 )
+print(decoded.to_dict())
 #> {'iss': 'myapp', 'sub': 'user123', 'exp': 1767715523}
 ```
 
 1. Note that the encoded payload is empty!
 2. The claims payload was transferred separately and is needed to perform the JWT verification. Remember the JWT signing input is the `.`-concatenated encoded Base64Url headers with encoded Base64Url claims.
+
+---
+
+## Token Size Limits 📏
+
+SuperJWT enforces a maximum token size to prevent abuse and ensure performance. By default, tokens are limited to 16 KB (16,384 bytes). You can adjust this limit using the `set_max_token_bytes()` function.
+
+```python
+from superjwt import Alg, decode, encode, set_max_token_bytes
+from superjwt.exceptions import SizeExceededError
+
+secret_key = "your-secret-key-of-len-32-bytes!"
+
+claims = {"data": "!" * 11_500}  # will create a compact of ~< 16 KB
+claims_big = {"data": "𒃲" * 23_900}  # will create a compact of ~< 128 KB
+
+compact = encode(claims, secret_key, Alg.HS256)
+print(len(compact))
+#> 15429
+try:
+    encode(claims_big, secret_key, Alg.HS256)
+except SizeExceededError as e:
+    print(e)
+    #> Token size (127563 bytes) exceeds maximum of 16384 bytes
+
+set_max_token_bytes(128 * 1024)  # 128 KB
+compact_big = encode(claims_big, secret_key, Alg.HS256)
+
+set_max_token_bytes(16 * 1024)  # 16 KB
+decode(compact, secret_key, Alg.HS256)
+try:
+    decode(compact_big, secret_key, Alg.HS256)
+except SizeExceededError as e:
+    print(e)
+    #> Token size (127563 bytes) exceeds maximum of 16384 bytes
+```
+
+/// warning
+Setting a very high limit may impact performance and security. Consider the constraints of your environment, such as HTTP header size limits.
+///

@@ -1,8 +1,4 @@
 <div align="center">
-
-</div>
-
-<div align="center">
 <picture>
 <img alt="SuperJWT full logo" src=https://raw.githubusercontent.com/ixunio/superjwt/main/docs/assets/logo-full-superjwt.png>
 </picture>
@@ -24,7 +20,9 @@ With powerful Pydantic validation features.
 <br />
 <br />
 
-<a href="https://ixunio.github.io/superjwt/"><strong><em>See documentation</em></strong></a>
+<a target="_blank" href="https://ixunio.github.io/superjwt/">🔗 <strong>Documentation</a></strong>
+<br>
+<a target="_blank" href="https://jwt.how">🔗 <strong>JWT Playground</strong></a>
 </div>
 
 ## Overview & Installation
@@ -92,7 +90,7 @@ decoded: JWTClaims = decode(compact, secret_key, Alg.HS256)
 print(decoded.to_dict())
 #> {'iss': 'my-app', 'sub': 'John Doe', 'iat': 1767027483, 'exp': 1767028383}
 print(decoded.exp)
-#> 1767028383
+#> 2025-12-29 17:13:03
 ```
 
 ### Custom Claims and Validation
@@ -101,9 +99,8 @@ Redefine standard claims or define new custom ones. Validate automatically durin
 
 ```python
 from typing import Annotated
-from uuid import UUID
 
-from pydantic import AfterValidator, Field
+from pydantic import UUID4, Field, PlainSerializer
 from superjwt import Alg, JWTClaims, Validation, decode, encode
 from superjwt.exceptions import ClaimsValidationError
 
@@ -114,7 +111,7 @@ class MyJWTClaims(JWTClaims):
     sub: int = Field(default=...)
 
     # new custom claim:  'user_id' is required and must be a valid UUIDv4 string
-    user_id: Annotated[str, AfterValidator(lambda x: str(UUID(x, version=4)))]
+    user_id: Annotated[UUID4, PlainSerializer(lambda v: str(v))]
 ```
 
 ```python
@@ -188,7 +185,7 @@ print(token.headers)
 
 2. Install dependencies
     ```bash
-    pip install -e .[asymmetric] --group test
+    pip install -e . --group test
     ```
 3. Run tests
     ```bash

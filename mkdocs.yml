@@ -109,3 +109,5 @@ nav:
     - 🔢 About Versions: development/versions.md
     # - 🤝 Contributing: development/contributing.md
     # - 🚀 Release Process: development/release-process.md
+  - JWT Playground 🕹️:
+    - 🔗 Link: playground.md

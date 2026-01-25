@@ -53,16 +53,10 @@ SuperJWT is a minimalist JWT library for Python 3.10+ that combines the simplici
 
 ## Installation
 
-HMAC support only (default)
 ```bash
 pip install superjwt
 ```
-
-With support for asymmetric algorithms
-```bash
-pip install superjwt[asymmetric]
-```
-
+<br>
 ---
 
 ## Features
@@ -88,7 +82,7 @@ pip install superjwt[asymmetric]
 ### 🩵 Modern Codebase
 
 - SuperJWT is written for Python 3.10+ with full type hints support in your IDE. Every function, method, and Pydantic model has autocompletion.
-- Clean, modular, and lightweight codebase: thanks to Pydantic and the optional `cryptography` library, SuperJWT is a compact library, well-structured, and easy to read.
+- Clean, modular, and lightweight codebase: thanks to Pydantic and the `cryptography` library, SuperJWT is a compact library, well-structured, and easy to read.
 
 ### 🤖 Heavily Tested
 
@@ -97,5 +91,11 @@ pip install superjwt[asymmetric]
 ---
 
 <p align="center">
-Start building now: go to <a href="./user-guide/">User Guide</a>!
+Start building now:
+</p>
+<p align="center">
+⇨ dive in the <a href="./user-guide/">User Guide📃</a>
+</p>
+<p align="center">
+⇨ play with <a target="_blank" href="https://jwt.how">JWT Playground🕹️</a>
 </p>

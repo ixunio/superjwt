@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changes (♻️)
+
+*JWT & Validation*
+
+- :zap: Performance update, SuperJWT encoding and decoding runs 3x to 8x faster ([#99]) ([#100])
+- `cryptography` is now used for all algorithms and becomes a required dependency ([#99])
+- Maximum token bytes size limit is now controlled with module-level `set_max_token_bytes()` ([#99])
+
 ## v0.7.0 (2026-01-18)
 
 ### Changes (♻️)
@@ -177,6 +187,8 @@
 - CI (tests, linter, release)
 
 
+[#100]: https://github.com/ixunio/superjwt/issues/100
+[#99]: https://github.com/ixunio/superjwt/issues/99
 [#96]: https://github.com/ixunio/superjwt/issues/96
 [#94]: https://github.com/ixunio/superjwt/issues/94
 [#91]: https://github.com/ixunio/superjwt/issues/91

@@ -21,16 +21,15 @@ These are the JWS signature algorithms that can be used to sign and verify a JWT
 | `Ed25519`<br><small>EdDSA using Ed25519 curve | `OKP`<br><small>Octet Key Pair</small> | `OKPKey`<br><small>asymmetric</small> | ![Yes](https://img.shields.io/badge/-Yes-success) | [RFC 9864](https://datatracker.ietf.org/doc/html/rfc9864) |
 | `Ed448`<br><small>EdDSA using Ed448 curve | `OKP`<br><small>Octet Key Pair</small> | `OKPKey`<br><small>asymmetric</small> | ![Yes](https://img.shields.io/badge/-Yes-success) | [RFC 9864](https://datatracker.ietf.org/doc/html/rfc9864) |
 
-/// note | Installation Requirement
-Asymmetric algorithms require the `cryptography` library. You can install it with:
-```bash
-pip install superjwt[asymmetric]
-```
+/// tip | Which algorithm to choose?
+TL;DR: use `Ed25519` for asymmetric, `HS256` for symmetric!
+
+See [What is best, and why](./jwt/signing-algorithms.md#what-is-best-and-why)?
+
+
 ///
 
-Which algorithm to choose? [See What is best, and why?](./jwt/signing-algorithms.md#what-is-best-and-why)
 
-TL;DR: use `Ed25519` for asymmetric, `HS256` for symmetric!
 
 ---
 

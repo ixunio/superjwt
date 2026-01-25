@@ -1,52 +1,58 @@
+
 # Signing Algorithms
 
-The security of a JWT depends heavily on the signing algorithm used. The `alg` header parameter specifies which algorithm was used to sign the token.
+In a signed JWT (a JWS in compact form), the integrity of the token ultimately comes down to the signature. The `alg` header parameter tells verifiers **which signing algorithm** was used so they can verify the signature correctly.
 
-There are two main categories of signing algorithms: **Symmetric** (HMAC) and **Asymmetric** (RSA, ECDSA, Ed25519/Ed448).
+This page explains the most common algorithm families, the trade-offs between them, and how to pick a reasonable default. If you want more context about how `alg`, `kid`, and other header fields fit into a token, see: [JWT Content](content.md).
+
+At a high level there are two categories:
+
+- **Symmetric** algorithms (HMAC): one shared secret is used for both signing and verification.
+- **Asymmetric** algorithms (RSA, ECDSA, EdDSA): a private key signs and a public key verifies.
 
 /// tip | Quick recommendations
-- Single service / monolith: start with `HS256` using a strong random secret.
-- Multiple independent verifiers (microservices, third parties): prefer `Ed25519` (or `Ed448`) when available; otherwise `ES256`; otherwise `RS256`.
+- **Single service / monolith**: start with `HS256` and a strong random secret.
+- **Many independent verifiers** (microservices, third parties): prefer `Ed25519` (or `Ed448`) when available; otherwise `ES256`; otherwise `RS256`.
 ///
-
-/// note | SuperJWT dependency note
-Asymmetric algorithms require the optional `cryptography` dependency.
-///
-
-See also: [JWT Content](content.md) for how `alg`, `kid`, and related headers fit into the token.
 
 ---
 
 ## Symmetric Algorithms (HMAC)
 
-**HMAC (Hash-based Message Authentication Code)** algorithms use a **single shared secret key** for both signing and verification.
+**HMAC (Hash-based Message Authentication Code)** algorithms use a **single shared secret key** for both signing and verification. This makes them extremely fast and simple, but it also means every verifier must be trusted with the same secret.
 
-- **Signing**: The issuer signs the token using the secret key.
-- **Verification**: The receiver verifies the token using the **same** secret key.
+Concretely:
 
-### Common Algorithms
+- When you **sign**, you use the shared secret.
+- When you **verify**, you use that same shared secret.
+
+### Most Used
+
+If you only need one HMAC algorithm, `HS256` is the common default.
 
 | Algorithm | Description | Key Type | Security Level |
 |-----------|-------------|----------|----------------|
-| **HS256** | HMAC using SHA-256 | Octet Sequence (Shared Secret) | Good (Standard) |
+| **HS256** | HMAC using SHA-256 | Octet Sequence (Shared Secret) | Good |
 | **HS384** | HMAC using SHA-384 | Octet Sequence (Shared Secret) | Better |
 | **HS512** | HMAC using SHA-512 | Octet Sequence (Shared Secret) | Best |
 
 ### Pros & Cons
 
-**✅ Pros:**
+HMAC tends to feel “easy” because there are fewer moving parts, and performance is excellent. The trade-off is operational: distributing the same secret to many verifiers increases the impact of a single compromise.
 
-- Faster computation (signing and verifying are very fast)
-- Smaller token size (signature is shorter)
-- Simple to implement
+**What HMAC is great at**
 
-**❌ Cons:**
+- Very fast signing and verification
+- Small signatures (good for cookies and bandwidth-constrained contexts)
+- Minimal key management complexity
 
-- **Key Distribution**: The secret key must be shared with every service that needs to verify the token. If one service is compromised, the key is compromised for everyone.
-- **No Non-repudiation**: Since multiple parties have the key, you can't prove *who* created the token (any party with the key could have created it).
+**What you give up**
+
+- **Key distribution safety**: every verifier that can validate can also forge if compromised
+- **Non-repudiation**: you cannot prove which holder of the secret signed a token
 
 ### When to use
-Use HMAC when the token issuer and verifier are the same application, or when you have a trusted internal network where sharing the secret key is safe.
+Use HMAC when the token issuer and verifier are the same application (or a tightly controlled cluster where sharing a single secret is acceptable).
 
 /// warning | Shared secret blast radius
 With HMAC, every verifier must know the same secret. If any verifier is compromised, an attacker can **forge** tokens.
@@ -56,14 +62,23 @@ With HMAC, every verifier must know the same secret. If any verifier is compromi
 
 ## Asymmetric Algorithms
 
-Asymmetric algorithms use a **key pair**: a **Private Key** for signing and a **Public Key** for verification.
+Asymmetric algorithms use a **key pair**: a **private key** for signing and a **public key** for verification. This separates responsibilities cleanly: only the issuer needs the private key, while any number of services can hold the public key.
 
-- **Signing**: The issuer signs the token using the **Private Key** (kept secret).
-- **Verification**: The receiver verifies the token using the **Public Key** (can be shared openly).
+In practice:
+
+- When you **sign**, you use the private key (keep it secret).
+- When you **verify**, you use the public key (it can be widely distributed).
+
+This model is usually the right choice when many independent systems must verify tokens, or when you can’t (or don’t want to) trust every verifier with the power to mint tokens.
 
 ### 1. RSA (Rivest–Shamir–Adleman)
 
-RSA is the most widely used asymmetric algorithm.
+RSA is the most widely deployed asymmetric option in JWT ecosystems. It’s often chosen for interoperability, especially in enterprise stacks.
+
+RSA has two common flavors in JWT:
+
+- **RS*** (PKCS#1 v1.5): very widely supported.
+- **PS*** (RSA-PSS): generally considered a more robust padding scheme, but support can be less universal.
 
 | Algorithm | Description | Key Type | Security Level |
 |-----------|-------------|----------|----------------|
@@ -71,6 +86,8 @@ RSA is the most widely used asymmetric algorithm.
 | **RS384** | RSASSA-PKCS1-v1_5 using SHA-384 | RSA Key Pair | Better |
 | **RS512** | RSASSA-PKCS1-v1_5 using SHA-512 | RSA Key Pair | Best |
 | **PS256** | RSASSA-PSS using SHA-256 | RSA Key Pair | Stronger than RS256 |
+| **PS384** | RSASSA-PSS using SHA-384 | RSA Key Pair | Stronger than RS384 |
+| **PS512** | RSASSA-PSS using SHA-512 | RSA Key Pair | Stronger than RS512 |
 
 /// tip | RSA choice
 Prefer RSA-PSS (`PS256`) over PKCS#1 v1.5 (`RS256`) when your ecosystem supports it.
@@ -78,7 +95,9 @@ Prefer RSA-PSS (`PS256`) over PKCS#1 v1.5 (`RS256`) when your ecosystem supports
 
 ### 2. ECDSA (Elliptic Curve Digital Signature Algorithm)
 
-ECDSA offers the same security level as RSA but with **much smaller key sizes**, resulting in faster computations and smaller signatures.
+ECDSA offers comparable security to RSA with **much smaller key sizes**, which usually yields smaller signatures but is slower.
+
+The main operational footgun with ECDSA is that signing requires a fresh per-signature nonce. High-quality implementations handle this correctly, but nonce reuse (or biased randomness) can leak the private key.
 
 | Algorithm | Description | Key Type | Curve |
 |-----------|-------------|----------|-------|
@@ -89,7 +108,13 @@ ECDSA offers the same security level as RSA but with **much smaller key sizes**,
 
 ### 3. EdDSA (Edwards-curve Digital Signature Algorithm)
 
-EdDSA is a modern, high-performance signature scheme. In JOSE/JWT, you typically select a specific curve with `alg = Ed25519` or `alg = Ed448`.
+EdDSA is a modern signature scheme designed to avoid common pitfalls (notably, it’s deterministic rather than relying on per-signature randomness like ECDSA).
+
+In **SuperJWT**, you select a specific EdDSA curve by choosing `alg = Ed25519` or `alg = Ed448`.
+
+/// note | Interop note
+Some JOSE/JWT ecosystems expose EdDSA as `alg = EdDSA` with the curve specified elsewhere (for example via key parameters). SuperJWT intentionally uses `Ed25519` and `Ed448` as algorithm identifiers.
+///
 
 | Algorithm | Description | Key Type | Curve |
 |-----------|-------------|----------|-------|
@@ -97,6 +122,8 @@ EdDSA is a modern, high-performance signature scheme. In JOSE/JWT, you typically
 | **Ed448** | EdDSA using Ed448 curve | OKP (Octet Key Pair) | Ed448 |
 
 ### RSA vs ECDSA vs EdDSA
+
+If you’re choosing among asymmetric families, it helps to think in terms of interoperability, signature size, and operational risk.
 
 **RSA (`RS256`/`PS256`)**
 
@@ -108,34 +135,33 @@ EdDSA is a modern, high-performance signature scheme. In JOSE/JWT, you typically
 **ECDSA (`ES256`/`ES384`/`ES512`)**
 
 - ✅ Smaller keys and signatures than RSA for comparable security.
-- ✅ Often faster at signing than RSA.
 - ❌ Requires high-quality per-signature randomness (a nonce). Bugs or nonce reuse can leak the private key.
-- ❌ Verification speed is not necessarily better than RSA, so verify-heavy workloads may not benefit.
+- ❌ Verification speed is slower than RSA, especially for ES256K, ES384, and ES512, so verify-heavy workloads may not benefit.
 
 **EdDSA (`Ed25519`/`Ed448`)** 👍👍👍
 
-- ✅ Deterministic signatures (avoids the ECDSA nonce-generation footgun).
+- ✅ Deterministic and compact signatures.
 - ✅ Fast signing and verification with compact signatures.
 - ❌ Support can be uneven in older JWT libraries and SaaS identity products (though it keeps improving).
+- ❌ Verification speed is slower than RSA, especially for Ed448, so verify-heavy workloads may not benefit.
 
-Reference: https://www.scottbrady.io/jose/jwts-which-signing-algorithm-should-i-use
+### Pros & Cons
 
-### Pros & Cons (Asymmetric)
+Asymmetric signing is typically what you want once you have multiple verifiers or third-party consumers.
 
-**✅ Pros:**
+**Why teams like asymmetric keys**
 
-- **Secure Key Distribution**: The private key never leaves the issuer. Verifiers only need the public key.
-- **Non-repudiation**: Only the holder of the private key could have signed the token.
-- **Scalability**: Perfect for microservices or third-party clients where you don't want to share secrets.
+- You can distribute verification widely without distributing signing power
+- Key rotation can be done by publishing public keys (for example via a JWKS endpoint)
+- You get a clearer separation of duties between issuer and verifier
 
-**❌ Cons:**
+**What it costs**
 
-- Slower computation than HMAC (especially RSA).
-- Larger token size (signatures are longer).
-- More complex key management (key rotation, JWKS endpoints).
+- More complex key management (rotation, publishing, `kid` selection)
+- Typically larger signatures and slower crypto than HMAC (especially with ECDSA)
 
 ### When to use
-Use Asymmetric algorithms when:
+Use asymmetric algorithms when any of the following are true:
 
 - You have multiple services verifying tokens (microservices).
 - You are issuing tokens to third-party clients (OAuth2/OIDC).
@@ -145,13 +171,15 @@ Use Asymmetric algorithms when:
 
 ## What is best, and why?
 
-There is no single best algorithm for every deployment, but these are strong defaults:
+There isn’t a single "best" algorithm for every deployment. Good defaults depend on who verifies tokens, how painful key distribution is for you, and what your interoperability constraints look like.
+
+These are strong, commonly safe defaults:
 
 - **Best default asymmetric**: `Ed25519` - fast, compact signatures, strong modern design.
 - **Best asymmetric for broad enterprise interoperability**: `RS256` (or `PS256` if supported) - widely supported, but larger and slower.
 - **Best symmetric**: `HS256` - simplest and fastest, but only appropriate when sharing a secret across verifiers is acceptable.
 
-Your best choice depends on:
+When in doubt, decide based on:
 
 - **Who verifies** (one service vs many services).
 - **Interoperability constraints** (legacy clients, language runtimes).
@@ -161,7 +189,7 @@ Your best choice depends on:
 
 ## Qualitative benchmark (rules of thumb)
 
-Real performance depends on hardware and crypto backends, but this table captures typical trade-offs.
+Real performance depends on hardware and crypto backends, but this table captures the usual trade-offs you can expect.
 
 | Algorithm family | Sign speed | Verify speed | Signature size | Interop |
 |---|---|---|---|---|
@@ -173,14 +201,18 @@ Real performance depends on hardware and crypto backends, but this table capture
 
 ### Picking an algorithm by scenario
 
-- **Single API + single verifier**: `HS256`
-- **Microservices (many verifiers)**: `Ed25519` (or `ES256`)
-- **OAuth2/OIDC-style ecosystems / maximum compatibility**: `RS256` (or `PS256`)
-- **Constrained bandwidth (cookies, mobile)**: prefer `HS256` or `Ed25519` over RSA
+If you just need a "good enough" decision quickly:
+
+- If **one service both issues and verifies** (or you fully trust every verifier), choose `HS256`.
+- If **many services verify** and you want to avoid sharing a single secret, choose `Ed25519` (or `ES256`).
+- If you need **maximum compatibility with existing JWT consumers**, choose `RS256` (or `PS256` if supported).
+- If you care about **small tokens** (cookies, mobile), prefer `HS256` or `Ed25519` over RSA.
 
 ---
 
 ## Summary Comparison
+
+This is the "shape" of the trade-off:
 
 | Feature | HMAC (Symmetric) | RSA/ECDSA/EdDSA (Asymmetric) |
 |---------|------------------|------------------------------|
@@ -194,14 +226,24 @@ Real performance depends on hardware and crypto backends, but this table capture
 
 ## Security Best Practices
 
-1. **Don't use `none`**: The `none` algorithm allows tokens without signatures. Always disable this in production (SuperJWT disables it by default).
-2. **Use Strong Keys**:
+Good algorithm choice helps, but most JWT failures in real systems come from configuration mistakes, key leaks, or verification shortcuts.
 
-      - HMAC: Minimum 256-bit random key (32 bytes).
-      - RSA: Minimum 2048-bit key length.
+1. **Never accept `none`**
 
-3. **Protect Private Keys**: Never share or commit private keys. Use environment variables or secret managers (Vault, AWS Secrets Manager, ...etc).
-4. **Rotate Keys**: Regularly rotate keys to minimize impact if a key is compromised. Use `kid` (Key ID) in the header to manage rotation.
+      The `none` algorithm produces an unsigned token. That’s almost never what you want for authentication. SuperJWT blocks `none` by default.
+
+2. **Use strong keys**
+
+      - HMAC: generate at least 256 bits of randomness (32 bytes) and treat it like a password that must never leak.
+      - RSA: use at least 2048-bit keys (3072+ is a common upgrade path for long-lived deployments).
+
+3. **Protect private keys**
+
+      Store private keys in a secret manager (Vault, AWS Secrets Manager, etc.) and limit access to only the systems that must sign.
+
+4. **Rotate keys deliberately**
+
+      Plan for rotation from day one: publish (or distribute) verification keys and use `kid` (Key ID) to let verifiers select the right key.
 
 /// tip | Rotation and `kid`
 If you rotate signing keys, publish (or distribute) the current set of verification keys and use `kid` to let verifiers select the correct key.

@@ -120,7 +120,7 @@ graph TB
     Y["Algorithm"] --> H
     H --> I["*signature*
     (bytes)"]
-    I --> J["Final token
+    I --> J["Compact JWT token
     *header.payload.signature*
     (bytes)"]
     F --> J
@@ -141,14 +141,18 @@ graph TB
 
 ```mermaid
 graph TD
-    A[*header.payload.signature*] --> B[Split by dots]
-    B --> C[*header*]
-    B --> D[*payload*]
-    B --> E[*signature*]
+    A[Compact JWT token] --> B[Split by dots]
+    B --> C["*headers*
+    (bytes)"]
+    B --> D["*payload*
+    (bytes)"]
+    B --> E["*signature*
+    (bytes)"]
     C --> F["Base64URL decode()"]
     D --> G["Base64URL decode()"]
-    F --> H[Extract Algorithm]
-    H --> I[Recreate Signature]
+    H[Algorithm] --> I[Recreate Signature]
+    KK[Key] --> I
+    F --> I
     G --> I
     I --> J[Compare Signatures]
     E --> J
