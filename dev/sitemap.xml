@@ -2,54 +2,54 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/algorithms/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/best-practices/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/error-handling/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/user-guide/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/development/changelog/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/development/versions/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/integrations/fastapi/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/integrations/flask/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/integrations/oauth2/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/jwt/basics/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/jwt/content/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
     <url>
          <loc>https://ixunio.github.io/superjwt/dev/jwt/signing-algorithms/</loc>
-         <lastmod>2026-01-18</lastmod>
+         <lastmod>2026-01-25</lastmod>
     </url>
 </urlset>
