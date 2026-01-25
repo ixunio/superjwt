@@ -37,6 +37,8 @@ AsymmetricKeyType = TypeVar("AsymmetricKeyType", RSAKey, ECKey, OKPKey)
 class BaseJWSAlgorithm(ABC, Generic[KeyType]):
     name: ClassVar[str]
     description: ClassVar[str]
+    default_encoded_headers: ClassVar[bytes]
+    default_encoded_headers_without_typ: ClassVar[bytes]
     key_type: type[KeyType]
 
     @abstractmethod
@@ -292,6 +294,8 @@ class EdDSAAlgorithm(AsymmetricJWSAlgorithm[OKPKey]):
 class HS256Algorithm(HMACAlgorithm):
     name = "HS256"
     description = "HMAC with SHA-256 signature"
+    default_encoded_headers = b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJIUzI1NiJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA256())
@@ -300,6 +304,8 @@ class HS256Algorithm(HMACAlgorithm):
 class HS384Algorithm(HMACAlgorithm):
     name = "HS384"
     description = "HMAC with SHA-384 signature"
+    default_encoded_headers = b"eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJIUzM4NCJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA384())
@@ -308,6 +314,8 @@ class HS384Algorithm(HMACAlgorithm):
 class HS512Algorithm(HMACAlgorithm):
     name = "HS512"
     description = "HMAC with SHA-512 signature"
+    default_encoded_headers = b"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJIUzUxMiJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA512())
@@ -316,6 +324,8 @@ class HS512Algorithm(HMACAlgorithm):
 class RS256Algorithm(RSAPKCS1v15Algorithm):
     name = "RS256"
     description = "RSASSA-PKCS1-v1_5 using SHA-256"
+    default_encoded_headers = b"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJSUzI1NiJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA256())
@@ -324,6 +334,8 @@ class RS256Algorithm(RSAPKCS1v15Algorithm):
 class RS384Algorithm(RSAPKCS1v15Algorithm):
     name = "RS384"
     description = "RSASSA-PKCS1-v1_5 using SHA-384"
+    default_encoded_headers = b"eyJhbGciOiJSUzM4NCIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJSUzM4NCJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA384())
@@ -332,6 +344,8 @@ class RS384Algorithm(RSAPKCS1v15Algorithm):
 class RS512Algorithm(RSAPKCS1v15Algorithm):
     name = "RS512"
     description = "RSASSA-PKCS1-v1_5 using SHA-512"
+    default_encoded_headers = b"eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJSUzUxMiJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA512())
@@ -340,6 +354,8 @@ class RS512Algorithm(RSAPKCS1v15Algorithm):
 class PS256Algorithm(RSAPSSAlgorithm):
     name = "PS256"
     description = "RSASSA-PSS using SHA-256 and MGF1 with SHA-256"
+    default_encoded_headers = b"eyJhbGciOiJQUzI1NiIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJQUzI1NiJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA256())
@@ -348,6 +364,8 @@ class PS256Algorithm(RSAPSSAlgorithm):
 class PS384Algorithm(RSAPSSAlgorithm):
     name = "PS384"
     description = "RSASSA-PSS using SHA-384 and MGF1 with SHA-384"
+    default_encoded_headers = b"eyJhbGciOiJQUzM4NCIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJQUzM4NCJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA384())
@@ -356,6 +374,8 @@ class PS384Algorithm(RSAPSSAlgorithm):
 class PS512Algorithm(RSAPSSAlgorithm):
     name = "PS512"
     description = "RSASSA-PSS using SHA-512 and MGF1 with SHA-512"
+    default_encoded_headers = b"eyJhbGciOiJQUzUxMiIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJQUzUxMiJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA512())
@@ -364,6 +384,8 @@ class PS512Algorithm(RSAPSSAlgorithm):
 class ES256Algorithm(ECDSAAlgorithm):
     name = "ES256"
     description = "ECDSA using secp256r1 (NIST P-256) curve and SHA-256"
+    default_encoded_headers = b"eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJFUzI1NiJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA256(), ec.SECP256R1)
@@ -372,6 +394,8 @@ class ES256Algorithm(ECDSAAlgorithm):
 class ES256KAlgorithm(ECDSAAlgorithm):
     name = "ES256K"
     description = "ECDSA using secp256k1 curve and SHA-256"
+    default_encoded_headers = b"eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJFUzI1NksifQ"
 
     def __init__(self):
         super().__init__(hashes.SHA256(), ec.SECP256K1)
@@ -380,6 +404,8 @@ class ES256KAlgorithm(ECDSAAlgorithm):
 class ES384Algorithm(ECDSAAlgorithm):
     name = "ES384"
     description = "ECDSA using secp384r1 (NIST P-384) curve and SHA-384"
+    default_encoded_headers = b"eyJhbGciOiJFUzM4NCIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJFUzM4NCJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA384(), ec.SECP384R1)
@@ -388,6 +414,8 @@ class ES384Algorithm(ECDSAAlgorithm):
 class ES512Algorithm(ECDSAAlgorithm):
     name = "ES512"
     description = "ECDSA using secp521r1 (NIST P-521) curve and SHA-512"
+    default_encoded_headers = b"eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJFUzUxMiJ9"
 
     def __init__(self):
         super().__init__(hashes.SHA512(), ec.SECP521R1)
@@ -396,6 +424,8 @@ class ES512Algorithm(ECDSAAlgorithm):
 class Ed25519Algorithm(EdDSAAlgorithm):
     name = "Ed25519"
     description = "EdDSA signature algorithm using Ed25519 curve"
+    default_encoded_headers = b"eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiSldUIn0"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJFZDI1NTE5In0"
 
     def __init__(self):
         super().__init__(ed25519.Ed25519PrivateKey, ed25519.Ed25519PublicKey)
@@ -404,6 +434,8 @@ class Ed25519Algorithm(EdDSAAlgorithm):
 class Ed448Algorithm(EdDSAAlgorithm):
     name = "Ed448"
     description = "EdDSA signature algorithm using Ed448 curve"
+    default_encoded_headers = b"eyJhbGciOiJFZDQ0OCIsInR5cCI6IkpXVCJ9"
+    default_encoded_headers_without_typ = b"eyJhbGciOiJFZDQ0OCJ9"
 
     def __init__(self):
         super().__init__(ed448.Ed448PrivateKey, ed448.Ed448PublicKey)

@@ -14,7 +14,7 @@ from superjwt.exceptions import (
     SizeExceededError,
 )
 from superjwt.keys import Key
-from superjwt.shared import get_max_token_bytes
+from superjwt.shared import Alg, get_max_token_bytes
 from superjwt.utils import as_bytes, trim_str, urlsafe_b64decode, urlsafe_b64encode
 from superjwt.validations import (
     JOSEHeader,
@@ -41,9 +41,7 @@ def jws_encode(
     segments = []
 
     if headers is None:
-        segments.append(
-            urlsafe_b64encode(json.dumps({"alg": jws_algorithm.name}).encode("utf-8"))
-        )
+        segments.append(jws_algorithm.default_encoded_headers)
     else:
         validation = Validation.get(headers, headers_validation, JOSEHeader, JOSEHeader)
         try:
@@ -100,9 +98,19 @@ def jws_decode(
         compact, with_detached_payload
     )
 
-    # decode headers + validation
-    headers = decode_raw_headers(encoded_headers)
-    validate_headers_and_algorithm(headers, headers_validation, jws_algorithm)
+    # attempt to find algorithm from encoded headers
+    find_alg = Alg.find_from_encoded_headers(encoded_headers)
+    if find_alg is not None:
+        if find_alg != jws_algorithm.name:
+            raise AlgorithmMismatchError(
+                f"JWS algorithm '{trim_str(find_alg, 16)}' "
+                f"does not match expected '{jws_algorithm.name}'"
+            )
+
+    # run full header decoding and validation
+    else:
+        headers = decode_raw_headers(encoded_headers)
+        validate_headers_and_algorithm(headers, headers_validation, jws_algorithm)
 
     # decode payload
     payload = decode_raw_payload(encoded_payload, with_detached_payload)

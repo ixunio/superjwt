@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from cryptography.hazmat.primitives import serialization
 from superjwt.algorithms import (
@@ -64,6 +66,119 @@ class TestAsymmetricAlgorithmKeyTypes:
         """Test that EdDSA algorithms specify OKPKey as key type."""
         assert Ed25519Algorithm.key_type is OKPKey
         assert Ed448Algorithm.key_type is OKPKey
+
+
+class TestDefaultHeaders:
+    """Test that algorithm classes have correct default headers."""
+
+    def test_all_algorithm_default_headers(self):
+        """Test that all algorithm classes have correct default headers with and without typ."""
+        from superjwt.utils import urlsafe_b64decode
+
+        # Test default_encoded_headers (with "typ": "JWT")
+        expected_headers_with_typ = {
+            HS256Algorithm: b"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+            HS384Algorithm: b"eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9",
+            HS512Algorithm: b"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9",
+            RS256Algorithm: b"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9",
+            RS384Algorithm: b"eyJhbGciOiJSUzM4NCIsInR5cCI6IkpXVCJ9",
+            RS512Algorithm: b"eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9",
+            PS256Algorithm: b"eyJhbGciOiJQUzI1NiIsInR5cCI6IkpXVCJ9",
+            PS384Algorithm: b"eyJhbGciOiJQUzM4NCIsInR5cCI6IkpXVCJ9",
+            PS512Algorithm: b"eyJhbGciOiJQUzUxMiIsInR5cCI6IkpXVCJ9",
+            ES256Algorithm: b"eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9",
+            ES256KAlgorithm: b"eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ",
+            ES384Algorithm: b"eyJhbGciOiJFUzM4NCIsInR5cCI6IkpXVCJ9",
+            ES512Algorithm: b"eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9",
+            Ed25519Algorithm: b"eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiSldUIn0",
+            Ed448Algorithm: b"eyJhbGciOiJFZDQ0OCIsInR5cCI6IkpXVCJ9",
+        }
+
+        # Test default_encoded_headers_without_typ (without "typ")
+        expected_headers_without_typ = {
+            HS256Algorithm: b"eyJhbGciOiJIUzI1NiJ9",
+            HS384Algorithm: b"eyJhbGciOiJIUzM4NCJ9",
+            HS512Algorithm: b"eyJhbGciOiJIUzUxMiJ9",
+            RS256Algorithm: b"eyJhbGciOiJSUzI1NiJ9",
+            RS384Algorithm: b"eyJhbGciOiJSUzM4NCJ9",
+            RS512Algorithm: b"eyJhbGciOiJSUzUxMiJ9",
+            PS256Algorithm: b"eyJhbGciOiJQUzI1NiJ9",
+            PS384Algorithm: b"eyJhbGciOiJQUzM4NCJ9",
+            PS512Algorithm: b"eyJhbGciOiJQUzUxMiJ9",
+            ES256Algorithm: b"eyJhbGciOiJFUzI1NiJ9",
+            ES256KAlgorithm: b"eyJhbGciOiJFUzI1NksifQ",
+            ES384Algorithm: b"eyJhbGciOiJFUzM4NCJ9",
+            ES512Algorithm: b"eyJhbGciOiJFUzUxMiJ9",
+            Ed25519Algorithm: b"eyJhbGciOiJFZDI1NTE5In0",
+            Ed448Algorithm: b"eyJhbGciOiJFZDQ0OCJ9",
+        }
+
+        # Algorithm names for JSON validation
+        algorithm_names = {
+            HS256Algorithm: "HS256",
+            HS384Algorithm: "HS384",
+            HS512Algorithm: "HS512",
+            RS256Algorithm: "RS256",
+            RS384Algorithm: "RS384",
+            RS512Algorithm: "RS512",
+            PS256Algorithm: "PS256",
+            PS384Algorithm: "PS384",
+            PS512Algorithm: "PS512",
+            ES256Algorithm: "ES256",
+            ES256KAlgorithm: "ES256K",
+            ES384Algorithm: "ES384",
+            ES512Algorithm: "ES512",
+            Ed25519Algorithm: "Ed25519",
+            Ed448Algorithm: "Ed448",
+        }
+
+        all_algorithms = list(expected_headers_with_typ.keys())
+
+        # Test all headers are bytes and have correct values
+        for algorithm_class in all_algorithms:
+            # Check default_encoded_headers
+            assert isinstance(algorithm_class.default_encoded_headers, bytes), (
+                f"{algorithm_class.__name__}.default_encoded_headers must be bytes"
+            )
+            assert (
+                algorithm_class.default_encoded_headers
+                == expected_headers_with_typ[algorithm_class]
+            ), f"{algorithm_class.__name__} has incorrect default_encoded_headers"
+
+            # Check default_encoded_headers_without_typ
+            assert isinstance(
+                algorithm_class.default_encoded_headers_without_typ, bytes
+            ), (
+                f"{algorithm_class.__name__}.default_encoded_headers_without_typ must be bytes"
+            )
+            assert (
+                algorithm_class.default_encoded_headers_without_typ
+                == expected_headers_without_typ[algorithm_class]
+            ), (
+                f"{algorithm_class.__name__} has incorrect default_encoded_headers_without_typ"
+            )
+
+        # Test JSON decoding for headers with typ
+        for algorithm_class in all_algorithms:
+            decoded = urlsafe_b64decode(algorithm_class.default_encoded_headers)
+            header_dict = json.loads(decoded.decode("utf-8"))
+            expected_alg = algorithm_names[algorithm_class]
+
+            assert header_dict == {"alg": expected_alg, "typ": "JWT"}, (
+                f"{algorithm_class.__name__} default encoded headers decode incorrectly"
+            )
+
+        # Test JSON decoding for headers without typ
+        for algorithm_class in all_algorithms:
+            decoded = urlsafe_b64decode(
+                algorithm_class.default_encoded_headers_without_typ
+            )
+            header_dict = json.loads(decoded.decode("utf-8"))
+            expected_alg = algorithm_names[algorithm_class]
+
+            assert header_dict == {"alg": expected_alg}, (
+                f"{algorithm_class.__name__} default encoded headers without typ decode incorrectly"
+            )
 
 
 class TestHMACAlgorithms:

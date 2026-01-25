@@ -42,13 +42,16 @@ _ALGORITHM_INSTANCES: dict[str, BaseJWSAlgorithm] = {}
 
 
 ALGORITHMS: dict[str, type[BaseJWSAlgorithm] | None] = {
+    # frequently used
     "HS256": HS256Algorithm,
+    "Ed25519": Ed25519Algorithm,
+    "RS256": RS256Algorithm,
+    "PS256": PS256Algorithm,
+    # less frequently used
     "HS384": HS384Algorithm,
     "HS512": HS512Algorithm,
-    "RS256": RS256Algorithm,
     "RS384": RS384Algorithm,
     "RS512": RS512Algorithm,
-    "PS256": PS256Algorithm,
     "PS384": PS384Algorithm,
     "PS512": PS512Algorithm,
     "ES256": ES256Algorithm,
@@ -56,9 +59,26 @@ ALGORITHMS: dict[str, type[BaseJWSAlgorithm] | None] = {
     "ES384": ES384Algorithm,
     "ES512": ES512Algorithm,
     "EdDSA": None,  # Deprecated and not supported
-    "Ed25519": Ed25519Algorithm,
     "Ed448": Ed448Algorithm,
 }
+
+
+def preload_algorithm_headers() -> dict[bytes, str]:
+    """Preload encoded headers for all supported algorithms and create reverse lookup."""
+    reverse_lookup: dict[bytes, str] = {}
+
+    for alg_name, alg_class in ALGORITHMS.items():
+        if alg_class is not None:
+            headers_with_typ = alg_class.default_encoded_headers
+            headers_without_typ = alg_class.default_encoded_headers_without_typ
+
+            reverse_lookup[headers_with_typ] = alg_name
+            reverse_lookup[headers_without_typ] = alg_name
+
+    return reverse_lookup
+
+
+_PRELOADED_HEADERS_TO_ALGORITHM = preload_algorithm_headers()
 
 
 class Alg(str, Enum):
@@ -99,6 +119,10 @@ class Alg(str, Enum):
             return instance
         else:
             return get_cached_algorithm(algorithm)
+
+    @staticmethod
+    def find_from_encoded_headers(encoded_headers: bytes) -> str | None:
+        return _PRELOADED_HEADERS_TO_ALGORITHM.get(encoded_headers)
 
 
 SUPPORTED_ALGORITHMS = Alg.__members__.keys()
