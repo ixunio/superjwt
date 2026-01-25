@@ -34,13 +34,12 @@ jobs:
         run: ruff check .
 
   test:
-    name: Test (Python ${{ matrix.python-version }}${{ matrix.cryptography && ' + cryptography' || '' }})
+    name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-        cryptography: [false, true]
     steps:
       - uses: actions/checkout@v5
       
@@ -50,21 +49,15 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       
-      - name: Install dependencies (without cryptography)
-        if: matrix.cryptography == false
+      - name: Install dependencies
         run: |
           pip install -e . --group test
-      
-      - name: Install dependencies (with cryptography)
-        if: matrix.cryptography == true
-        run: |
-          pip install -e .[asymmetric] --group test
       
       - name: Run tests with coverage
         run: pytest --cov --cov-branch --cov-report=xml
       
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.12' && matrix.cryptography == true
+        if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
