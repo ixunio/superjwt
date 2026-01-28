@@ -1,8 +1,9 @@
 import pytest
+from superjwt.algorithms import BaseJWSAlgorithm
 from superjwt.exceptions import AlgorithmNotSupportedError, InvalidAlgorithmError
 from superjwt.shared import (
     ALGORITHMS,
-    SUPPORTED_ALGORITHMS,
+    VALID_ALGORITHMS,
     Alg,
     get_cached_algorithm,
     get_max_token_bytes,
@@ -13,7 +14,7 @@ from superjwt.shared import (
 # These imports are used in the test functions below
 _ = (
     ALGORITHMS,
-    SUPPORTED_ALGORITHMS,
+    VALID_ALGORITHMS,
     get_cached_algorithm,
     get_max_token_bytes,
     set_max_token_bytes,
@@ -31,30 +32,9 @@ class TestAlgEnum:
         ):
             Alg.EdDSA.get_instance()
 
-    def test_get_instance_by_name_invalid_algorithm(self):
-        """Test that get_instance_by_name() raises InvalidAlgorithmError for invalid algorithm names."""
-        with pytest.raises(
-            InvalidAlgorithmError, match=r"INVALID.*not a valid JWS algorithm"
-        ):
-            Alg.get_instance_by_name("INVALID")
-
-    def test_get_instance_by_name_not_implemented(self):
-        """Test that get_instance_by_name() raises AlgorithmNotSupportedError for unimplemented algorithms."""
-        # EdDSA is defined but not yet implemented (ALGORITHMS[EdDSA] = None)
-        with pytest.raises(
-            AlgorithmNotSupportedError, match=r"EdDSA.*not yet implemented"
-        ):
-            Alg.get_instance_by_name("EdDSA")
-
     def test_get_instance_success(self):
         """Test that get_instance() successfully returns an algorithm instance for implemented algorithms."""
         instance = Alg.HS256.get_instance()
-        assert instance is not None
-        assert instance.__class__.__name__ == "HS256Algorithm"
-
-    def test_get_instance_by_name_success(self):
-        """Test that get_instance_by_name() successfully returns an algorithm instance for implemented algorithms."""
-        instance = Alg.get_instance_by_name("HS256")
         assert instance is not None
         assert instance.__class__.__name__ == "HS256Algorithm"
 
@@ -116,13 +96,6 @@ class TestAlgEnum:
         """Test that get_instance() returns the same cached instance."""
         instance1 = Alg.HS256.get_instance()
         instance2 = Alg.HS256.get_instance()
-        # Should be the exact same object (cached)
-        assert instance1 is instance2
-
-    def test_get_instance_by_name_caches_instances(self):
-        """Test that get_instance_by_name() returns cached instances."""
-        instance1 = Alg.get_instance_by_name("RS256")
-        instance2 = Alg.get_instance_by_name("RS256")
         # Should be the exact same object (cached)
         assert instance1 is instance2
 
@@ -299,7 +272,7 @@ class TestALGORITHMS:
 
         for alg_name in implemented_algorithms:
             assert ALGORITHMS[alg_name] is not None
-            assert callable(ALGORITHMS[alg_name])
+            assert isinstance(ALGORITHMS[alg_name], BaseJWSAlgorithm)
 
     def test_algorithms_dict_eddsa_is_none(self):
         """Test that EdDSA algorithm is marked as not implemented (None)."""
@@ -335,7 +308,7 @@ class TestSupportedAlgorithms:
     def test_supported_algorithms_matches_alg_enum(self):
         """Test that SUPPORTED_ALGORITHMS contains all Alg enum member names."""
         expected = set(Alg.__members__.keys())
-        actual = set(SUPPORTED_ALGORITHMS)
+        actual = set(VALID_ALGORITHMS)
         assert actual == expected
 
     def test_supported_algorithms_includes_all_algorithms(self):
@@ -359,12 +332,12 @@ class TestSupportedAlgorithms:
             "Ed448",
         }
 
-        assert set(SUPPORTED_ALGORITHMS) == expected_algorithms
+        assert set(VALID_ALGORITHMS) == expected_algorithms
 
     def test_supported_algorithms_is_iterable(self):
         """Test that SUPPORTED_ALGORITHMS can be iterated."""
         count = 0
-        for alg_name in SUPPORTED_ALGORITHMS:
+        for alg_name in VALID_ALGORITHMS:
             assert isinstance(alg_name, str)
             count += 1
 

@@ -20,7 +20,7 @@ from superjwt.exceptions import (
     TokenExpiredError,
     TokenNotYetValidError,
 )
-from superjwt.shared import SUPPORTED_ALGORITHMS
+from superjwt.shared import VALID_ALGORITHMS
 from superjwt.utils import delta_datetime_timestamp
 
 
@@ -95,7 +95,7 @@ class JOSEHeader(JWTBaseModel):
         """Validate that the algorithm is a valid algorithm name and normalize to string."""
 
         # Check if it's a valid algorithm
-        if value not in SUPPORTED_ALGORITHMS:
+        if value not in VALID_ALGORITHMS:
             raise ValueError(f"'{value}' is not a valid algorithm")
 
         return value
