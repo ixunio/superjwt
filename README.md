@@ -20,9 +20,9 @@ With powerful Pydantic validation features.
 <br />
 <br />
 
-<a target="_blank" href="https://ixunio.github.io/superjwt/">🔗 <strong>Documentation</a></strong>
+🔗 <a href="https://ixunio.github.io/superjwt/latest/"><strong>Documentation</a></strong>
 <br>
-<a target="_blank" href="https://jwt.how">🔗 <strong>JWT Playground</strong></a>
+🔗 <a href="https://jwt.how"><strong>JWT Playground</strong></a>
 </div>
 
 ## Overview & Installation
@@ -177,7 +177,7 @@ print(token.headers)
 #> {'alg': 'NoNe', 'typ': 'JWT'}
 ```
 
-<a href="https://ixunio.github.io/superjwt/"><strong><em>See full documentation</em></strong></a>
+<a href="https://ixunio.github.io/superjwt/latest/"><strong><em>See full documentation</em></strong></a>
 
 ## Test
 
