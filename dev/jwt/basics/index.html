@@ -143,6 +143,15 @@
 
         </a>
 </li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../playground/">
+          
+  
+  
+  JWT Playground 🕹️
+
+        </a>
+</li>
 </ul>
 </div>
 </nav>
@@ -651,6 +660,44 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    JWT Playground 🕹️
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    JWT Playground 🕹️
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../playground/">
+<span class="md-ellipsis">
+    
+  
+    🔗 Link
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
 </ul>
 </nav>
 </div>
@@ -944,7 +991,7 @@
     Y["Algorithm"] --&gt; H
     H --&gt; I["*signature*
     (bytes)"]
-    I --&gt; J["Final token
+    I --&gt; J["Compact JWT token
     *header.payload.signature*
     (bytes)"]
     F --&gt; J
@@ -962,14 +1009,18 @@
 </ol>
 <h3 id="token-verification-decode">Token Verification (Decode)<a class="headerlink" href="#token-verification-decode" title="Permanent link">¶</a></h3>
 <pre class="mermaid"><code>graph TD
-    A[*header.payload.signature*] --&gt; B[Split by dots]
-    B --&gt; C[*header*]
-    B --&gt; D[*payload*]
-    B --&gt; E[*signature*]
+    A[Compact JWT token] --&gt; B[Split by dots]
+    B --&gt; C["*headers*
+    (bytes)"]
+    B --&gt; D["*payload*
+    (bytes)"]
+    B --&gt; E["*signature*
+    (bytes)"]
     C --&gt; F["Base64URL decode()"]
     D --&gt; G["Base64URL decode()"]
-    F --&gt; H[Extract Algorithm]
-    H --&gt; I[Recreate Signature]
+    H[Algorithm] --&gt; I[Recreate Signature]
+    KK[Key] --&gt; I
+    F --&gt; I
     G --&gt; I
     I --&gt; J[Compare Signatures]
     E --&gt; J
