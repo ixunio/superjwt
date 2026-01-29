@@ -1078,7 +1078,7 @@ compact = encode(claims, secret_key, Alg.HS256)
 
 ### Disable Validation
 
-You can disable claims validation entirely during encoding or decoding. In this scenario, an expired token will not raise an error. When validation is disabled, `decode()` returns an instance of [JWTBaseModel](#jwtbasemodel).
+You can disable claims validation entirely during encoding or decoding. In this scenario, an expired token will not raise an error. When validation is disabled, `decode()` returns an instance of [JWTBaseModel](#pydantic-models).
 
 ```python
 from superjwt import Alg, JWTBaseModel, JWTClaims, Validation, decode, encode
@@ -1251,7 +1251,7 @@ Unlike HMAC algorithm which uses the same key for encoding and decoding, asymmet
 
 /// tip | Why Use Asymmetric Algorithms?
 In this scenario, the private key never needs to be shared, while the public key can be distributed widely to many verifiers. This enables scalable architectures (multiple services can verify tokens without access to private keys), easier key rotation and auditability, and support for robust algorithms (RSA, ECDSA, EdDSA) suited for cross‑service and third‑party integrations.
-<br><br>See [Pros & Cons (Asymmetric)](jwt/signing-algorithms.md/#pros-cons-asymmetric)
+<br><br>See [Pros & Cons (Asymmetric)](jwt/signing-algorithms.md/#pros-cons_1)
 ///
 
 ### Encode With a Private Key
