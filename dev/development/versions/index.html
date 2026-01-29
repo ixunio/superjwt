@@ -1342,22 +1342,22 @@
 <p>While we are working towards a stable <code>v1.0.0</code> release, the library is already robust and used in production environments. We strive to maintain stability, but please note that versions before 1.0.0 may introduce breaking changes in minor updates.</p>
 <p>However, we are committed to minimizing disruption:</p>
 <ul>
-<li><strong>Patch versions</strong> (e.g., <code>0.7.0</code> -&gt; <code>0.7.1</code>) contain only bug fixes and are safe to upgrade.</li>
-<li><strong>Minor versions</strong> (e.g., <code>0.7.x</code> -&gt; <code>0.8.x</code>) may contain new features or breaking changes.<br>We will document these clearly in the <a href="../changelog/">Changelog</a>.</li>
+<li><strong>Patch versions</strong> (e.g., <code>0.8.0</code> -&gt; <code>0.8.1</code>) contain only bug fixes and are safe to upgrade.</li>
+<li><strong>Minor versions</strong> (e.g., <code>0.8.x</code> -&gt; <code>0.9.x</code>) may contain new features or breaking changes.<br>We will document these clearly in the <a href="../changelog/">Changelog</a>.</li>
 </ul>
 <h2 id="pinning-strategy">Pinning Strategy<a class="headerlink" href="#pinning-strategy" title="Permanent link">&para;</a></h2>
 <p>To ensure stability in your application, we strongly recommend pinning your dependency on SuperJWT. This prevents unexpected breaking changes from affecting your deployments.</p>
 <p>If you are using a <code>pyproject.toml</code> or <code>requirements.txt</code> file, <code>uv</code>, <code>poetry</code>, or <code>pip</code>, you should restrict the version range to the current minor version.</p>
 <p><strong>Example:</strong>
-If you start using SuperJWT at version <code>0.7.0</code>, pin it like this:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>superjwt&gt;=0.7.0,&lt;0.8.0
+If you start using SuperJWT at version <code>0.8.0</code>, pin it like this:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>superjwt&gt;=0.8.0,&lt;0.9.0
 </span></code></pre></div>
-<p>This configuration allows you to automatically receive bug fixes (e.g., <code>0.7.1</code>, <code>0.7.2</code>) but prevents upgrading to <code>0.8.0</code>, which might require code changes on your end.</p>
+<p>This configuration allows you to automatically receive bug fixes (e.g., <code>0.8.1</code>, <code>0.8.2</code>) but prevents upgrading to <code>0.9.0</code>, which might require code changes on your end.</p>
 <h2 id="how-to-upgrade">How to Upgrade<a class="headerlink" href="#how-to-upgrade" title="Permanent link">&para;</a></h2>
-<p>When you decide to upgrade to a new minor version (e.g., from <code>0.7.x</code> to <code>0.8.x</code>):</p>
+<p>When you decide to upgrade to a new minor version (e.g., from <code>0.8.x</code> to <code>0.9.x</code>):</p>
 <ol>
 <li><strong>Check the <a href="../changelog/">Changelog</a></strong> for any breaking changes or migration guides.</li>
-<li><strong>Update your dependency pin</strong> (e.g., change <code>superjwt&gt;=0.7.0,&lt;0.8.0</code> to <code>superjwt&gt;=0.8.0,&lt;0.9.0</code>).</li>
+<li><strong>Update your dependency pin</strong> (e.g., change <code>superjwt&gt;=0.8.0,&lt;0.9.0</code> to <code>superjwt&gt;=0.9.0,&lt;0.10.0</code>).</li>
 <li><strong>Run your test suite</strong>. SuperJWT has extensive test coverage, and we recommend you do the same for your integration code.</li>
 <li>If tests pass, you are good to go!</li>
 </ol>
