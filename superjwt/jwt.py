@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from superjwt.cache import CacheConfig
 from superjwt.exceptions import ClaimsValidationError
 from superjwt.jws import (
     JWSToken,
@@ -105,6 +106,7 @@ def decode(
     | Validation.Flags
     | None = Validation.DEFAULT,
     with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
+    cache: CacheConfig | None = None,
 ) -> JWTBaseModel:
     """Decode the JWT token with signature verification.
 
@@ -122,10 +124,34 @@ def decode(
             or None (no validation).
         with_detached_payload (JWTBaseModel | dict[str, Any] | None, opt.):
             Detached payload to use for signature verification, if any.
+        cache (CacheConfig | None, opt.): Cache configuration for improved decoding performance.
+            When enabled, caches the entire JWT decode process from compact token to final Pydantic model.
 
     Returns:
         JWSToken: a JWSToken instance representing the decoded and verified JWT token.
     """
+    from superjwt.cache import decode_from_cache_or_compute
+
+    return decode_from_cache_or_compute(
+        cache,
+        compact,
+        key,
+        algorithm,
+        validation,
+        headers_validation,
+        with_detached_payload,
+    )
+
+
+def _decode_jwt_uncached(
+    compact: bytes | str,
+    key: Key | bytes | str,
+    algorithm: Alg | str,
+    validation: type[JWTBaseModel] | ValidationConfig | Validation.Flags | None,
+    headers_validation: type[JOSEHeader] | ValidationConfig | Validation.Flags | None,
+    with_detached_payload: JWTBaseModel | dict[str, Any] | None = None,
+) -> JWTBaseModel:
+    """Perform full JWT decode without caching."""
 
     # CASE 1: detached payload mode
     if with_detached_payload is not None:
@@ -149,6 +175,8 @@ def decode(
             headers_validation=headers_validation,
         )
 
+        return claims_pydantic
+
     # CASE 2: normal mode
     else:
         # JWS decode
@@ -170,7 +198,7 @@ def decode(
         except ValidationError as e:
             raise ClaimsValidationError(validation_errors=e.errors()) from e
 
-    return claims_pydantic
+        return claims_pydantic
 
 
 def inspect(compact: bytes | str) -> JWSToken:

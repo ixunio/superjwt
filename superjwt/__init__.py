@@ -1,4 +1,5 @@
 from superjwt._version import __version__
+from superjwt.cache import CacheConfig, calculate_ttl
 from superjwt.jws import JWSToken
 from superjwt.jwt import decode, encode, inspect
 from superjwt.keys import ECKey, OctKey, OKPKey, RSAKey
@@ -16,6 +17,7 @@ from superjwt.validations import (
 
 __all__ = [
     "Alg",
+    "CacheConfig",
     "ECKey",
     "JOSEHeader",
     "JWSToken",
@@ -29,6 +31,7 @@ __all__ = [
     "Validation",
     "ValidationConfig",
     "__version__",
+    "calculate_ttl",
     "decode",
     "encode",
     "inspect",
