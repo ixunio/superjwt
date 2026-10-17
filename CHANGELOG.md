@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes (🐛)
+
+*Algorithm & Key*
+
+- :lock: HMAC key guard now detects PEM variants accepted by `cryptography` (whitespace before END marker, CR-only line endings, single-line PEM), preventing an asymmetric public key from being used as an HMAC secret. Same root cause as PyJWT [GHSA-ffc3-869f-jxw9](https://github.com/jpadilla/pyjwt/security/advisories/GHSA-ffc3-869f-jxw9)
+- `RSAKey`, `ECKey` and `OKPKey` now accept these PEM variants on import
+
 ## v0.8.0 (2026-01-29)
 
 ### Changes (♻️)
