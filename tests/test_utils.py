@@ -205,6 +205,48 @@ def test_is_pem_format():
     assert is_pem_format(pem_wrong) is False
 
 
+PEM_SAMPLE = (
+    b"-----BEGIN PUBLIC KEY-----\n"
+    b"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n"
+    b"-----END PUBLIC KEY-----\n"
+)
+
+
+@pytest.mark.parametrize(
+    "pem",
+    [
+        pytest.param(PEM_SAMPLE.replace(b"-----END", b"\t-----END"), id="tab-before-end"),
+        pytest.param(PEM_SAMPLE.replace(b"\n", b"\r"), id="cr-only"),
+        pytest.param(PEM_SAMPLE.replace(b"\n", b""), id="single-line"),
+        pytest.param(PEM_SAMPLE.replace(b"\n", b"\r\n"), id="crlf"),
+        pytest.param(b"  " + PEM_SAMPLE.replace(b"\n", b"\n  "), id="indented"),
+        pytest.param(b"-----BEGIN PUBLIC KEY-----" + PEM_SAMPLE, id="later-pem-block"),
+        pytest.param(b"-----END CERTIFICATE" + PEM_SAMPLE, id="overlapping-end-marker"),
+    ],
+)
+def test_is_pem_format_detects_loader_accepted_variants(pem: bytes):
+    """Regression GHSA-ffc3-869f-jxw9: PEM variants accepted by cryptography must be detected."""
+    assert is_pem_format(pem) is True
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        pytest.param(b"-----BEGIN PUBLIC KEY-----" * 10000, id="repeated-begin-only"),
+        pytest.param(
+            b"-----END PUBLIC KEY----------BEGIN PUBLIC KEY-----", id="end-before-begin"
+        ),
+        pytest.param(
+            b"-----BEGIN PUBLIC KEY-----\nabc\n-----END PRIVATE KEY-----",
+            id="mismatched-labels",
+        ),
+    ],
+)
+def test_is_pem_format_rejects_incomplete_markers(key: bytes):
+    """Test that incomplete or mismatched PEM markers are not detected as PEM."""
+    assert is_pem_format(key) is False
+
+
 def test_is_ssh_key():
     # Valid SSH keys
     assert is_ssh_key(b"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...") is True

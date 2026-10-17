@@ -6,8 +6,19 @@ import pytest
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+from superjwt import Alg, encode
 from superjwt.exceptions import InvalidKeyError, KeyLengthSecurityWarning, SuperJWTError
 from superjwt.keys import ECKey, OctKey, OKPKey, RSAKey
+
+
+# PEM reformattings accepted by the cryptography loader (GHSA-ffc3-869f-jxw9)
+PEM_MUTATIONS = [
+    pytest.param(
+        lambda pem: pem.replace(b"-----END", b"\t-----END"), id="tab-before-end"
+    ),
+    pytest.param(lambda pem: pem.replace(b"\n", b"\r"), id="cr-only"),
+    pytest.param(lambda pem: pem.replace(b"\n", b""), id="single-line"),
+]
 
 
 class TestOctKey:
@@ -51,6 +62,28 @@ MIIEpAIBAAKCAQEA4Z9v...
             match=r"asymmetric key or x509 certificate.*should not be used as an HMAC secret",
         ):
             OctKey.import_key(pem_key)
+
+    @pytest.mark.parametrize(
+        "key_pair_fixture", ["rsa_2048_key_pair", "ec_p256_key_pair"]
+    )
+    @pytest.mark.parametrize("mutation", PEM_MUTATIONS)
+    def test_oct_key_rejects_loader_accepted_pem_mutations(
+        self, request, key_pair_fixture, mutation
+    ):
+        """Regression GHSA-ffc3-869f-jxw9: a reformatted public key must not become an HMAC secret."""
+        public_pem = request.getfixturevalue(key_pair_fixture).public_pem
+        mutated_pem = mutation(public_pem)
+        # precondition: cryptography still loads the mutated PEM
+        serialization.load_pem_public_key(mutated_pem)
+
+        with pytest.raises(
+            InvalidKeyError, match=r"should not be used as an HMAC secret"
+        ):
+            OctKey.import_key(mutated_pem)
+        with pytest.raises(
+            InvalidKeyError, match=r"should not be used as an HMAC secret"
+        ):
+            encode({"sub": "admin"}, mutated_pem, Alg.HS256)
 
     def test_oct_key_rejects_ssh_key(self):
         """Test that SSH keys are rejected."""
@@ -206,6 +239,14 @@ class TestRSAKey:
         assert key.public_key == rsa_public_key_spki
         assert key._private_key_obj is None
         assert key._public_key_obj is not None
+
+    @pytest.mark.parametrize("mutation", PEM_MUTATIONS)
+    def test_rsa_key_import_public_key_loader_accepted_pem_mutations(
+        self, rsa_public_key_spki, mutation
+    ):
+        """Test that PEM reformattings accepted by cryptography are imported."""
+        key = RSAKey.import_public_key(mutation(rsa_public_key_spki))
+        assert isinstance(key._public_key_obj, rsa.RSAPublicKey)
 
     def test_rsa_key_get_private_key(self, rsa_private_key_pkcs1):
         """Test getting the private key object for signing."""
