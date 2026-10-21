@@ -82,6 +82,8 @@ exclude = [
     "__pycache__",
     "dev_*",
 ]
+# keep docs code blocks as written (ruff >= 0.17 formats Markdown)
+extend-exclude = ["*.md"]
 show-fixes = true
 
 [tool.ruff.format]

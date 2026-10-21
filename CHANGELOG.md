@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes (🐛)
+
+*Algorithm & Key*
+
+- PEM detection now matches what `cryptography` accepts (whitespace before END marker, CR-only line endings, single-line PEM): `OctKey` rejects such keys and `RSAKey`, `ECKey`, `OKPKey` accept them
+
 ## v0.8.0 (2026-01-29)
 
 ### Changes (♻️)

@@ -82,18 +82,28 @@ _PEMS = {
     b"X509 CRL",
 }
 
-_PEM_RE = re.compile(
-    b"----[- ]BEGIN ("
-    + b"|".join(_PEMS)
-    + b""")[- ]----\r?
-.+?\r?
-----[- ]END \\1[- ]----\r?\n?""",
-    re.DOTALL,
+# Match BEGIN/END markers anywhere (lookahead allows overlapping markers) rather than
+# requiring strict line layout: the cryptography loader accepts PEM variants (tab before
+# END, CR-only line endings, single-line) that a layout-strict regex would miss, which
+# would let a public key slip through as an HMAC secret (see GHSA-ffc3-869f-jxw9).
+_PEM_MARKER_RE = re.compile(
+    b"(?=(----[- ](BEGIN|END) (" + b"|".join(_PEMS) + b")[- ]----))"
 )
 
 
 def is_pem_format(key: bytes) -> bool:
-    return bool(_PEM_RE.search(key))
+    """Return True if key contains a BEGIN marker followed later by a matching END marker.
+
+    Single O(n) pass, no regex backtracking.
+    """
+    begin_markers: dict[bytes, int] = {}
+    for marker in _PEM_MARKER_RE.finditer(key):
+        marker_type, label = marker.group(2), marker.group(3)
+        if marker_type == b"BEGIN":
+            begin_markers[label] = marker.start(1) + len(marker.group(1))
+        elif label in begin_markers and begin_markers[label] < marker.start(1):
+            return True
+    return False
 
 
 # Based on https://github.com/pyca/cryptography/blob/bcb70852d577b3f490f015378c75cba74986297b/src/cryptography/hazmat/primitives/serialization/ssh.py#L40-L46
